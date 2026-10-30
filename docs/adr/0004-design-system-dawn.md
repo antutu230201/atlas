@@ -26,8 +26,15 @@
 
 ### 偏差与缓办
 
-- Storybook + axe 无障碍检查 + Playwright 视觉回归：列入阶段 1 收尾，本轮先以 `/design` 示例应用页作为验收面（它同时是文档要求的"设计系统自身的示例应用页"）。
 - Inter / 思源黑体自托管：暂用系统字体栈（预览一致），自托管在体验打磨阶段（阶段 4）随性能预算一起做。
+
+## 收尾记录（2026-10-31，阶段 1 关账）
+
+- Storybook 9 + @storybook/react-vite + addon-a11y/addon-docs 落地于 packages/ui，18 个故事覆盖全部组件；令牌经 `@tailwindcss/vite` 与应用侧同源。
+- **axe 无障碍门禁**（`pnpm a11y`）：遍历全部故事跑 axe，serious/critical 必须为零。首跑发现 10 处 color-contrast 问题（muted 文字 3.3:1、语义色 soft 配对 3.0~4.1:1）→ 亮色语义色整体加深达标（muted #6f6a60、ok #3a7346、warn #8f6208、err #b03a32、info #366585，neutral 徽标改深字）。暗色全部达标未改。
+- **视觉回归**（`pnpm visual`）：29 张故事级基线，`maxDiffPixelRatio 0.05`，按平台分目录存放。当前仅本地启用；推送到 GitHub 后在 CI 生成基线并开启门禁（避免首跑假红）。
+- CI：e2e job 追加 `pnpm --filter @atlas/ui a11y` 步骤。
+- Drawer / Toast / 命令面板外壳移入阶段 3（随应用外壳），表格虚拟滚动移入阶段 4。
 
 ## 后果
 
