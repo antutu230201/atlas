@@ -1,0 +1,145 @@
+/*
+ * ============================================================
+ * Atlas 设计令牌 · 唯一视觉来源（ADR-0004）
+ * 方向：晨白 Dawn —— 温暖纸感，靛蓝主色，8px 圆角，柔和阴影
+ * ============================================================
+ * 规则：
+ * 1. 业务代码禁止出现写死的颜色 / 圆角 / 阴影 / 时长，只允许引用
+ *    本文件暴露的语义令牌（bg-surface、text-muted、rounded-md …）。
+ * 2. 换风格只改本文件；换品牌只改 --atlas-brand-* 一组（白标预留）。
+ * 3. 主题三态：<html data-theme="light|dark|system">，
+ *    system 由下方媒体查询解析；首屏防闪烁脚本见 src/index.ts。
+ */
+
+/* dark: 变体跟随 data-theme（而非仅系统偏好），供个别场景使用 */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ---------- 品牌覆盖层（亮色默认值；企业白标改这里） ---------- */
+:root {
+  color-scheme: light;
+  --atlas-brand-primary: #4f5ddb;
+  --atlas-brand-primary-hover: #3f4bc4;
+  --atlas-brand-primary-soft: #eaecfc;
+  --atlas-brand-on-primary: #ffffff;
+}
+
+/* ---------- 语义令牌（亮色 = 默认主题） ---------- */
+@theme {
+  --color-bg: #faf7f1;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f5f0e6;
+  --color-text: #2d2a25;
+  --color-muted: #8b8478;
+  --color-border: #ebe4d7;
+
+  --color-primary: var(--atlas-brand-primary);
+  --color-primary-hover: var(--atlas-brand-primary-hover);
+  --color-primary-soft: var(--atlas-brand-primary-soft);
+  --color-on-primary: var(--atlas-brand-on-primary);
+
+  --color-ok: #4e8a5c;
+  --color-ok-soft: #e5f0e7;
+  --color-warn: #c08a1e;
+  --color-warn-soft: #f7eeda;
+  --color-err: #c14a42;
+  --color-err-soft: #f9e7e5;
+  --color-on-err: #ffffff;
+  --color-info: #4a7fa5;
+  --color-info-soft: #e6eff5;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-soft: 0 2px 10px rgba(60, 50, 30, 0.07);
+  --shadow-md: 0 6px 24px rgba(60, 50, 30, 0.1);
+  --shadow-lg: 0 16px 48px rgba(60, 50, 30, 0.14);
+
+  --font-sans:
+    'Inter', 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
+
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-out-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-overlay: 1200;
+  --z-modal: 1300;
+  --z-toast: 1400;
+}
+
+/* ---------- 暗色主题（晨白暗色 = 暖夜） ---------- */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: #1a1814;
+  --color-surface: #25221c;
+  --color-surface-hover: #2e2a22;
+  --color-text: #f1ede4;
+  --color-muted: #a59d8f;
+  --color-border: #3b352a;
+
+  --atlas-brand-primary: #98a2f2;
+  --atlas-brand-primary-hover: #afb7f5;
+  --atlas-brand-primary-soft: #2a2b44;
+  --atlas-brand-on-primary: #1d2145;
+
+  --color-ok: #8fc49b;
+  --color-ok-soft: #1f2b22;
+  --color-warn: #ddb36a;
+  --color-warn-soft: #2d2717;
+  --color-err: #e18b84;
+  --color-err-soft: #301e1c;
+  --color-on-err: #301e1c;
+  --color-info: #93bddc;
+  --color-info-soft: #1b252d;
+
+  --shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+/* system 主题：跟随系统偏好在两种取值间切换 */
+@media (prefers-color-scheme: dark) {
+  [data-theme='system'] {
+    color-scheme: dark;
+    --color-bg: #1a1814;
+    --color-surface: #25221c;
+    --color-surface-hover: #2e2a22;
+    --color-text: #f1ede4;
+    --color-muted: #a59d8f;
+    --color-border: #3b352a;
+
+    --atlas-brand-primary: #98a2f2;
+    --atlas-brand-primary-hover: #afb7f5;
+    --atlas-brand-primary-soft: #2a2b44;
+    --atlas-brand-on-primary: #1d2145;
+
+    --color-ok: #8fc49b;
+    --color-ok-soft: #1f2b22;
+    --color-warn: #ddb36a;
+    --color-warn-soft: #2d2717;
+    --color-err: #e18b84;
+    --color-err-soft: #301e1c;
+    --color-on-err: #301e1c;
+    --color-info: #93bddc;
+    --color-info-soft: #1b252d;
+
+    --shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* 减少动态效果：全局尊重系统设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

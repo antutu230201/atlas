@@ -1,0 +1,14 @@
+{
+  "name": "@atlas/tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atlas 设计令牌：全站唯一的视觉来源（色彩 / 字体 / 圆角 / 阴影 / 动效 / 层级）",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
