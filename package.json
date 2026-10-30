@@ -16,7 +16,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "e2e": "pnpm --filter @atlas/web e2e",
-    "prepare": "husky"
+    "prepare": "husky",
+    "a11y": "pnpm --filter @atlas/ui a11y",
+    "visual": "pnpm --filter @atlas/ui visual"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",

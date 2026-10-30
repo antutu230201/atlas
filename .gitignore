@@ -3,6 +3,7 @@ node_modules/
 dist/
 .next/
 .turbo/
+storybook-static/
 *.tsbuildinfo
 
 # 本地数据（内嵌 PostgreSQL 数据目录、本地磁盘存储，见 ADR-0002）

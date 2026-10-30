@@ -13,6 +13,8 @@ export default tseslint.config(
       '**/coverage/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      '**/storybook-static/**',
+      '**/__screenshots__/**',
       'apps/api/drizzle/**',
       'docs/**',
     ],

@@ -4,9 +4,9 @@ import { cn } from '../cn';
 
 export type BadgeVariant = 'neutral' | 'primary' | 'ok' | 'warn' | 'err' | 'info';
 
-/** 显式映射，保证 Tailwind 能静态扫描到全部类名 */
+/** 显式映射，保证 Tailwind 能静态扫描到全部类名（neutral 用深字保证对比度） */
 const badgeClasses: Record<BadgeVariant, string> = {
-  neutral: 'bg-border text-muted',
+  neutral: 'bg-border text-text',
   primary: 'bg-primary-soft text-primary',
   ok: 'bg-ok-soft text-ok',
   warn: 'bg-warn-soft text-warn',

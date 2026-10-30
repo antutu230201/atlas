@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+/* 与应用侧完全相同的令牌来源，保证 Storybook 与真实应用渲染一致 */
+@import '@atlas/tokens/tokens.css';
+
+@source '../src';
