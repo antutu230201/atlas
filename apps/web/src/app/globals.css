@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+
+/*
+ * 阶段 0 的占位样式：只允许使用 Tailwind 默认调色板。
+ * 设计令牌（packages/tokens）在阶段 1 第二步落地后，
+ * 全站样式必须切换为令牌引用，本文件只保留 Tailwind 入口。
+ */
