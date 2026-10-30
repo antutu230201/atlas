@@ -1,7 +1,6 @@
 @import 'tailwindcss';
+/* 设计令牌：全站唯一视觉来源（ADR-0004）。本文件除两行结构声明外不得出现任何视觉值。 */
+@import '@atlas/tokens/tokens.css';
 
-/*
- * 阶段 0 的占位样式：只允许使用 Tailwind 默认调色板。
- * 设计令牌（packages/tokens）在阶段 1 第二步落地后，
- * 全站样式必须切换为令牌引用，本文件只保留 Tailwind 入口。
- */
+/* 组件库以 TS 源码形态参与编译，其类名需纳入 Tailwind 扫描 */
+@source '../../../../packages/ui/src';

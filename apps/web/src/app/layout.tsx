@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { THEME_INIT_SCRIPT } from '@atlas/tokens';
+import { ThemeProvider } from '@atlas/ui';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -8,8 +10,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-CN">
-      <body className="min-h-screen bg-zinc-50 text-zinc-900 antialiased">{children}</body>
+    // suppressHydrationWarning：防闪烁脚本会在水合前改写 data-theme
+    <html lang="zh-CN" data-theme="system" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className="min-h-screen bg-bg font-sans text-text antialiased">
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

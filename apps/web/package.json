@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@atlas/sdk": "workspace:*",
+    "@atlas/tokens": "workspace:*",
+    "@atlas/ui": "workspace:*",
     "next": "^16.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
