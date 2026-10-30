@@ -1,0 +1,961 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atlas · 视觉方向选型（阶段 1 · 第一步）</title>
+    <style>
+      /* ============ 基础 ============ */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+        background: #eceef1;
+        color: #1b2733;
+        padding: 32px 20px 64px;
+      }
+      .page {
+        max-width: 1440px;
+        margin: 0 auto;
+      }
+      .page-head {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+      .page-head .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.25em;
+        color: #64748b;
+        font-weight: 600;
+      }
+      .page-head h1 {
+        font-size: 26px;
+        margin: 10px 0 8px;
+      }
+      .page-head p {
+        color: #4b5563;
+        font-size: 14px;
+        line-height: 1.7;
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      .global-controls {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin: 20px 0 32px;
+        flex-wrap: wrap;
+      }
+      .global-controls button {
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        color: #1b2733;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 13px;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .global-controls button:hover {
+        background: #f1f5f9;
+      }
+
+      /* ============ 三列布局 ============ */
+      .directions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 20px;
+        align-items: start;
+      }
+      @media (max-width: 1080px) {
+        .directions {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* 每个方向是一个独立作用域：.dir 决定方向，.mode-light / .mode-dark 决定主题 */
+      .dir {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid #d5dae1;
+      }
+      .dir .canvas {
+        padding: 24px;
+        transition: background 0.2s ease;
+      }
+      .dir-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .dir-head h2 {
+        font-size: 19px;
+      }
+      .dir-head .motto {
+        font-size: 13px;
+        margin-top: 6px;
+        line-height: 1.6;
+      }
+      .theme-toggle {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 5px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        font-family: inherit;
+        flex-shrink: 0;
+        transition: all var(--motion-dur) var(--motion-ease);
+      }
+      .spec {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      .spec span {
+        font-size: 11px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-weight: 500;
+      }
+      .section-label {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        font-weight: 700;
+        margin: 22px 0 10px;
+        color: var(--muted);
+      }
+
+      /* 色板 */
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 6px;
+      }
+      .swatch {
+        aspect-ratio: 1;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        position: relative;
+      }
+      .swatch i {
+        position: absolute;
+        left: 50%;
+        bottom: -16px;
+        transform: translateX(-50%);
+        font-style: normal;
+        font-size: 8.5px;
+        color: var(--muted);
+        white-space: nowrap;
+        font-family: Consolas, monospace;
+      }
+      .swatches {
+        margin-bottom: 18px;
+      }
+
+      /* 字体示例 */
+      .type-sample {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+      .type-sample .h {
+        font-family: var(--font-heading);
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .type-sample .b {
+        font-family: var(--font-body);
+        font-size: 13px;
+      }
+      .type-sample .n {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: Consolas, monospace;
+      }
+
+      /* ============ 组件（全部用变量驱动，三个方向共用结构） ============ */
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .btn {
+        font-family: var(--font-body);
+        font-size: 13px;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: var(--radius-sm);
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all var(--motion-dur) var(--motion-ease);
+      }
+      .btn:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: var(--on-primary);
+      }
+      .btn-primary:hover {
+        background: var(--primary-hover);
+      }
+      .btn-secondary {
+        background: var(--surface);
+        color: var(--text);
+        border-color: var(--border);
+      }
+      .btn-secondary:hover {
+        background: var(--hover-bg);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--primary);
+      }
+      .btn-ghost:hover {
+        background: var(--primary-soft);
+      }
+      .btn:disabled {
+        background: var(--disabled-bg);
+        color: var(--muted);
+        cursor: not-allowed;
+        border-color: transparent;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .field label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .field input {
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 9px 12px;
+        transition:
+          border-color var(--motion-dur) var(--motion-ease),
+          box-shadow var(--motion-dur) var(--motion-ease);
+      }
+      .field input::placeholder {
+        color: var(--muted);
+      }
+      .field input:focus-visible {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--ring);
+      }
+      .field.error input {
+        border-color: var(--err);
+      }
+      .field.error input:focus-visible {
+        box-shadow: 0 0 0 3px var(--err-soft);
+      }
+      .field .hint {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .field.error .hint {
+        color: var(--err);
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 16px;
+        box-shadow: var(--shadow);
+      }
+      .card h3 {
+        font-family: var(--font-heading);
+        font-size: 15px;
+        margin-bottom: 6px;
+      }
+      .card p {
+        font-size: 12.5px;
+        color: var(--muted);
+        line-height: 1.65;
+        margin-bottom: 10px;
+      }
+      .card a {
+        font-size: 12.5px;
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .card a:hover {
+        text-decoration: underline;
+      }
+
+      .table {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        background: var(--surface);
+      }
+      .trow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 14px;
+        font-size: 13px;
+        transition: background var(--motion-dur) var(--motion-ease);
+      }
+      .trow + .trow {
+        border-top: 1px solid var(--border);
+      }
+      .trow:hover {
+        background: var(--hover-bg);
+      }
+      .trow .name {
+        color: var(--text);
+      }
+      .trow .due {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .badge {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 10px;
+        border-radius: 999px;
+      }
+      .badge.ok {
+        color: var(--ok);
+        background: var(--ok-soft);
+      }
+      .badge.warn {
+        color: var(--warn);
+        background: var(--warn-soft);
+      }
+      .badge.err {
+        color: var(--err);
+        background: var(--err-soft);
+      }
+
+      dialog.dir-dialog {
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 22px;
+        width: min(400px, 90vw);
+        box-shadow: var(--shadow);
+        margin: auto; /* 通配符重置清掉了 UA 的 margin:auto，需显式恢复居中 */
+      }
+      dialog.dir-dialog::backdrop {
+        background: rgba(0, 0, 0, 0.45);
+      }
+      dialog.dir-dialog h3 {
+        font-family: var(--font-heading);
+        font-size: 16px;
+        margin-bottom: 8px;
+      }
+      dialog.dir-dialog p {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.7;
+        margin-bottom: 16px;
+      }
+      dialog.dir-dialog .row {
+        justify-content: flex-end;
+      }
+
+      /* ============ 方向一：墨玉 Ink ============ */
+      .dir-ink {
+        --radius-sm: 4px;
+        --radius-md: 6px;
+        --motion-dur: 120ms;
+        --motion-ease: ease-out;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        --font-heading: 'Songti SC', 'SimSun', 'Noto Serif SC', serif;
+        --font-body: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      }
+      .dir-ink .canvas,
+      .dir-ink dialog.dir-dialog {
+        font-family: var(--font-body);
+      }
+      .dir-ink .dir-head h2,
+      .dir-ink .card h3,
+      .dir-ink dialog.dir-dialog h3 {
+        font-family: var(--font-heading);
+      }
+      .dir-ink.mode-light {
+        --bg: #f6f6f4;
+        --surface: #ffffff;
+        --text: #1c1c1a;
+        --muted: #71716a;
+        --border: #e5e5e0;
+        --hover-bg: #f1f1ee;
+        --disabled-bg: #ecece8;
+        --primary: #9c6b14;
+        --primary-hover: #7e5510;
+        --on-primary: #ffffff;
+        --primary-soft: #f5ebd9;
+        --ring: rgba(156, 107, 20, 0.22);
+        --ok: #3e7b4f;
+        --ok-soft: #e5efe7;
+        --warn: #a66a12;
+        --warn-soft: #f6ecd9;
+        --err: #b3403a;
+        --err-soft: #f8e7e5;
+        --info: #3d6b8e;
+        --info-soft: #e6eef4;
+      }
+      .dir-ink.mode-dark {
+        --bg: #141412;
+        --surface: #1d1d1b;
+        --text: #ecece7;
+        --muted: #9c9c93;
+        --border: #30302c;
+        --hover-bg: #262623;
+        --disabled-bg: #2a2a27;
+        --primary: #d9a83c;
+        --primary-hover: #e5bc5c;
+        --on-primary: #191914;
+        --primary-soft: #2c2519;
+        --ring: rgba(217, 168, 60, 0.28);
+        --ok: #7cc08f;
+        --ok-soft: #1f2b22;
+        --warn: #dcac5c;
+        --warn-soft: #2d2517;
+        --err: #e08580;
+        --err-soft: #301d1c;
+        --info: #8fb3d1;
+        --info-soft: #1b242d;
+      }
+
+      /* ============ 方向二：晨白 Dawn ============ */
+      .dir-dawn {
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --motion-dur: 200ms;
+        --motion-ease: ease;
+        --shadow: 0 2px 10px rgba(60, 50, 30, 0.07);
+        --font-heading: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+        --font-body: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+      }
+      .dir-dawn.mode-light {
+        --bg: #faf7f1;
+        --surface: #ffffff;
+        --text: #2d2a25;
+        --muted: #8b8478;
+        --border: #ebe4d7;
+        --hover-bg: #f5f0e6;
+        --disabled-bg: #efe9dd;
+        --primary: #4f5ddb;
+        --primary-hover: #3f4bc4;
+        --on-primary: #ffffff;
+        --primary-soft: #eaecfc;
+        --ring: rgba(79, 93, 219, 0.2);
+        --ok: #4e8a5c;
+        --ok-soft: #e5f0e7;
+        --warn: #c08a1e;
+        --warn-soft: #f7eeda;
+        --err: #c14a42;
+        --err-soft: #f9e7e5;
+        --info: #4a7fa5;
+        --info-soft: #e6eff5;
+      }
+      .dir-dawn.mode-dark {
+        --bg: #1a1814;
+        --surface: #25221c;
+        --text: #f1ede4;
+        --muted: #a59d8f;
+        --border: #3b352a;
+        --hover-bg: #2e2a22;
+        --disabled-bg: #322e26;
+        --primary: #98a2f2;
+        --primary-hover: #afb7f5;
+        --on-primary: #1d2145;
+        --primary-soft: #2a2b44;
+        --ring: rgba(152, 162, 242, 0.3);
+        --ok: #8fc49b;
+        --ok-soft: #1f2b22;
+        --warn: #ddb36a;
+        --warn-soft: #2d2717;
+        --err: #e18b84;
+        --err-soft: #301e1c;
+        --info: #93bddc;
+        --info-soft: #1b252d;
+      }
+
+      /* ============ 方向三：石青 Slate ============ */
+      .dir-slate {
+        --radius-sm: 12px;
+        --radius-md: 16px;
+        --motion-dur: 250ms;
+        --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --shadow: 0 4px 16px rgba(15, 23, 32, 0.08);
+        --font-heading: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        --font-body: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      }
+      .dir-slate.mode-light {
+        --bg: #f3f5f8;
+        --surface: #ffffff;
+        --text: #1b2733;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --hover-bg: #eef2f6;
+        --disabled-bg: #e8edf2;
+        --primary: #0e7490;
+        --primary-hover: #0b5c73;
+        --on-primary: #ffffff;
+        --primary-soft: #e0f2f7;
+        --ring: rgba(14, 116, 144, 0.2);
+        --ok: #0e9f6e;
+        --ok-soft: #e0f5ec;
+        --warn: #d97706;
+        --warn-soft: #fdf0dc;
+        --err: #dc2626;
+        --err-soft: #fde8e8;
+        --info: #0284c7;
+        --info-soft: #e0f0fa;
+      }
+      .dir-slate.mode-dark {
+        --bg: #0f1720;
+        --surface: #17222d;
+        --text: #e6edf3;
+        --muted: #8b99ab;
+        --border: #27323e;
+        --hover-bg: #1e2a36;
+        --disabled-bg: #223040;
+        --primary: #2cb8ce;
+        --primary-hover: #55c9db;
+        --on-primary: #062028;
+        --primary-soft: #123840;
+        --ring: rgba(44, 184, 206, 0.3);
+        --ok: #4ade80;
+        --ok-soft: #12291b;
+        --warn: #fbbf24;
+        --warn-soft: #2c2312;
+        --err: #f87171;
+        --err-soft: #2d1414;
+        --info: #38bdf8;
+        --info-soft: #10222f;
+      }
+
+      .canvas,
+      .trow,
+      .card,
+      .table {
+        background: var(--bg);
+      }
+      .card,
+      .table,
+      .trow {
+        background: var(--surface);
+      }
+      .dir .canvas {
+        background: var(--bg);
+        color: var(--text);
+      }
+      .dir .dir-head h2,
+      .dir .dir-head .motto {
+        color: var(--text);
+      }
+      .dir .dir-head .motto {
+        color: var(--muted);
+      }
+      .dir .theme-toggle {
+        background: var(--surface);
+        color: var(--text);
+        border-color: var(--border);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+          animation: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-head">
+        <p class="eyebrow">ATLAS · 阶段 1 · 第一步</p>
+        <h1>视觉方向选型</h1>
+        <p>
+          三套方向都遵循"专业、克制、高级、长期耐看"的气质，差异在于性格。每套展示同一批五个组件
+          （按钮、输入框、卡片、表格行、弹窗）在亮色与暗色主题下的完整状态。选定后，令牌将写入
+          packages/tokens，全站锁定；今后换风格只改令牌。
+        </p>
+        <div class="global-controls">
+          <button id="all-light" type="button">全部切亮色</button>
+          <button id="all-dark" type="button">全部切暗色</button>
+        </div>
+      </header>
+
+      <div class="directions">
+        <!-- ================= 方向一：墨玉 Ink ================= -->
+        <section class="dir dir-ink mode-light" id="dir-ink">
+          <div class="canvas">
+            <div class="dir-head">
+              <div>
+                <h2>墨玉 Ink</h2>
+                <p class="motto">
+                  沉稳克制，工具感 —— 像一台可靠的精密仪器，深青黑中性色配琥珀强调。
+                </p>
+              </div>
+              <button class="theme-toggle" type="button" data-dir="dir-ink">切到暗色</button>
+            </div>
+            <div class="spec">
+              <span>圆角 4px</span><span>动效 120ms</span><span>极轻阴影</span><span>衬线标题</span>
+            </div>
+
+            <p class="section-label">色板（当前主题）</p>
+            <div class="swatches">
+              <div class="swatch" style="background: var(--bg)"><i>bg</i></div>
+              <div class="swatch" style="background: var(--surface)"><i>surface</i></div>
+              <div class="swatch" style="background: var(--border)"><i>border</i></div>
+              <div class="swatch" style="background: var(--muted)"><i>muted</i></div>
+              <div class="swatch" style="background: var(--primary)"><i>primary</i></div>
+              <div class="swatch" style="background: var(--ok)"><i>ok</i></div>
+              <div class="swatch" style="background: var(--warn)"><i>warn</i></div>
+              <div class="swatch" style="background: var(--err)"><i>err</i></div>
+            </div>
+
+            <p class="section-label">字体（宋体标题 + 黑体正文）</p>
+            <div class="type-sample">
+              <div class="h">长期主义，复利生长</div>
+              <div class="b">正文使用无衬线字体，保证长时间阅读的舒适度与信息密度。</div>
+              <div class="n">
+                标题：Songti SC / SimSun · 正文：PingFang SC / Microsoft YaHei（正式落地将自托管
+                Inter + 思源）
+              </div>
+            </div>
+
+            <p class="section-label">按钮</p>
+            <div class="stack">
+              <div class="row">
+                <button class="btn btn-primary" type="button">主按钮</button>
+                <button class="btn btn-secondary" type="button">次级按钮</button>
+                <button class="btn btn-ghost" type="button">幽灵按钮</button>
+                <button class="btn btn-primary" type="button" disabled>禁用</button>
+              </div>
+
+              <div class="field">
+                <label for="ink-input">记一件事</label>
+                <input id="ink-input" type="text" placeholder="记录今天的一件小事…" />
+                <span class="hint">聚焦时有 2px 外圈 + 柔和光环</span>
+              </div>
+              <div class="field error">
+                <label for="ink-input-err">再试一次</label>
+                <input id="ink-input-err" type="text" value="" placeholder="内容不能为空" />
+                <span class="hint">内容不能为空</span>
+              </div>
+
+              <div class="card">
+                <h3>本周回顾</h3>
+                <p>
+                  你完成了 12 件待办，写下了 3 篇笔记，连续打卡 5
+                  天。按这个节奏，月度目标可以如期达成。
+                </p>
+                <a href="#" onclick="return false;">查看详情 →</a>
+              </div>
+
+              <div class="table">
+                <div class="trow">
+                  <span class="name">整理季度复盘</span><span class="badge warn">进行中</span>
+                </div>
+                <div class="trow">
+                  <span class="name">晨间跑步 5km</span><span class="badge ok">已完成</span>
+                </div>
+                <div class="trow">
+                  <span class="name">提交项目周报</span><span class="badge err">已逾期</span>
+                </div>
+              </div>
+
+              <div class="row">
+                <button class="btn btn-secondary" type="button" data-dialog="ink-dialog">
+                  打开弹窗示例
+                </button>
+              </div>
+            </div>
+          </div>
+          <dialog class="dir-dialog" id="ink-dialog">
+            <h3>确认归档？</h3>
+            <p>归档后这条记录会移入档案库，仍可搜索与恢复。此操作会记入审计日志。</p>
+            <div class="row">
+              <button class="btn btn-ghost" type="button" data-close>取消</button>
+              <button class="btn btn-primary" type="button" data-close>确认归档</button>
+            </div>
+          </dialog>
+        </section>
+
+        <!-- ================= 方向二：晨白 Dawn ================= -->
+        <section class="dir dir-dawn mode-light" id="dir-dawn">
+          <div class="canvas">
+            <div class="dir-head">
+              <div>
+                <h2>晨白 Dawn</h2>
+                <p class="motto">
+                  温暖纸感，日常陪伴 —— 像一本摊开的纸质手账，暖白纸底配靛蓝主色。
+                </p>
+              </div>
+              <button class="theme-toggle" type="button" data-dir="dir-dawn">切到暗色</button>
+            </div>
+            <div class="spec">
+              <span>圆角 8px</span><span>动效 200ms</span><span>柔和阴影</span><span>全无衬线</span>
+            </div>
+
+            <p class="section-label">色板（当前主题）</p>
+            <div class="swatches">
+              <div class="swatch" style="background: var(--bg)"><i>bg</i></div>
+              <div class="swatch" style="background: var(--surface)"><i>surface</i></div>
+              <div class="swatch" style="background: var(--border)"><i>border</i></div>
+              <div class="swatch" style="background: var(--muted)"><i>muted</i></div>
+              <div class="swatch" style="background: var(--primary)"><i>primary</i></div>
+              <div class="swatch" style="background: var(--ok)"><i>ok</i></div>
+              <div class="swatch" style="background: var(--warn)"><i>warn</i></div>
+              <div class="swatch" style="background: var(--err)"><i>err</i></div>
+            </div>
+
+            <p class="section-label">字体（全无衬线，圆润友好）</p>
+            <div class="type-sample">
+              <div class="h">长期主义，复利生长</div>
+              <div class="b">正文使用无衬线字体，保证长时间阅读的舒适度与信息密度。</div>
+              <div class="n">
+                标题与正文统一：PingFang SC / Microsoft YaHei（正式落地将自托管 Inter + 思源黑体）
+              </div>
+            </div>
+
+            <p class="section-label">按钮</p>
+            <div class="stack">
+              <div class="row">
+                <button class="btn btn-primary" type="button">主按钮</button>
+                <button class="btn btn-secondary" type="button">次级按钮</button>
+                <button class="btn btn-ghost" type="button">幽灵按钮</button>
+                <button class="btn btn-primary" type="button" disabled>禁用</button>
+              </div>
+
+              <div class="field">
+                <label for="dawn-input">记一件事</label>
+                <input id="dawn-input" type="text" placeholder="记录今天的一件小事…" />
+                <span class="hint">聚焦时有 2px 外圈 + 柔和光环</span>
+              </div>
+              <div class="field error">
+                <label for="dawn-input-err">再试一次</label>
+                <input id="dawn-input-err" type="text" value="" placeholder="内容不能为空" />
+                <span class="hint">内容不能为空</span>
+              </div>
+
+              <div class="card">
+                <h3>本周回顾</h3>
+                <p>
+                  你完成了 12 件待办，写下了 3 篇笔记，连续打卡 5
+                  天。按这个节奏，月度目标可以如期达成。
+                </p>
+                <a href="#" onclick="return false;">查看详情 →</a>
+              </div>
+
+              <div class="table">
+                <div class="trow">
+                  <span class="name">整理季度复盘</span><span class="badge warn">进行中</span>
+                </div>
+                <div class="trow">
+                  <span class="name">晨间跑步 5km</span><span class="badge ok">已完成</span>
+                </div>
+                <div class="trow">
+                  <span class="name">提交项目周报</span><span class="badge err">已逾期</span>
+                </div>
+              </div>
+
+              <div class="row">
+                <button class="btn btn-secondary" type="button" data-dialog="dawn-dialog">
+                  打开弹窗示例
+                </button>
+              </div>
+            </div>
+          </div>
+          <dialog class="dir-dialog" id="dawn-dialog">
+            <h3>确认归档？</h3>
+            <p>归档后这条记录会移入档案库，仍可搜索与恢复。此操作会记入审计日志。</p>
+            <div class="row">
+              <button class="btn btn-ghost" type="button" data-close>取消</button>
+              <button class="btn btn-primary" type="button" data-close>确认归档</button>
+            </div>
+          </dialog>
+        </section>
+
+        <!-- ================= 方向三：石青 Slate ================= -->
+        <section class="dir dir-slate mode-light" id="dir-slate">
+          <div class="canvas">
+            <div class="dir-head">
+              <div>
+                <h2>石青 Slate</h2>
+                <p class="motto">冷静几何，轻快现代 —— 冷灰蓝画布配石青主色，大圆角与轻盈动效。</p>
+              </div>
+              <button class="theme-toggle" type="button" data-dir="dir-slate">切到暗色</button>
+            </div>
+            <div class="spec">
+              <span>圆角 12px</span><span>动效 250ms</span><span>轻盈阴影</span
+              ><span>几何无衬线</span>
+            </div>
+
+            <p class="section-label">色板（当前主题）</p>
+            <div class="swatches">
+              <div class="swatch" style="background: var(--bg)"><i>bg</i></div>
+              <div class="swatch" style="background: var(--surface)"><i>surface</i></div>
+              <div class="swatch" style="background: var(--border)"><i>border</i></div>
+              <div class="swatch" style="background: var(--muted)"><i>muted</i></div>
+              <div class="swatch" style="background: var(--primary)"><i>primary</i></div>
+              <div class="swatch" style="background: var(--ok)"><i>ok</i></div>
+              <div class="swatch" style="background: var(--warn)"><i>warn</i></div>
+              <div class="swatch" style="background: var(--err)"><i>err</i></div>
+            </div>
+
+            <p class="section-label">字体（几何感无衬线）</p>
+            <div class="type-sample">
+              <div class="h">长期主义，复利生长</div>
+              <div class="b">正文使用无衬线字体，保证长时间阅读的舒适度与信息密度。</div>
+              <div class="n">
+                标题与正文：Segoe UI / PingFang SC（正式落地将自托管 Inter + 思源黑体）
+              </div>
+            </div>
+
+            <p class="section-label">按钮</p>
+            <div class="stack">
+              <div class="row">
+                <button class="btn btn-primary" type="button">主按钮</button>
+                <button class="btn btn-secondary" type="button">次级按钮</button>
+                <button class="btn btn-ghost" type="button">幽灵按钮</button>
+                <button class="btn btn-primary" type="button" disabled>禁用</button>
+              </div>
+
+              <div class="field">
+                <label for="slate-input">记一件事</label>
+                <input id="slate-input" type="text" placeholder="记录今天的一件小事…" />
+                <span class="hint">聚焦时有 2px 外圈 + 柔和光环</span>
+              </div>
+              <div class="field error">
+                <label for="slate-input-err">再试一次</label>
+                <input id="slate-input-err" type="text" value="" placeholder="内容不能为空" />
+                <span class="hint">内容不能为空</span>
+              </div>
+
+              <div class="card">
+                <h3>本周回顾</h3>
+                <p>
+                  你完成了 12 件待办，写下了 3 篇笔记，连续打卡 5
+                  天。按这个节奏，月度目标可以如期达成。
+                </p>
+                <a href="#" onclick="return false;">查看详情 →</a>
+              </div>
+
+              <div class="table">
+                <div class="trow">
+                  <span class="name">整理季度复盘</span><span class="badge warn">进行中</span>
+                </div>
+                <div class="trow">
+                  <span class="name">晨间跑步 5km</span><span class="badge ok">已完成</span>
+                </div>
+                <div class="trow">
+                  <span class="name">提交项目周报</span><span class="badge err">已逾期</span>
+                </div>
+              </div>
+
+              <div class="row">
+                <button class="btn btn-secondary" type="button" data-dialog="slate-dialog">
+                  打开弹窗示例
+                </button>
+              </div>
+            </div>
+          </div>
+          <dialog class="dir-dialog" id="slate-dialog">
+            <h3>确认归档？</h3>
+            <p>归档后这条记录会移入档案库，仍可搜索与恢复。此操作会记入审计日志。</p>
+            <div class="row">
+              <button class="btn btn-ghost" type="button" data-close>取消</button>
+              <button class="btn btn-primary" type="button" data-close>确认归档</button>
+            </div>
+          </dialog>
+        </section>
+      </div>
+
+      <footer
+        style="
+          margin-top: 40px;
+          text-align: center;
+          color: #64748b;
+          font-size: 13px;
+          line-height: 1.8;
+        "
+      >
+        <p>选型方法：把每个方向都切到亮 / 暗各看一遍，重点看"你愿意每天盯着的那个"。</p>
+        <p>
+          决定后告诉 Agent 方向名（例如"选墨玉 Ink"），即可进入阶段 1 第二步 ——
+          完整设计令牌与组件库。
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      // 每列独立主题切换
+      document.querySelectorAll('.theme-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var dir = document.getElementById(btn.dataset.dir);
+          var dark = dir.classList.toggle('mode-dark');
+          dir.classList.toggle('mode-light', !dark);
+          btn.textContent = dark ? '切到亮色' : '切到暗色';
+        });
+      });
+      // 全局切换
+      function setAll(mode) {
+        ['dir-ink', 'dir-dawn', 'dir-slate'].forEach(function (id) {
+          var dir = document.getElementById(id);
+          dir.classList.remove('mode-light', 'mode-dark');
+          dir.classList.add(mode);
+          var btn = dir.querySelector('.theme-toggle');
+          btn.textContent = mode === 'mode-dark' ? '切到亮色' : '切到暗色';
+        });
+      }
+      document.getElementById('all-light').addEventListener('click', function () {
+        setAll('mode-light');
+      });
+      document.getElementById('all-dark').addEventListener('click', function () {
+        setAll('mode-dark');
+      });
+      // 弹窗
+      document.querySelectorAll('[data-dialog]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.getElementById(btn.dataset.dialog).showModal();
+        });
+      });
+      document.querySelectorAll('[data-close]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          btn.closest('dialog').close();
+        });
+      });
+    </script>
+  </body>
+</html>
