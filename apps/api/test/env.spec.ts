@@ -7,7 +7,9 @@ describe('parseEnv', () => {
     expect(env.PORT).toBe(3001);
     expect(env.NODE_ENV).toBe('development');
     expect(env.EMBEDDED_PG).toBe(true);
-    expect(env.DATABASE_URL).toBe('postgres://atlas:atlas@localhost:5432/atlas');
+    expect(env.DATABASE_URL).toBe('postgres://atlas_app:atlas_app@localhost:5432/atlas');
+    expect(env.DATABASE_URL_ADMIN).toBe('postgres://atlas:atlas@localhost:5432/atlas');
+    expect(env.SESSION_TTL_DAYS).toBe(30);
     expect(env.CORS_ORIGIN).toBe('http://localhost:3000');
   });
 
