@@ -29,7 +29,8 @@
   --color-surface: #ffffff;
   --color-surface-hover: #f5f0e6;
   --color-text: #2d2a25;
-  --color-muted: #8b8478;
+  /* muted 曾为 #8b8478，在 12px 字号下对比度 3.3:1 不达 WCAG AA，加深至 4.7:1（axe 门禁发现） */
+  --color-muted: #6f6a60;
   --color-border: #ebe4d7;
 
   --color-primary: var(--atlas-brand-primary);
@@ -37,14 +38,15 @@
   --color-primary-soft: var(--atlas-brand-primary-soft);
   --color-on-primary: var(--atlas-brand-on-primary);
 
-  --color-ok: #4e8a5c;
+  /* 语义色同样为对比度达标做过加深（soft 底色不变） */
+  --color-ok: #3a7346;
   --color-ok-soft: #e5f0e7;
-  --color-warn: #c08a1e;
+  --color-warn: #8f6208;
   --color-warn-soft: #f7eeda;
-  --color-err: #c14a42;
+  --color-err: #b03a32;
   --color-err-soft: #f9e7e5;
   --color-on-err: #ffffff;
-  --color-info: #4a7fa5;
+  --color-info: #366585;
   --color-info-soft: #e6eff5;
 
   --radius-xs: 4px;
