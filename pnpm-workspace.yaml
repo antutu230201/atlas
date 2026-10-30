@@ -1,0 +1,9 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'modules/*'
+
+# pnpm 12 起安全默认拦截依赖构建脚本；这里放行确需脚本的可信依赖（ADR-0002）
+allowBuilds:
+  '@embedded-postgres/windows-x64': true
+  esbuild: true

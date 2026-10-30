@@ -1,0 +1,10 @@
+node_modules
+dist
+.next
+.turbo
+coverage
+.local
+pnpm-lock.yaml
+playwright-report
+test-results
+docs/design/总体设计（原始）.md

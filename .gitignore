@@ -1,0 +1,24 @@
+# 依赖与构建产物
+node_modules/
+dist/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# 本地数据（内嵌 PostgreSQL 数据目录、本地磁盘存储，见 ADR-0002）
+.local/
+
+# 环境变量（仓库只提交 .env.example）
+.env
+.env.local
+.env.*.local
+
+# 测试与覆盖率
+coverage/
+playwright-report/
+test-results/
+
+# 编辑器与系统文件
+.DS_Store
+Thumbs.db
+.zcode/
