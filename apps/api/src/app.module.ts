@@ -1,26 +1,50 @@
 import { Module } from '@nestjs/common';
 import type { HealthProbe } from '@atlas/core';
+import { provideAuditInterceptor, AuditService } from './audit/audit.service';
+import { AuthController } from './auth/auth.controller';
+import { AuthService } from './auth/auth.service';
+import { RateLimitService } from './auth/rate-limit.service';
+import { SessionService } from './auth/session.service';
 import { createDb, type Db } from './db/client';
 import type { ApiEnv } from './env';
 import { loadEnv } from './env';
 import { buildProbes } from './infra/probes';
 import { HealthController } from './modules/health/health.controller';
 import { HealthService } from './modules/health/health.service';
-import { API_VERSION, DB_TOKEN, ENV_TOKEN, PROBES_TOKEN } from './tokens';
+import { WorkspaceController } from './workspace/workspace.controller';
+import { WorkspaceService } from './workspace/workspace.service';
+import {
+  API_VERSION,
+  ADMIN_DB_TOKEN,
+  AUDIT_SERVICE_TOKEN,
+  AUTH_SERVICE_TOKEN,
+  DB_TOKEN,
+  ENV_TOKEN,
+  HEALTH_SERVICE_TOKEN,
+  PROBES_TOKEN,
+  RATE_LIMIT_SERVICE_TOKEN,
+  SESSION_SERVICE_TOKEN,
+  WORKSPACE_SERVICE_TOKEN,
+} from './tokens';
 
 /**
- * 阶段 0 的应用模块：只有健康检查一个功能。
- * 阶段 2 的内核（账号、工作空间、模块系统、事件总线……）从这里长出来，
- * 且必须以"新增模块"的方式生长，不改已有文件（AGENTS.md 架构铁律）。
+ * 阶段 2a 内核应用模块（ADR-0005）：
+ * 健康检查 + 认证 + 工作空间/成员 + 审计。
+ * 所有依赖注入使用显式 @Inject(token)（esbuild 兼容约定，见 tokens.ts）。
  */
 @Module({
-  controllers: [HealthController],
+  controllers: [HealthController, AuthController, WorkspaceController],
   providers: [
     { provide: ENV_TOKEN, useFactory: loadEnv },
     {
       provide: DB_TOKEN,
       inject: [ENV_TOKEN],
       useFactory: (env: ApiEnv) => createDb(env.DATABASE_URL),
+    },
+    {
+      provide: ADMIN_DB_TOKEN,
+      inject: [ENV_TOKEN],
+      useFactory: (env: ApiEnv) => createDb(env.DATABASE_URL_ADMIN),
     },
     {
       provide: PROBES_TOKEN,
@@ -32,6 +56,32 @@ import { API_VERSION, DB_TOKEN, ENV_TOKEN, PROBES_TOKEN } from './tokens';
       inject: [DB_TOKEN, PROBES_TOKEN],
       useFactory: (db: Db, probes: HealthProbe[]) => new HealthService(db, probes, API_VERSION),
     },
+    { provide: SessionService, useFactory: (db: Db) => new SessionService(db), inject: [DB_TOKEN] },
+    { provide: RateLimitService, useFactory: () => new RateLimitService() },
+    {
+      provide: AuditService,
+      useFactory: (db: Db) => new AuditService(db),
+      inject: [DB_TOKEN],
+    },
+    {
+      provide: AuthService,
+      useFactory: (db: Db, adminDb: Db, sessions: SessionService) =>
+        new AuthService(db, adminDb, sessions),
+      inject: [DB_TOKEN, ADMIN_DB_TOKEN, SESSION_SERVICE_TOKEN],
+    },
+    {
+      provide: WorkspaceService,
+      useFactory: (db: Db, audit: AuditService, sessions: SessionService) =>
+        new WorkspaceService(db, audit, sessions),
+      inject: [DB_TOKEN, AUDIT_SERVICE_TOKEN, SESSION_SERVICE_TOKEN],
+    },
+    { provide: SESSION_SERVICE_TOKEN, useExisting: SessionService },
+    { provide: RATE_LIMIT_SERVICE_TOKEN, useExisting: RateLimitService },
+    { provide: AUTH_SERVICE_TOKEN, useExisting: AuthService },
+    { provide: AUDIT_SERVICE_TOKEN, useExisting: AuditService },
+    { provide: WORKSPACE_SERVICE_TOKEN, useExisting: WorkspaceService },
+    { provide: HEALTH_SERVICE_TOKEN, useExisting: HealthService },
+    provideAuditInterceptor(),
   ],
 })
 export class AppModule {}
