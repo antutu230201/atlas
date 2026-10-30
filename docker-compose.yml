@@ -1,0 +1,52 @@
+# 备用完整形态的基础设施（ADR-0002）
+#
+# 当前本地开发默认使用"免 Docker 本地栈"（embedded-postgres + 进程内适配器），
+# 本文件在安装 Docker Desktop 后启用：
+#   1. docker compose up -d
+#   2. apps/api/.env 中设置 EMBEDDED_PG=false（DATABASE_URL 保持默认即可对上）
+#
+# 数据卷为 Docker 命名卷，与 .local/ 内嵌数据互相独立，切换前注意备份。
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: atlas-postgres
+    environment:
+      POSTGRES_USER: atlas
+      POSTGRES_PASSWORD: atlas
+      POSTGRES_DB: atlas
+    ports:
+      - '5432:5432'
+    volumes:
+      - atlas-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U atlas']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: atlas-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - atlas-redisdata:/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: atlas-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: atlas
+      MINIO_ROOT_PASSWORD: atlas-minio
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - atlas-miniodata:/data
+
+volumes:
+  atlas-pgdata:
+  atlas-redisdata:
+  atlas-miniodata:
