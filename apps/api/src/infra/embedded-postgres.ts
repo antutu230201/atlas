@@ -28,13 +28,15 @@ function isPortOpen(host: string, port: number, timeoutMs = 800): Promise<boolea
  * 2. 目标端口已有实例在监听 → 直接复用（上次遗留的实例 / 手动启动的 PG）；
  * 3. 否则用 embedded-postgres 拉起本地 PostgreSQL 18，
  *    数据目录 apps/api/.local/pgdata（gitignore，可随时删除重建）。
+ * 内嵌实例以管理员身份（DATABASE_URL_ADMIN）启动与建库；应用运行时另用受 RLS
+ * 约束的 atlas_app 角色（DATABASE_URL，见 ADR-0005 §4）。
  */
 export async function startEmbeddedPostgres(env: ApiEnv): Promise<EmbeddedPostgresHandle> {
   if (!env.EMBEDDED_PG) {
     return IDLE_HANDLE;
   }
 
-  const url = new URL(env.DATABASE_URL);
+  const url = new URL(env.DATABASE_URL_ADMIN);
   const host = url.hostname || 'localhost';
   const port = Number(url.port || 5432);
   const user = url.username || 'atlas';

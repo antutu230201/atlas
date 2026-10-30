@@ -10,7 +10,10 @@ import { z } from 'zod';
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
-  DATABASE_URL: z.url().default('postgres://atlas:atlas@localhost:5432/atlas'),
+  /** 应用运行时连接（受 RLS 约束的 atlas_app 角色，ADR-0005 §4） */
+  DATABASE_URL: z.url().default('postgres://atlas_app:atlas_app@localhost:5432/atlas'),
+  /** 迁移与管理连接（embedded-postgres 初始化的 atlas 用户） */
+  DATABASE_URL_ADMIN: z.url().default('postgres://atlas:atlas@localhost:5432/atlas'),
   /** true 时由 API 进程拉起内嵌 PostgreSQL（ADR-0002）；连接外部 PG 时设为 false */
   EMBEDDED_PG: z
     .string()
@@ -22,6 +25,8 @@ const envSchema = z.object({
   STORAGE_DIR: z.string().default('.local/storage'),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  /** 会话有效期（天） */
+  SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
 });
 
 export type ApiEnv = z.infer<typeof envSchema>;

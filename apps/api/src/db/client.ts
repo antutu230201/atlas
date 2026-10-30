@@ -9,3 +9,12 @@ export function createDb(databaseUrl: string): Db {
   const pool = new Pool({ connectionString: databaseUrl, max: 5 });
   return drizzle(pool, { schema });
 }
+
+/** 带连接池句柄的变体：迁移/测试用完可显式释放 */
+export function createManagedDb(databaseUrl: string): {
+  db: Db;
+  end: () => Promise<void>;
+} {
+  const pool = new Pool({ connectionString: databaseUrl, max: 5 });
+  return { db: drizzle(pool, { schema }), end: () => pool.end() };
+}

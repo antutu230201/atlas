@@ -8,6 +8,20 @@
       "when": 1793374484143,
       "tag": "0000_tough_proemial_gods",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793385609959,
+      "tag": "0001_nosy_rafael_vega",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793385611146,
+      "tag": "0002_rls-policies",
+      "breakpoints": true
     }
   ]
 }
