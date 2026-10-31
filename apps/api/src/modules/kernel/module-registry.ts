@@ -47,7 +47,9 @@ export class ModuleRegistryService {
     for (const packageName of packageNames) {
       const mod = (await import(packageName)) as { definition?: unknown };
       const definition = this.parseDefinition(mod, packageName);
-      const pkgDir = path.dirname(require.resolve(`${packageName}/package.json`));
+      // 主入口（dist/index.js）上溯两级到包根 —— 不依赖 exports 是否放行 package.json
+      const entryPath = require.resolve(packageName);
+      const pkgDir = path.dirname(path.dirname(entryPath));
       map.set(definition.manifest.name, {
         packageName,
         definition,
