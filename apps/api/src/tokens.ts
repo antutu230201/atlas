@@ -19,6 +19,8 @@ export const RATE_LIMIT_SERVICE_TOKEN = Symbol('RATE_LIMIT_SERVICE');
 export const AUTH_SERVICE_TOKEN = Symbol('AUTH_SERVICE');
 export const AUDIT_SERVICE_TOKEN = Symbol('AUDIT_SERVICE');
 export const WORKSPACE_SERVICE_TOKEN = Symbol('WORKSPACE_SERVICE');
+export const MODULE_REGISTRY_SERVICE_TOKEN = Symbol('MODULE_REGISTRY_SERVICE');
+export const MODULE_SERVICE_TOKEN = Symbol('MODULE_SERVICE');
 
 /** 会话 Cookie 名；令牌明文只在 Cookie，库存 sha256 */
 export const SESSION_COOKIE = 'atlas_session';

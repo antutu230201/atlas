@@ -9,6 +9,9 @@ import { createDb, type Db } from './db/client';
 import type { ApiEnv } from './env';
 import { loadEnv } from './env';
 import { buildProbes } from './infra/probes';
+import { ModuleController } from './modules/kernel/module.controller';
+import { ModuleRegistryService } from './modules/kernel/module-registry';
+import { ModuleService } from './modules/kernel/module.service';
 import { HealthController } from './modules/health/health.controller';
 import { HealthService } from './modules/health/health.service';
 import { WorkspaceController } from './workspace/workspace.controller';
@@ -21,6 +24,8 @@ import {
   DB_TOKEN,
   ENV_TOKEN,
   HEALTH_SERVICE_TOKEN,
+  MODULE_REGISTRY_SERVICE_TOKEN,
+  MODULE_SERVICE_TOKEN,
   PROBES_TOKEN,
   RATE_LIMIT_SERVICE_TOKEN,
   SESSION_SERVICE_TOKEN,
@@ -33,7 +38,7 @@ import {
  * 所有依赖注入使用显式 @Inject(token)（esbuild 兼容约定，见 tokens.ts）。
  */
 @Module({
-  controllers: [HealthController, AuthController, WorkspaceController],
+  controllers: [HealthController, AuthController, WorkspaceController, ModuleController],
   providers: [
     { provide: ENV_TOKEN, useFactory: loadEnv },
     {
@@ -75,6 +80,15 @@ import {
         new WorkspaceService(db, audit, sessions),
       inject: [DB_TOKEN, AUDIT_SERVICE_TOKEN, SESSION_SERVICE_TOKEN],
     },
+    { provide: ModuleRegistryService, useFactory: () => new ModuleRegistryService() },
+    {
+      provide: ModuleService,
+      useFactory: (db: Db, adminDb: Db, audit: AuditService, registry: ModuleRegistryService) =>
+        new ModuleService(db, adminDb, audit, registry),
+      inject: [DB_TOKEN, ADMIN_DB_TOKEN, AUDIT_SERVICE_TOKEN, MODULE_REGISTRY_SERVICE_TOKEN],
+    },
+    { provide: MODULE_REGISTRY_SERVICE_TOKEN, useExisting: ModuleRegistryService },
+    { provide: MODULE_SERVICE_TOKEN, useExisting: ModuleService },
     { provide: SESSION_SERVICE_TOKEN, useExisting: SessionService },
     { provide: RATE_LIMIT_SERVICE_TOKEN, useExisting: RateLimitService },
     { provide: AUTH_SERVICE_TOKEN, useExisting: AuthService },
