@@ -1,7 +1,7 @@
 import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { ModuleDefinition } from '@atlas/sdk';
-import { moduleManifestSchema } from '@atlas/sdk';
+import { ModuleActionError, moduleManifestSchema } from '@atlas/sdk';
 import { note } from './db/schema';
 
 /**
@@ -78,7 +78,7 @@ export const definition: ModuleDefinition = {
       permission: 'note:write',
       handler: async (ctx, input) => {
         const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
-        if (!parsed.success) throw new Error('输入不合法：id 必须是 uuid');
+        if (!parsed.success) throw new ModuleActionError('输入不合法：id 必须是 uuid');
         await ctx.db.delete(note).where(eq(note.id, parsed.data.id));
         return { removed: parsed.data.id };
       },
