@@ -6,13 +6,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": [
-    "next-env.d.ts",
-    "src",
-    "e2e",
-    "../../modules/*/src/web/**/*",
-    "playwright.config.ts",
-    "next.config.ts"
-  ],
+  "include": ["next-env.d.ts", "src", "e2e", "playwright.config.ts", "next.config.ts"],
   "exclude": ["node_modules"]
 }

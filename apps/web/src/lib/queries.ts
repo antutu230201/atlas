@@ -33,6 +33,7 @@ export interface ModuleStatus {
   installed: boolean;
   permissions: string[];
   routes: ModuleRoute[];
+  widgets?: Array<{ id: string; title: string; component: string; span?: number }>;
 }
 
 export interface NotificationItem {

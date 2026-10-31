@@ -17,12 +17,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   ThemeToggle,
+  ToastProvider,
   cn,
 } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { useEnabledModules, useLogout, useSession } from '@/lib/queries';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
 import { useUiStore } from '@/lib/store';
+import { CommandPalette } from './command-palette';
 
 /**
  * 应用外壳（阶段 3）：侧边导航（工作空间切换 + 已启用模块动态生成）+ 顶栏。
@@ -193,6 +195,18 @@ function ShellBody({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const { workspace } = useActiveWorkspace();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -240,6 +254,15 @@ function ShellBody({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="打开命令面板"
+              className="hidden items-center gap-1.5 rounded-sm border border-border bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:inline-flex"
+            >
+              <span>搜索</span>
+              <kbd className="rounded-xs bg-surface-hover px-1 text-[10px]">Ctrl+K</kbd>
+            </button>
             <ThemeToggle />
             <Link
               href="/notifications"
@@ -290,6 +313,8 @@ function ShellBody({ children }: { children: React.ReactNode }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }
@@ -313,5 +338,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <ShellBody>{children}</ShellBody>;
+  return (
+    <ToastProvider>
+      <ShellBody>{children}</ShellBody>
+    </ToastProvider>
+  );
 }

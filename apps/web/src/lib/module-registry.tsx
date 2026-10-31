@@ -2,11 +2,13 @@
 
 import type { ComponentType } from 'react';
 import { SampleNoteListPage } from '@atlas/module-sample-note/web';
+import { TodoListPage, TodoTodayWidget, TodoTrashPage } from '@atlas/module-todo-notes/web';
 
 /**
  * 模块前端注册表（装配点，ADR-0005 §7）：
- * 新增带界面的模块时，在此登记一行 —— 页面经 /m/<module>/<route> 动态挂载。
- * 后端动作不需要登记（走 /v1/modules/.../call 网关）。
+ * - pages：/m/<module>/<route> 动态挂载（route 对应 manifest.routes[].path）
+ * - widgets：首页"今天"聚合（id 对应 manifest.widgets[].component）
+ * 新增带界面的模块时在此登记。
  */
 
 export interface ModulePageProps {
@@ -16,6 +18,14 @@ export interface ModulePageProps {
 
 export const moduleWebRegistry: Record<string, Record<string, ComponentType<ModulePageProps>>> = {
   sample_note: { list: SampleNoteListPage },
+  todo_notes: { list: TodoListPage, trash: TodoTrashPage },
+};
+
+export const moduleWidgetRegistry: Record<
+  string,
+  Record<string, ComponentType<ModulePageProps>>
+> = {
+  todo_notes: { TodayWidget: TodoTodayWidget },
 };
 
 export function getModulePage(
@@ -23,4 +33,11 @@ export function getModulePage(
   routePath: string,
 ): ComponentType<ModulePageProps> | undefined {
   return moduleWebRegistry[moduleName]?.[routePath];
+}
+
+export function getModuleWidget(
+  moduleName: string,
+  widgetComponent: string,
+): ComponentType<ModulePageProps> | undefined {
+  return moduleWidgetRegistry[moduleName]?.[widgetComponent];
 }

@@ -19,7 +19,8 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zustand": "^5.0.16",
-    "@atlas/module-sample-note": "workspace:*"
+    "@atlas/module-sample-note": "workspace:*",
+    "@atlas/module-todo-notes": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
