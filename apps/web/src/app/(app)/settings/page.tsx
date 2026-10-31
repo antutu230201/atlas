@@ -232,6 +232,23 @@ function ModulesTab({ slug }: { slug: string }) {
     },
   });
 
+  const exportData = useMutation({
+    mutationFn: () =>
+      api<{ todos: Array<{ title: string; status: string; priority: string }> }>(
+        `/modules/workspaces/${slug}/todo_notes/call/exportData`,
+        { method: 'POST' },
+      ),
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `todo_notes_export_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+
   if (modules.isPending) return <Skeleton className="h-40 w-full" />;
 
   return (
@@ -259,6 +276,16 @@ function ModulesTab({ slug }: { slug: string }) {
           </CardHeader>
         </Card>
       ))}
+      <div className="flex gap-2 pt-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          loading={exportData.isPending}
+          onClick={() => exportData.mutate()}
+        >
+          导出待办 JSON
+        </Button>
+      </div>
     </div>
   );
 }

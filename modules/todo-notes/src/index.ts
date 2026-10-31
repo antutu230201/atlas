@@ -301,5 +301,97 @@ export const definition: ModuleDefinition = {
         };
       },
     },
+
+    /** 全文搜索：标题 + 正文模糊匹配 */
+    search: {
+      permission: 'todo:read',
+      handler: async (ctx, input) => {
+        const parsed = z.object({ q: z.string().min(1).max(200) }).safeParse(input);
+        if (!parsed.success) return { results: [] };
+        const term = `%${parsed.data.q.trim()}%`;
+        const rows = await ctx.db
+          .select({
+            id: todo.id,
+            title: todo.title,
+            status: todo.status,
+            priority: todo.priority,
+          })
+          .from(todo)
+          .where(
+            and(
+              eq(todo.workspaceId, ctx.workspaceId),
+              isNull(todo.deletedAt),
+              sql`(${todo.title} ILIKE ${term} OR ${todo.notes} ILIKE ${term})`,
+            ),
+          )
+          .limit(20);
+        return {
+          results: rows.map((row) => ({
+            label: row.title,
+            hint: row.status === 'done' ? '已完成' : row.status === 'doing' ? '进行中' : '待办',
+            href: `/m/todo_notes/list`,
+          })),
+        };
+      },
+    },
+
+    /** 导出全部待办为 JSON（含已删除） */
+    exportData: {
+      permission: 'todo:read',
+      handler: async (ctx) => {
+        const rows = await ctx.db.select().from(todo).where(eq(todo.workspaceId, ctx.workspaceId));
+        return {
+          exportedAt: new Date().toISOString(),
+          moduleName: 'todo_notes',
+          count: rows.length,
+          todos: rows,
+        };
+      },
+    },
+
+    /** 导入：接受导出格式的 JSON，跳过已存在的 id，返回导入计数 */
+    importData: {
+      permission: 'todo:write',
+      handler: async (ctx, input) => {
+        const parsed = z
+          .object({
+            todos: z.array(
+              z.object({
+                id: z.string().uuid().optional(),
+                title: z.string().min(1).max(120),
+                notes: z.string().optional(),
+                status: z.enum(STATUSES).optional(),
+                priority: z.enum(PRIORITIES).optional(),
+                dueDate: z.string().nullable().optional(),
+              }),
+            ),
+          })
+          .safeParse(input);
+        if (!parsed.success) bad('导入数据格式不正确');
+        let imported = 0;
+        for (const item of parsed.data.todos) {
+          // 有 id 时检查是否已存在（跳过重复），无 id 直接插入
+          if (item.id) {
+            const exists = await ctx.db
+              .select({ id: todo.id })
+              .from(todo)
+              .where(eq(todo.id, item.id))
+              .limit(1);
+            if (exists.length > 0) continue;
+          }
+          await ctx.db.insert(todo).values({
+            workspaceId: ctx.workspaceId,
+            title: item.title,
+            notes: item.notes ?? '',
+            status: item.status ?? 'open',
+            priority: item.priority ?? 'normal',
+            dueDate: item.dueDate ? new Date(item.dueDate) : null,
+            createdBy: ctx.userId,
+          });
+          imported += 1;
+        }
+        return { imported, skipped: parsed.data.todos.length - imported };
+      },
+    },
   },
 };
