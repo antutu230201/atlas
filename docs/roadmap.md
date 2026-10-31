@@ -87,10 +87,12 @@
 - [x] 导出/导入：exportData / importData actions + 设置页导出按钮（JSON 下载）
 - [x] ModuleActionError：模块业务错误统一映射 400（不再 500）
 - [x] e2e 7/7 + 七项质量门 exit 0
+- [x] Toast 反馈接入待办操作（创建/删除/错误）
+- [x] Drawer 替代 Dialog 用于移动端导航（正确组件语义）
+- [x] 命令面板集成待办搜索（300ms 防抖 + 结果导航）
 - [ ] 性能审计（Lighthouse + 10 万数据压力测试）
 - [ ] 离线支持（service worker）
-- [ ] 无障碍复查（axe 全页面扫描 + 屏幕阅读器）
-- [ ] 体验走查报告
+- [ ] 无障碍复查（屏幕阅读器完整走查）
 
 ## 每周复盘记录
 
