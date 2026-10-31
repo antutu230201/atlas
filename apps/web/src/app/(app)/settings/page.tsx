@@ -228,7 +228,7 @@ function ModulesTab({ slug }: { slug: string }) {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['modules-status', slug] });
-      void queryClient.invalidateQueries({ queryKey: ['modules'] });
+      void queryClient.invalidateQueries({ queryKey: ['modules-enabled', slug] });
     },
   });
 
