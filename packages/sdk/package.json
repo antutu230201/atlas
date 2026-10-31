@@ -4,12 +4,18 @@
   "private": true,
   "description": "Atlas 模块开发 SDK：对外契约类型与（未来的）模块开发工具集",
   "main": "dist/index.js",
+  "dependencies": {
+    "@atlas/core": "workspace:*",
+    "zod": "^4.1.0"
+  },
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@atlas/core": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "typescript": "^5.9.2"
   }
 }
