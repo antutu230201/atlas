@@ -14,9 +14,12 @@
     "@atlas/sdk": "workspace:*",
     "@atlas/tokens": "workspace:*",
     "@atlas/ui": "workspace:*",
+    "@tanstack/react-query": "^5.105.0",
     "next": "^16.0.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "zustand": "^5.0.16",
+    "@atlas/module-sample-note": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

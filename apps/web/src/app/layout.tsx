@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { THEME_INIT_SCRIPT } from '@atlas/tokens';
-import { ThemeProvider } from '@atlas/ui';
+import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-screen bg-bg font-sans text-text antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
