@@ -267,3 +267,17 @@ GET  /v1/settings / PUT /v1/settings         （用户级）
 - 邮箱写入时应用层小写归一化（不用 citext）。
 - 集成测试基座：vitest globalSetup 在 5433 拉起独立内嵌 PG（.local/pgdata-test），迁移后 TRUNCATE 保证幂等。
 - slug 冲突处理：捕获 23505 + 随机短尾重试 5 次。
+
+## 14. 实现记录（2b 模块系统，2026-10-31）
+
+2b 已交付并有真实数据库集成测试锁定。两个关键实现决策（相对设计稿的细化）：
+
+1. **模块发现 = 依赖声明**：模块以工作区包（@atlas/module-*）交付，API 在运行时扫描自身 package.json 依赖并动态 import 其 definition。新增模块 = 新增依赖 + 工作空间启用，内核代码零改动（严格满足总体设计的验收标准）。模块迁移目录经 require.resolve 定位包内 migrations/。
+2. **模块服务端 = action handler 网关**，而非 Nest 控制器：POST /v1/modules/workspaces/:slug/:name/call/:action 统一分发（认证 → 工作空间成员 → 启用校验 → canModule 权限 → 一个调用一个租户事务）。避免动态 DI 的复杂性，且 handler 内 ctx.db/ctx.events/ctx.settings 全部同事务（outbox 原子性天然成立）。
+
+其余要点：
+
+- 每模块独立迁移 journal 表（module_<name>_migrations），避免共享 drizzle 迁移日志互串。
+- **模块模板必须自带**：GRANT atlas_app + 该 schema 的 RLS 策略（示例模块 migrations/0001_rls.sql 是模板）。
+- 启用 = 依赖深度优先自动启用 + 迁移 + module_install upsert + 事件订阅登记；停用数据保留，有启用中的依赖方时 409。
+- 前端动态挂载移入阶段 3（应用外壳 + 登录态就绪后才有意义），本阶段动作为 API 全链路验证。
