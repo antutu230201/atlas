@@ -40,6 +40,17 @@ export const moduleManifestSchema = z.object({
       }),
     )
     .max(50),
+  /** 首页小组件声明（id → 模块 web 注册表的 widget 键） */
+  widgets: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(60),
+        title: z.string().min(1).max(80),
+        component: z.string().min(1).max(80),
+        span: z.number().int().min(1).max(4).optional(),
+      }),
+    )
+    .optional(),
   /** 工作空间级设置项（渲染与校验由内核设置页完成） */
   settings: z
     .array(
@@ -105,6 +116,14 @@ export interface ModuleAction {
 export interface ModuleDefinition {
   manifest: ModuleManifest;
   actions: Record<string, ModuleAction>;
+}
+
+/** 模块动作的业务错误：网关映射为 400（校验失败/资源不存在等），其余错误仍为 500 */
+export class ModuleActionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ModuleActionError';
+  }
 }
 
 export function parseManifest(input: unknown): ModuleManifest {
