@@ -4,3 +4,4 @@
 
 /* 组件库以 TS 源码形态参与编译，其类名需纳入 Tailwind 扫描 */
 @source '../../../../packages/ui/src';
+@source '../../../../modules/*/src/web';
