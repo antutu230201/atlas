@@ -1,0 +1,26 @@
+{
+  "name": "@atlas/module-sample-note",
+  "version": "0.1.0",
+  "private": true,
+  "description": "阶段 2b 验收示例模块：一张 note 表 + list/create/remove actions",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@atlas/sdk": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^5.9.2"
+  }
+}
