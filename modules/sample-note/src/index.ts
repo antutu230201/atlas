@@ -19,8 +19,11 @@ const manifest = moduleManifestSchema.parse({
   routes: [{ path: 'list', title: '笔记', nav: { order: 10 } }],
   settings: [{ key: 'maxNotes', label: '最大条数', type: 'number', default: 100 }],
   events: {
-    publishes: ['note.created'],
-    subscribes: [],
+    publishes: ['note.created', 'note.failing'],
+    subscribes: [
+      { event: 'note.created', handler: 'onNoteCreated' },
+      { event: 'note.failing', handler: 'onFailing' },
+    ],
   },
   migrations: 'migrations',
 });
@@ -90,6 +93,33 @@ export const definition: ModuleDefinition = {
         }
         const current = await ctx.settings.get();
         return { settings: current };
+      },
+    },
+
+    /** 事件订阅演示：note.created → 设置里自增计数 */
+    onNoteCreated: {
+      permission: 'note:read',
+      handler: async (ctx) => {
+        const current = await ctx.settings.get();
+        const greeted = Number(current.greeted ?? 0) + 1;
+        await ctx.settings.set({ greeted });
+        return { greeted };
+      },
+    },
+
+    /** 测试重试/死信路径：发布一个必然失败的事件 */
+    emitFailing: {
+      permission: 'note:write',
+      handler: async (ctx) => {
+        await ctx.events.publish('note.failing', { reason: '测试重试/死信' });
+        return { published: true };
+      },
+    },
+
+    onFailing: {
+      permission: 'note:read',
+      handler: async () => {
+        throw new Error('故意失败（测试重试/死信路径）');
       },
     },
   },
