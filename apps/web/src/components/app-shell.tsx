@@ -6,10 +6,11 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -301,18 +302,19 @@ function ShellBody({ children }: { children: React.ReactNode }) {
         <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
       </div>
 
-      <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
-        <DialogContent className="left-0 top-0 h-full max-h-none w-64 translate-x-0 translate-y-0 rounded-none border-y-0 border-l-0 p-4">
-          <DialogTitle className="mb-4 text-sm font-bold tracking-widest text-primary">
-            ATLAS
-          </DialogTitle>
-          <DialogDescription className="sr-only">主导航</DialogDescription>
-          <WorkspaceSwitcher />
-          <div className="mt-4">
+      <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
+        <DrawerContent className="p-4">
+          <DrawerHeader>
+            <DrawerTitle className="text-sm font-bold tracking-widest text-primary">
+              ATLAS
+            </DrawerTitle>
+          </DrawerHeader>
+          <DrawerBody className="space-y-4">
+            <WorkspaceSwitcher />
             <SidebarNav onNavigate={() => setMobileOpen(false)} />
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>

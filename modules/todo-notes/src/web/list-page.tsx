@@ -2,13 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Badge, Button, Card, CardContent, EmptyState, Input, Skeleton } from '@atlas/ui';
+import { Badge, Button, Card, CardContent, EmptyState, Input, Skeleton, useToast } from '@atlas/ui';
 import { api } from '@/lib/api';
 import type { ModulePageProps, TodoRow } from './types';
 
 /** 待办列表：创建/状态流转/筛选/搜索/删除（软删进回收站） */
 export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const base = `/modules/workspaces/${workspaceSlug}/${moduleName}/call`;
   const [title, setTitle] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -34,8 +35,12 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
       setTitle('');
       setError(null);
       invalidate();
+      toast({ title: '已添加', variant: 'ok' });
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => {
+      setError(e.message);
+      toast({ title: '添加失败', description: e.message, variant: 'err' });
+    },
   });
 
   const setStatus = useMutation({
@@ -46,7 +51,10 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
 
   const remove = useMutation({
     mutationFn: (id: string) => api(`${base}/remove`, { method: 'POST', json: { id } }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast({ title: '已移入回收站', variant: 'info' });
+    },
   });
 
   const todos = list.data?.todos ?? [];
