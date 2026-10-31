@@ -11,8 +11,14 @@ import {
 import type { Db } from '../db/client';
 import { withUser } from '../db/tenant';
 import type { AuditService } from '../audit/audit.service';
+import type { EventOutboxService } from '../events/event-outbox.service';
 import type { SessionService } from '../auth/session.service';
-import { AUDIT_SERVICE_TOKEN, DB_TOKEN, SESSION_SERVICE_TOKEN } from '../tokens';
+import {
+  AUDIT_SERVICE_TOKEN,
+  DB_TOKEN,
+  EVENT_OUTBOX_SERVICE_TOKEN,
+  SESSION_SERVICE_TOKEN,
+} from '../tokens';
 
 export interface CreateWorkspaceInput {
   name: string;
@@ -41,6 +47,7 @@ export class WorkspaceService {
   constructor(
     @Inject(DB_TOKEN) private readonly db: Db,
     @Inject(AUDIT_SERVICE_TOKEN) private readonly audit: AuditService,
+    @Inject(EVENT_OUTBOX_SERVICE_TOKEN) private readonly outbox: EventOutboxService,
     @Inject(SESSION_SERVICE_TOKEN) private readonly sessions: SessionService,
   ) {}
 
@@ -66,6 +73,12 @@ export class WorkspaceService {
           const ws = wsRows[0];
           if (!ws) throw new Error('工作空间创建失败');
           await tx.insert(membership).values({ workspaceId: ws.id, userId, role: 'owner' });
+          await this.outbox.publishInTx(tx, {
+            name: 'workspace.created',
+            workspaceId: ws.id,
+            actorUserId: userId,
+            payload: { name: ws.name, slug: ws.slug },
+          });
           return ws;
         });
         await this.audit.record({
@@ -176,6 +189,12 @@ export class WorkspaceService {
           message: '该邮箱已有待处理邀请',
         });
       }
+      const wsNameRows = await tx
+        .select({ name: workspace.name })
+        .from(workspace)
+        .where(eq(workspace.id, workspaceId))
+        .limit(1);
+      const workspaceName = wsNameRows[0]?.name ?? '';
       const token = this.sessions.newInvitationToken();
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await tx.insert(invitationTable).values({
@@ -185,6 +204,12 @@ export class WorkspaceService {
         tokenHash: this.sessions.hashToken(token),
         invitedBy: actor.userId,
         expiresAt,
+      });
+      await this.outbox.publishInTx(tx, {
+        name: 'member.invited',
+        workspaceId,
+        actorUserId: actor.userId,
+        payload: { email, role: input.role, workspaceName },
       });
       return { token, expiresAt };
     });
@@ -231,6 +256,12 @@ export class WorkspaceService {
         .update(membership)
         .set({ role })
         .where(and(eq(membership.workspaceId, workspaceId), eq(membership.userId, targetUserId)));
+      await this.outbox.publishInTx(tx, {
+        name: 'member.role-changed',
+        workspaceId,
+        actorUserId: actor.userId,
+        payload: { targetUserId, before: target.role, after: role },
+      });
       return { before: target.role, after: role };
     });
     await this.audit.record({
@@ -274,6 +305,12 @@ export class WorkspaceService {
       await tx
         .delete(membership)
         .where(and(eq(membership.workspaceId, workspaceId), eq(membership.userId, targetUserId)));
+      await this.outbox.publishInTx(tx, {
+        name: 'member.removed',
+        workspaceId,
+        actorUserId: actor.userId,
+        payload: { targetUserId, previousRole: target.role },
+      });
       return target.role;
     });
     await this.audit.record({

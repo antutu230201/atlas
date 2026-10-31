@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../../src/app.module';
+import { EventDispatcherService } from '../../src/events/event-dispatcher.service';
 
 export interface TestApp {
   url: string;
@@ -24,13 +25,25 @@ export async function createTestApp(): Promise<TestApp> {
   process.env.DATABASE_URL = 'postgres://atlas_app:atlas_app@localhost:5433/atlas';
   process.env.DATABASE_URL_ADMIN = 'postgres://atlas:atlas@localhost:5433/atlas';
   process.env.LOG_LEVEL = 'error';
+  process.env.DISPATCHER_ENABLED = 'false';
+  process.env.DISPATCH_INTERVAL_MS = '200';
 
   const app = await NestFactory.create(AppModule, { logger: ['error'] });
   app.enableCors({ origin: 'http://localhost:3000', credentials: true });
   app.setGlobalPrefix('v1');
   await app.listen(0);
   const url = await app.getUrl();
-  return { url, close: () => app.close() };
+  const dispatcher = app.get(EventDispatcherService);
+  (globalThis as { __atlasTestDispatcher?: EventDispatcherService }).__atlasTestDispatcher =
+    dispatcher;
+  return {
+    url,
+    close: async () => {
+      (globalThis as { __atlasTestDispatcher?: EventDispatcherService }).__atlasTestDispatcher =
+        undefined;
+      await app.close();
+    },
+  };
 }
 
 export async function apiFetch(

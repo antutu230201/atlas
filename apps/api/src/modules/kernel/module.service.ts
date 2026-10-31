@@ -7,10 +7,12 @@ import { event, eventSubscription, moduleInstall } from '../../db/schema';
 import type { Db } from '../../db/client';
 import { withUser } from '../../db/tenant';
 import type { AuditService } from '../../audit/audit.service';
+import type { EventOutboxService } from '../../events/event-outbox.service';
 import {
   ADMIN_DB_TOKEN,
   AUDIT_SERVICE_TOKEN,
   DB_TOKEN,
+  EVENT_OUTBOX_SERVICE_TOKEN,
   MODULE_REGISTRY_SERVICE_TOKEN,
 } from '../../tokens';
 import type { LoadedModule, ModuleRegistryService } from './module-registry';
@@ -40,6 +42,7 @@ export class ModuleService {
     @Inject(DB_TOKEN) private readonly db: Db,
     @Inject(ADMIN_DB_TOKEN) private readonly adminDb: Db,
     @Inject(AUDIT_SERVICE_TOKEN) private readonly audit: AuditService,
+    @Inject(EVENT_OUTBOX_SERVICE_TOKEN) private readonly outbox: EventOutboxService,
     @Inject(MODULE_REGISTRY_SERVICE_TOKEN) private readonly registry: ModuleRegistryService,
   ) {}
 
@@ -148,6 +151,12 @@ export class ModuleService {
             .values({ moduleName, eventName: sub.event, handlerKey: sub.handler })
             .onConflictDoNothing();
         }
+        await this.outbox.publishInTx(tx, {
+          name: 'module.enabled',
+          workspaceId,
+          actorUserId: userId,
+          payload: { module: moduleName, version: mod.definition.manifest.version },
+        });
       });
       await this.audit.record({
         workspaceId,
@@ -197,6 +206,12 @@ export class ModuleService {
         .set({ status: 'disabled', updatedAt: new Date() })
         .where(and(eq(moduleInstall.workspaceId, workspaceId), eq(moduleInstall.moduleName, name))),
     );
+    await this.outbox.publishInTx(this.db, {
+      name: 'module.disabled',
+      workspaceId,
+      actorUserId: userId,
+      payload: { module: name },
+    });
     await this.audit.record({
       workspaceId,
       actorUserId: userId,

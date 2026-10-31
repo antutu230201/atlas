@@ -1,10 +1,12 @@
 import { index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { platform } from './platform';
+import { user } from './identity';
 import { workspace } from './workspace';
 
 /**
  * 事件 outbox（ADR-0005 §8）：业务数据与事件同事务写入，派发器异步投递。
  * 投递语义 at-least-once；status: pending → processing → delivered / dead。
+ * actor_user_id：触发者（派发时作为 RLS 投递上下文）；claimed_at：僵死回收依据。
  */
 export const event = platform.table(
   'event',
@@ -14,12 +16,14 @@ export const event = platform.table(
     version: integer('version').notNull().default(1),
     payload: jsonb('payload').notNull(),
     workspaceId: uuid('workspace_id').references(() => workspace.id, { onDelete: 'cascade' }),
+    actorUserId: uuid('actor_user_id').references(() => user.id, { onDelete: 'set null' }),
     status: text('status', { enum: ['pending', 'processing', 'delivered', 'dead'] })
       .notNull()
       .default('pending'),
     attempts: integer('attempts').notNull().default(0),
     maxAttempts: integer('max_attempts').notNull().default(8),
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
     lastError: text('last_error'),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

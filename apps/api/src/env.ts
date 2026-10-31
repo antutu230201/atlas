@@ -27,6 +27,13 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   /** 会话有效期（天） */
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  /** 事件派发器轮询间隔（毫秒）；测试中可关闭自动派发 */
+  DISPATCH_INTERVAL_MS: z.coerce.number().int().min(200).max(60_000).default(2000),
+  DISPATCHER_ENABLED: z
+    .string()
+    .default('true')
+    .transform((value) => value !== 'false'),
+  EVENT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(8),
 });
 
 export type ApiEnv = z.infer<typeof envSchema>;

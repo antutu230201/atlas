@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import type { HealthProbe } from '@atlas/core';
 import { provideAuditInterceptor, AuditService } from './audit/audit.service';
+import { EventDispatcherService } from './events/event-dispatcher.service';
+import { EventOutboxService } from './events/event-outbox.service';
+import { NotificationController } from './events/notification.controller';
+import { NotificationService } from './events/notification.service';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { RateLimitService } from './auth/rate-limit.service';
@@ -14,6 +18,7 @@ import { ModuleRegistryService } from './modules/kernel/module-registry';
 import { ModuleService } from './modules/kernel/module.service';
 import { HealthController } from './modules/health/health.controller';
 import { HealthService } from './modules/health/health.service';
+import { ConsoleMailAdapter } from '@atlas/core';
 import { WorkspaceController } from './workspace/workspace.controller';
 import { WorkspaceService } from './workspace/workspace.service';
 import {
@@ -23,7 +28,10 @@ import {
   AUTH_SERVICE_TOKEN,
   DB_TOKEN,
   ENV_TOKEN,
+  EVENT_OUTBOX_SERVICE_TOKEN,
   HEALTH_SERVICE_TOKEN,
+  MAIL_ADAPTER_TOKEN,
+  NOTIFICATION_SERVICE_TOKEN,
   MODULE_REGISTRY_SERVICE_TOKEN,
   MODULE_SERVICE_TOKEN,
   PROBES_TOKEN,
@@ -38,7 +46,13 @@ import {
  * 所有依赖注入使用显式 @Inject(token)（esbuild 兼容约定，见 tokens.ts）。
  */
 @Module({
-  controllers: [HealthController, AuthController, WorkspaceController, ModuleController],
+  controllers: [
+    HealthController,
+    AuthController,
+    WorkspaceController,
+    ModuleController,
+    NotificationController,
+  ],
   providers: [
     { provide: ENV_TOKEN, useFactory: loadEnv },
     {
@@ -76,16 +90,67 @@ import {
     },
     {
       provide: WorkspaceService,
-      useFactory: (db: Db, audit: AuditService, sessions: SessionService) =>
-        new WorkspaceService(db, audit, sessions),
-      inject: [DB_TOKEN, AUDIT_SERVICE_TOKEN, SESSION_SERVICE_TOKEN],
+      useFactory: (
+        db: Db,
+        audit: AuditService,
+        outbox: EventOutboxService,
+        sessions: SessionService,
+      ) => new WorkspaceService(db, audit, outbox, sessions),
+      inject: [DB_TOKEN, AUDIT_SERVICE_TOKEN, EVENT_OUTBOX_SERVICE_TOKEN, SESSION_SERVICE_TOKEN],
+    },
+    {
+      provide: EventOutboxService,
+      useFactory: (db: Db, env: ApiEnv) => new EventOutboxService(db, env),
+      inject: [DB_TOKEN, ENV_TOKEN],
+    },
+    { provide: EVENT_OUTBOX_SERVICE_TOKEN, useExisting: EventOutboxService },
+    { provide: ConsoleMailAdapter, useFactory: () => new ConsoleMailAdapter() },
+    { provide: MAIL_ADAPTER_TOKEN, useExisting: ConsoleMailAdapter },
+    {
+      provide: NotificationService,
+      useFactory: (db: Db, mail: ConsoleMailAdapter) => new NotificationService(db, mail),
+      inject: [DB_TOKEN, ConsoleMailAdapter],
+    },
+    { provide: NOTIFICATION_SERVICE_TOKEN, useExisting: NotificationService },
+    {
+      provide: EventDispatcherService,
+      useFactory: (
+        db: Db,
+        adminDb: Db,
+        env: ApiEnv,
+        registry: ModuleRegistryService,
+        moduleService: ModuleService,
+        notifications: NotificationService,
+        mail: ConsoleMailAdapter,
+      ) =>
+        new EventDispatcherService(db, adminDb, env, registry, moduleService, notifications, mail),
+      inject: [
+        DB_TOKEN,
+        ADMIN_DB_TOKEN,
+        ENV_TOKEN,
+        MODULE_REGISTRY_SERVICE_TOKEN,
+        MODULE_SERVICE_TOKEN,
+        NOTIFICATION_SERVICE_TOKEN,
+        ConsoleMailAdapter,
+      ],
     },
     { provide: ModuleRegistryService, useFactory: () => new ModuleRegistryService() },
     {
       provide: ModuleService,
-      useFactory: (db: Db, adminDb: Db, audit: AuditService, registry: ModuleRegistryService) =>
-        new ModuleService(db, adminDb, audit, registry),
-      inject: [DB_TOKEN, ADMIN_DB_TOKEN, AUDIT_SERVICE_TOKEN, MODULE_REGISTRY_SERVICE_TOKEN],
+      useFactory: (
+        db: Db,
+        adminDb: Db,
+        audit: AuditService,
+        outbox: EventOutboxService,
+        registry: ModuleRegistryService,
+      ) => new ModuleService(db, adminDb, audit, outbox, registry),
+      inject: [
+        DB_TOKEN,
+        ADMIN_DB_TOKEN,
+        AUDIT_SERVICE_TOKEN,
+        EVENT_OUTBOX_SERVICE_TOKEN,
+        MODULE_REGISTRY_SERVICE_TOKEN,
+      ],
     },
     { provide: MODULE_REGISTRY_SERVICE_TOKEN, useExisting: ModuleRegistryService },
     { provide: MODULE_SERVICE_TOKEN, useExisting: ModuleService },
