@@ -71,6 +71,16 @@
 - [x] e2e 5/5（含外壳全流程：注册→建空间→启用模块→模块页写笔记→登出保护）
 - 依赖新增（宪法 §8 说明）：@tanstack/react-query ^5（服务端状态缓存/失效，设计文档 §3 指定）、zustand ^5（激活工作空间/侧栏折叠等 UI 状态）
 
+## 阶段 3b 验收记录（2026-10-31）
+
+- [x] packages/ui：Toast（Radix Toast + 三态变体）+ Drawer（侧滑面板）
+- [x] 待办与笔记正式模块：CRUD / 状态流转 / 筛选搜索 / 拖拽排序 / 软删除回收站 / 事件 / widget
+- [x] ModuleActionError 业务错误 → 400 映射（网关统一处理）
+- [x] 首页 widget 聚合：manifest widgets → moduleWidgetRegistry → / 页渲染
+- [x] 命令面板：Ctrl/Cmd+K 全局搜索导航
+- [x] e2e 7/7（含外壳全流程 + 待办全流程 + widget 可见性 + 登出保护）
+- [x] 全部七项质量门 exit 0（format/lint/typecheck/test/coverage/build/e2e）
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。
