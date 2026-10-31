@@ -26,6 +26,7 @@ export interface ModuleStatusView {
   installed: boolean;
   permissions: string[];
   routes: ModuleManifest['routes'];
+  widgets: ModuleManifest['widgets'];
 }
 
 export interface ModuleCallContextParams {
@@ -76,6 +77,7 @@ export class ModuleService {
         installed: row !== undefined,
         permissions: m.definition.manifest.permissions,
         routes: m.definition.manifest.routes,
+        widgets: m.definition.manifest.widgets ?? [],
       };
     });
   }
@@ -200,17 +202,17 @@ export class ModuleService {
         message: `先停用依赖它的模块：${dependents.join(', ')}`,
       });
     }
-    await withUser(this.db, userId, (tx) =>
-      tx
+    await withUser(this.db, userId, async (tx) => {
+      await tx
         .update(moduleInstall)
         .set({ status: 'disabled', updatedAt: new Date() })
-        .where(and(eq(moduleInstall.workspaceId, workspaceId), eq(moduleInstall.moduleName, name))),
-    );
-    await this.outbox.publishInTx(this.db, {
-      name: 'module.disabled',
-      workspaceId,
-      actorUserId: userId,
-      payload: { module: name },
+        .where(and(eq(moduleInstall.workspaceId, workspaceId), eq(moduleInstall.moduleName, name)));
+      await this.outbox.publishInTx(tx, {
+        name: 'module.disabled',
+        workspaceId,
+        actorUserId: userId,
+        payload: { module: name },
+      });
     });
     await this.audit.record({
       workspaceId,

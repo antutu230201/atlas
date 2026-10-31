@@ -13,6 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { canModule } from '@atlas/core';
+import { ModuleActionError } from '@atlas/sdk';
 import type { Request } from 'express';
 import { withUser } from '../../db/tenant';
 import type { Db } from '../../db/client';
@@ -107,15 +108,27 @@ export class ModuleController {
       });
     }
 
-    const result = await withUser(this.db, user.id, async (tx) => {
-      const context = this.moduleService.buildContext(mod, {
-        tx,
-        userId: user.id,
-        workspaceId: request.workspace!.id,
-        role,
+    let result: unknown;
+    try {
+      result = await withUser(this.db, user.id, async (tx) => {
+        const context = this.moduleService.buildContext(mod, {
+          tx,
+          userId: user.id,
+          workspaceId: request.workspace!.id,
+          role,
+        });
+        return action.handler(context, body ?? {});
       });
-      return action.handler(context, body ?? {});
-    });
+    } catch (error) {
+      // 模块业务错误（校验失败/资源不存在）映射为 400；其余按 500 交给全局处理
+      if (error instanceof ModuleActionError) {
+        throw new BadRequestException({
+          error: 'atlas.module.action-failed',
+          message: error.message,
+        });
+      }
+      throw error;
+    }
     return { data: result ?? null };
   }
 }
