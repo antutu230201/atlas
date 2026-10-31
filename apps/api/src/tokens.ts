@@ -24,6 +24,7 @@ export const MODULE_SERVICE_TOKEN = Symbol('MODULE_SERVICE');
 export const EVENT_OUTBOX_SERVICE_TOKEN = Symbol('EVENT_OUTBOX_SERVICE');
 export const NOTIFICATION_SERVICE_TOKEN = Symbol('NOTIFICATION_SERVICE');
 export const MAIL_ADAPTER_TOKEN = Symbol('MAIL_ADAPTER');
+export const AI_ADAPTER_TOKEN = Symbol('AI_ADAPTER');
 
 /** 会话 Cookie 名；令牌明文只在 Cookie，库存 sha256 */
 export const SESSION_COOKIE = 'atlas_session';

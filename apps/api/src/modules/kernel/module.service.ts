@@ -2,14 +2,16 @@ import { and, eq, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { canModule, type Role } from '@atlas/core';
+import type { AIAdapter } from '@atlas/core';
 import type { ModuleContext, ModuleExecutor, ModuleManifest } from '@atlas/sdk';
-import { event, eventSubscription, moduleInstall } from '../../db/schema';
+import { event, eventSubscription, moduleInstall, aiUsage } from '../../db/schema';
 import type { Db } from '../../db/client';
 import { withUser } from '../../db/tenant';
 import type { AuditService } from '../../audit/audit.service';
 import type { EventOutboxService } from '../../events/event-outbox.service';
 import {
   ADMIN_DB_TOKEN,
+  AI_ADAPTER_TOKEN,
   AUDIT_SERVICE_TOKEN,
   DB_TOKEN,
   EVENT_OUTBOX_SERVICE_TOKEN,
@@ -45,6 +47,7 @@ export class ModuleService {
     @Inject(AUDIT_SERVICE_TOKEN) private readonly audit: AuditService,
     @Inject(EVENT_OUTBOX_SERVICE_TOKEN) private readonly outbox: EventOutboxService,
     @Inject(MODULE_REGISTRY_SERVICE_TOKEN) private readonly registry: ModuleRegistryService,
+    @Inject(AI_ADAPTER_TOKEN) private readonly ai: AIAdapter,
   ) {}
 
   /** 内核级目录：全部可发现模块（与工作空间无关） */
@@ -266,6 +269,20 @@ export class ModuleService {
       events: {
         publish: async (name: string, payload: Record<string, unknown>) => {
           await tx.insert(event).values({ name, payload, workspaceId });
+        },
+      },
+      ai: {
+        complete: async (prompt: string, system?: string) => {
+          const response = await this.ai.complete({ prompt, system, maxTokens: 1024 });
+          await tx.insert(aiUsage).values({
+            workspaceId,
+            userId,
+            moduleName,
+            model: response.model,
+            promptTokens: response.usage.promptTokens,
+            completionTokens: response.usage.completionTokens,
+          });
+          return response.text;
         },
       },
     };

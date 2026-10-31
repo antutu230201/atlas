@@ -101,6 +101,10 @@ export interface ModuleContext {
   events: {
     publish(name: string, payload: Record<string, unknown>): Promise<void>;
   };
+  /** AI 能力（阶段 5）：模块通过 ctx.ai.complete() 调用平台配置的 AI 供应商 */
+  ai: {
+    complete(prompt: string, system?: string): Promise<string>;
+  };
 }
 
 /** 模块内可用的 Drizzle 执行器（与内核 Db 同形，避免向模块泄露连接管理） */

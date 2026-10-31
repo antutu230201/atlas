@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import type { HealthProbe } from '@atlas/core';
 import { provideAuditInterceptor, AuditService } from './audit/audit.service';
 import { EventDispatcherService } from './events/event-dispatcher.service';
@@ -16,14 +16,17 @@ import { buildProbes } from './infra/probes';
 import { ModuleController } from './modules/kernel/module.controller';
 import { ModuleRegistryService } from './modules/kernel/module-registry';
 import { ModuleService } from './modules/kernel/module.service';
+import { EntitlementService } from './modules/kernel/entitlement.service';
+import { SecurityHeadersMiddleware } from './auth/security-headers.middleware';
 import { HealthController } from './modules/health/health.controller';
 import { HealthService } from './modules/health/health.service';
-import { ConsoleMailAdapter } from '@atlas/core';
+import { ConsoleMailAdapter, MockAIProvider } from '@atlas/core';
 import { WorkspaceController } from './workspace/workspace.controller';
 import { WorkspaceService } from './workspace/workspace.service';
 import {
   API_VERSION,
   ADMIN_DB_TOKEN,
+  AI_ADAPTER_TOKEN,
   AUDIT_SERVICE_TOKEN,
   AUTH_SERVICE_TOKEN,
   DB_TOKEN,
@@ -106,6 +109,8 @@ import {
     { provide: EVENT_OUTBOX_SERVICE_TOKEN, useExisting: EventOutboxService },
     { provide: ConsoleMailAdapter, useFactory: () => new ConsoleMailAdapter() },
     { provide: MAIL_ADAPTER_TOKEN, useExisting: ConsoleMailAdapter },
+    { provide: MockAIProvider, useFactory: () => new MockAIProvider() },
+    { provide: AI_ADAPTER_TOKEN, useExisting: MockAIProvider },
     {
       provide: NotificationService,
       useFactory: (db: Db, mail: ConsoleMailAdapter) => new NotificationService(db, mail),
@@ -136,6 +141,11 @@ import {
     },
     { provide: ModuleRegistryService, useFactory: () => new ModuleRegistryService() },
     {
+      provide: EntitlementService,
+      useFactory: (db: Db) => new EntitlementService(db),
+      inject: [DB_TOKEN],
+    },
+    {
       provide: ModuleService,
       useFactory: (
         db: Db,
@@ -143,13 +153,15 @@ import {
         audit: AuditService,
         outbox: EventOutboxService,
         registry: ModuleRegistryService,
-      ) => new ModuleService(db, adminDb, audit, outbox, registry),
+        ai: MockAIProvider,
+      ) => new ModuleService(db, adminDb, audit, outbox, registry, ai),
       inject: [
         DB_TOKEN,
         ADMIN_DB_TOKEN,
         AUDIT_SERVICE_TOKEN,
         EVENT_OUTBOX_SERVICE_TOKEN,
         MODULE_REGISTRY_SERVICE_TOKEN,
+        AI_ADAPTER_TOKEN,
       ],
     },
     { provide: MODULE_REGISTRY_SERVICE_TOKEN, useExisting: ModuleRegistryService },
@@ -163,4 +175,8 @@ import {
     provideAuditInterceptor(),
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(SecurityHeadersMiddleware).forRoutes('*');
+  }
+}

@@ -1,4 +1,4 @@
-import { bigserial, index, inet, jsonb, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigserial, index, inet, integer, jsonb, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { user } from './identity';
 import { platform } from './platform';
 import { workspace } from './workspace';
@@ -45,4 +45,27 @@ export const notification = platform.table(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('notification_user_created_idx').on(t.userId, t.createdAt)],
+);
+
+/** AI 调用用量（阶段 5）：按工作空间/用户/模块追踪 token 消耗，用于计费与限额 */
+export const aiUsage = platform.table(
+  'ai_usage',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspace.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    moduleName: text('module_name').notNull(),
+    model: text('model').notNull(),
+    promptTokens: integer('prompt_tokens').notNull().default(0),
+    completionTokens: integer('completion_tokens').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('ai_usage_workspace_idx').on(t.workspaceId, t.createdAt),
+    index('ai_usage_user_idx').on(t.userId, t.createdAt),
+  ],
 );
