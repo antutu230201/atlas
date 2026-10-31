@@ -143,20 +143,21 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { workspace } = useActiveWorkspace();
   const modules = useEnabledModules(workspace?.slug ?? null);
 
-  const item = (href: string, label: string, active: boolean) => (
+  const item = (href: string, label: string, active: boolean, icon?: string) => (
     <Link
       key={href}
       href={href}
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'block rounded-sm px-3 py-2 text-sm transition-colors duration-[var(--duration-fast)]',
+        'flex items-center gap-2.5 rounded-sm px-3 py-2 text-sm transition-colors duration-[var(--duration-fast)]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
         active
           ? 'bg-primary-soft font-semibold text-primary'
           : 'text-muted hover:bg-surface-hover hover:text-text',
       )}
     >
+      {icon ? <span className="w-4 text-center text-xs">{icon}</span> : null}
       {label}
     </Link>
   );
@@ -171,7 +172,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav aria-label="主导航" className="space-y-1">
-      {item('/', '今天', pathname === '/')}
+      {item('/', '今天', pathname === '/', '☀')}
       <p className="px-3 pb-1 pt-4 text-[11px] font-semibold tracking-widest text-muted">模块</p>
       {moduleRoutes.length === 0 ? (
         <p className="px-3 text-xs text-muted">尚无已启用模块，可在设置中启用。</p>
@@ -181,8 +182,8 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       <p className="px-3 pb-1 pt-4 text-[11px] font-semibold tracking-widest text-muted">
         工作空间
       </p>
-      {workspace ? item('/settings', '设置', pathname === '/settings') : null}
-      {item('/notifications', '通知', pathname === '/notifications')}
+      {workspace ? item('/settings', '设置', pathname === '/settings', '⚙') : null}
+      {item('/notifications', '通知', pathname === '/notifications', '✉')}
     </nav>
   );
 }

@@ -13,15 +13,22 @@ function greeting(): string {
   return '晚上好';
 }
 
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
 export default function TodayPage() {
   const { workspace, user } = useActiveWorkspace();
   const modules = useEnabledModules(workspace?.slug ?? null);
   const enabled = modules.data ?? [];
+  const now = new Date();
+  const dateStr = `${now.getMonth() + 1} 月 ${now.getDate()} 日 · 周${WEEKDAYS[now.getDay()]}`;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8">
-      <header className="space-y-2">
-        <p className="text-xs font-medium tracking-[0.2em] text-muted">今天</p>
+      <header className="space-y-1">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium tracking-[0.2em] text-muted">今天</p>
+          <span className="text-xs text-muted/60">{dateStr}</span>
+        </div>
         <h1 className="text-2xl font-semibold">
           {greeting()}
           {user ? `，${user.displayName}` : ''}
@@ -79,9 +86,11 @@ export default function TodayPage() {
                   <Link
                     key={`${m.name}/${route.path}`}
                     href={`/m/${m.name}/${route.path}`}
-                    className="rounded-md border border-border bg-surface p-4 shadow-soft transition-shadow hover:shadow-md"
+                    className="group rounded-md border border-border bg-surface p-4 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
                   >
-                    <p className="text-sm font-semibold">{route.title}</p>
+                    <p className="text-sm font-semibold text-text transition-colors group-hover:text-primary">
+                      {route.title}
+                    </p>
                     <p className="mt-1 text-xs text-muted">{m.title}</p>
                   </Link>
                 )),
