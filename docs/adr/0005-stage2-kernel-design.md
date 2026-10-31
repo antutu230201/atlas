@@ -281,3 +281,11 @@ GET  /v1/settings / PUT /v1/settings         （用户级）
 - **模块模板必须自带**：GRANT atlas_app + 该 schema 的 RLS 策略（示例模块 migrations/0001_rls.sql 是模板）。
 - 启用 = 依赖深度优先自动启用 + 迁移 + module_install upsert + 事件订阅登记；停用数据保留，有启用中的依赖方时 409。
 - 前端动态挂载移入阶段 3（应用外壳 + 登录态就绪后才有意义），本阶段动作为 API 全链路验证。
+
+## 15. 实现记录（2c 事件总线 + 通知，2026-10-31）
+
+- **派发器**（EventDispatcherService）：原子认领（UPDATE ... RETURNING + FOR UPDATE SKIP LOCKED，多实例安全）→ 订阅匹配（精确 / 前缀通配 todo.* / 全局 *，且订阅模块须在该工作空间启用）→ 一个事件一个租户事务投递（actor_user_id 作为 RLS 上下文；无主事件走管理员通道）→ 失败退避 5s×2^n → 死信；僵死 processing 行 5 分钟自动回收。
+- **outbox**：EventOutboxService.publishInTx —— 业务数据与事件同事务（workspace.created / member.invited / member.role-changed / member.removed / module.enabled / module.disabled + 模块自定义事件）。
+- **内置订阅**：member.invited → 站内通知（收件人已注册时）+ ConsoleMailAdapter（本地打印，生产换 SMTP 适配器）。
+- **通知 API**：GET /v1/notifications、POST /:id/read、POST /read-all。
+- 事件不丢的验证：集成测试覆盖发布→pending→派发→delivered、失败重试计数、耗尽后死信；进程崩溃恢复由 claimed_at 僵死回收保证（代码路径 + 5 分钟阈值）。
