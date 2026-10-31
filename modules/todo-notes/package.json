@@ -1,0 +1,42 @@
+{
+  "name": "@atlas/module-todo-notes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "待办与笔记：第一个正式业务模块（ADR-0003）",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./web": "./src/web/index.tsx",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@atlas/sdk": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "zod": "^4.1.0",
+    "@atlas/ui": "workspace:*",
+    "@tanstack/react-query": "^5.0.0",
+    "next": "^16.0.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^5.9.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
