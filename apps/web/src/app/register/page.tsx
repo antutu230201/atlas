@@ -35,17 +35,18 @@ export default function RegisterPage() {
   });
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-bg px-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <p className="text-sm font-bold tracking-[0.3em] text-primary">ATLAS</p>
-          <p className="mt-1 text-xs text-muted">个人长期成长型系统</p>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-6">
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-32 -right-32 size-96 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute top-1/2 -left-24 size-72 rounded-full bg-info/8 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-sm">
+        <div className="mb-10 text-center">
+          <p className="text-2xl font-bold tracking-[0.3em] text-primary">ATLAS</p>
+          <p className="mt-2 text-xs text-muted">创建你的个人成长空间</p>
         </div>
-        <Card className="shadow-md">
-          <div className="mb-6 space-y-1">
-            <h1 className="text-lg font-semibold">注册</h1>
-            <p className="text-sm text-muted">创建你的个人成长空间</p>
-          </div>
+        <Card variant="glass" className="shadow-lg">
           <form
             className="space-y-4"
             onSubmit={(event) => {
@@ -98,7 +99,7 @@ export default function RegisterPage() {
             </a>
           </p>
         </Card>
-        <p className="mt-8 text-center text-[11px] text-muted/60">你的数据完全属于你，随时可导出</p>
+        <p className="mt-8 text-center text-[11px] text-muted/50">你的数据完全属于你，随时可导出</p>
       </div>
     </main>
   );

@@ -1,6 +1,7 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import type { HealthProbe } from '@atlas/core';
 import { provideAuditInterceptor, AuditService } from './audit/audit.service';
+import { AIController } from './ai/ai.controller';
 import { EventDispatcherService } from './events/event-dispatcher.service';
 import { EventOutboxService } from './events/event-outbox.service';
 import { NotificationController } from './events/notification.controller';
@@ -55,6 +56,7 @@ import {
     WorkspaceController,
     ModuleController,
     NotificationController,
+    AIController,
   ],
   providers: [
     { provide: ENV_TOKEN, useFactory: loadEnv },

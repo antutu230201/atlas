@@ -182,6 +182,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       <p className="px-3 pb-1 pt-4 text-[11px] font-semibold tracking-widest text-muted">
         工作空间
       </p>
+      {item('/assistant', 'AI 助手', pathname === '/assistant', '✦')}
       {workspace ? item('/settings', '设置', pathname === '/settings', '⚙') : null}
       {item('/notifications', '通知', pathname === '/notifications', '✉')}
     </nav>
@@ -214,7 +215,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       <aside
         className={cn(
-          'hidden shrink-0 flex-col gap-6 border-r border-border bg-surface p-4 transition-[width] duration-[var(--duration-base)] md:flex',
+          'glass-strong hidden shrink-0 flex-col gap-6 border-r border-white/20 p-4 transition-[width] duration-[var(--duration-base)] md:flex',
           collapsed ? 'w-16' : 'w-64',
         )}
       >
@@ -242,7 +243,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between gap-3 border-b border-border bg-surface px-4 md:px-6">
+        <header className="glass sticky top-0 z-[var(--z-sticky)] flex h-14 items-center justify-between gap-3 border-b border-white/20 px-4 md:px-6">
           <div className="flex items-center gap-2">
             <button
               type="button"

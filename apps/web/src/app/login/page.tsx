@@ -33,16 +33,22 @@ export default function LoginPage() {
   });
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-bg px-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <p className="text-sm font-bold tracking-[0.3em] text-primary">ATLAS</p>
-          <p className="mt-1 text-xs text-muted">个人长期成长型系统</p>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-6">
+      {/* OriginOS 风格渐变背景球 */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-32 -left-32 size-96 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute top-1/3 -right-24 size-80 rounded-full bg-ok/8 blur-3xl" />
+        <div className="absolute -bottom-24 left-1/4 size-72 rounded-full bg-warn/6 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-sm">
+        <div className="mb-10 text-center">
+          <p className="text-2xl font-bold tracking-[0.3em] text-primary">ATLAS</p>
+          <p className="mt-2 text-xs text-muted">个人长期成长型系统</p>
         </div>
-        <Card className="shadow-md">
+        <Card variant="glass" className="shadow-lg">
           <div className="mb-6 space-y-1">
-            <h1 className="text-lg font-semibold">登录</h1>
-            <p className="text-sm text-muted">欢迎回来</p>
+            <h1 className="text-lg font-semibold">欢迎回来</h1>
           </div>
           <form
             className="space-y-4"
@@ -84,7 +90,7 @@ export default function LoginPage() {
             </a>
           </p>
         </Card>
-        <p className="mt-8 text-center text-[11px] text-muted/60">
+        <p className="mt-8 text-center text-[11px] text-muted/50">
           平台内核 + 可插拔模块 · 数据完全属于你
         </p>
       </div>

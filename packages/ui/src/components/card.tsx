@@ -1,12 +1,21 @@
 import type { ComponentPropsWithRef } from 'react';
 import { cn } from '../cn';
 
-export function Card({ className, ref, ...props }: ComponentPropsWithRef<'div'>) {
+export function Card({
+  className,
+  variant = 'solid',
+  ref,
+  ...props
+}: ComponentPropsWithRef<'div'> & { variant?: 'solid' | 'glass' }) {
   return (
     <div
       ref={ref}
       className={cn(
-        'rounded-md border border-border bg-surface p-5 shadow-soft transition-shadow duration-[var(--duration-base)]',
+        'rounded-[var(--radius-md)] p-5 transition-all duration-[var(--duration-base)]',
+        variant === 'glass'
+          ? 'glass border-white/30 shadow-soft'
+          : 'border border-border bg-surface shadow-soft',
+        'hover:shadow-md',
         className,
       )}
       {...props}

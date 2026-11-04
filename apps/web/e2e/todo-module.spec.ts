@@ -22,7 +22,7 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
     // 启用待办模块
     await page.goto('/settings');
     await page.getByRole('button', { name: '模块', exact: true }).click();
-    const todoCard = page.locator('div.rounded-md.border', { hasText: 'todo_notes' }).first();
+    const todoCard = page.getByTestId('module-card-todo_notes');
     const enable = todoCard.getByRole('button', { name: '启用' });
     await expect(enable).toBeVisible({ timeout: 10_000 });
     await enable.click();
@@ -85,7 +85,7 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
 
     await page.goto('/settings');
     await page.getByRole('button', { name: '模块', exact: true }).click();
-    const todoCard = page.locator('div.rounded-md.border', { hasText: 'todo_notes' }).first();
+    const todoCard = page.getByTestId('module-card-todo_notes');
     const enable = todoCard.getByRole('button', { name: '启用' });
     await expect(enable).toBeVisible({ timeout: 10_000 });
     await enable.click();

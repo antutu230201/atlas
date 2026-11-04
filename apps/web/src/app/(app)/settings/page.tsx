@@ -254,7 +254,7 @@ function ModulesTab({ slug }: { slug: string }) {
   return (
     <div className="space-y-3">
       {(modules.data ?? []).map((m) => (
-        <Card key={m.name}>
+        <Card key={m.name} data-testid={`module-card-${m.name}`}>
           <CardHeader>
             <div>
               <CardTitle>
