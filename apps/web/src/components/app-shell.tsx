@@ -175,7 +175,9 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
     <nav aria-label="主导航" className="space-y-1">
       {item('/', '今天', pathname === '/', '☀')}
       <p className="px-3 pb-1 pt-4 text-[11px] font-semibold tracking-widest text-muted">模块</p>
-      {moduleRoutes.length === 0 ? (
+      {modules.isError ? (
+        <p className="px-3 text-xs text-err">模块状态加载失败，请稍后重试。</p>
+      ) : moduleRoutes.length === 0 ? (
         <p className="px-3 text-xs text-muted">尚无已启用模块，可在设置中启用。</p>
       ) : (
         moduleRoutes.map((route) => item(route.href, route.label, pathname === route.href))
@@ -193,6 +195,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 function ShellBody({ children }: { children: React.ReactNode }) {
   const collapsed = useUiStore((state) => state.sidebarCollapsed);
   const toggle = useUiStore((state) => state.toggleSidebar);
+  const chromeHidden = useUiStore((state) => state.chromeHidden);
   const session = useSession();
   const router = useRouter();
   const logout = useLogout();
@@ -214,105 +217,112 @@ function ShellBody({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside
-        className={cn(
-          'glass-strong hidden shrink-0 flex-col gap-6 border-r border-white/20 p-4 transition-[width] duration-[var(--duration-base)] md:flex',
-          collapsed ? 'w-16' : 'w-64',
-        )}
-      >
-        <div className="flex items-center justify-between">
-          {!collapsed ? (
-            <Link href="/" className="text-sm font-bold tracking-widest text-primary">
-              ATLAS
-            </Link>
-          ) : (
-            <span className="text-sm font-bold text-primary">A</span>
+      {/* chromeHidden：沉浸模式（大屏全屏），侧栏/顶栏/抽屉隐藏，命令面板仍可用 */}
+      {!chromeHidden ? (
+        <aside
+          className={cn(
+            'glass-strong hidden shrink-0 flex-col gap-6 p-4 transition-[width] duration-[var(--duration-base)] md:flex',
+            collapsed ? 'w-16' : 'w-64',
           )}
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={collapsed ? '展开导航' : '折叠导航'}
-            className="rounded-sm p-1 text-muted transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          >
-            {collapsed ? '»' : '«'}
-          </button>
-        </div>
-        <WorkspaceSwitcher compact={collapsed} />
-        <div className={cn(collapsed && 'hidden')}>
-          <SidebarNav />
-        </div>
-      </aside>
+        >
+          <div className="flex items-center justify-between">
+            {!collapsed ? (
+              <Link href="/" className="text-sm font-bold tracking-widest text-primary">
+                ATLAS
+              </Link>
+            ) : (
+              <span className="text-sm font-bold text-primary">A</span>
+            )}
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label={collapsed ? '展开导航' : '折叠导航'}
+              className="rounded-sm p-1 text-muted transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              {collapsed ? '»' : '«'}
+            </button>
+          </div>
+          <WorkspaceSwitcher compact={collapsed} />
+          <div className={cn(collapsed && 'hidden')}>
+            <SidebarNav />
+          </div>
+        </aside>
+      ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="glass sticky top-0 z-[var(--z-sticky)] flex h-14 items-center justify-between gap-3 border-b border-white/20 px-4 md:px-6">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded-sm border border-border p-1.5 text-muted md:hidden"
-              aria-label="打开导航"
-              onClick={() => setMobileOpen(true)}
-            >
-              ☰
-            </button>
-            <span className="hidden text-sm text-muted md:inline">{workspace?.name ?? ''}</span>
-          </div>
+        {!chromeHidden ? (
+          <header className="glass sticky top-0 z-[var(--z-sticky)] flex h-14 items-center justify-between gap-3 px-4 md:px-6">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded-sm border border-border p-1.5 text-muted md:hidden"
+                aria-label="打开导航"
+                onClick={() => setMobileOpen(true)}
+              >
+                ☰
+              </button>
+              <span className="hidden text-sm text-muted md:inline">{workspace?.name ?? ''}</span>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPaletteOpen(true)}
-              aria-label="打开命令面板"
-              className="hidden items-center gap-1.5 rounded-sm border border-border bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:inline-flex"
-            >
-              <span>搜索</span>
-              <kbd className="rounded-xs bg-surface-hover px-1 text-[10px]">Ctrl+K</kbd>
-            </button>
-            <ThemeToggle />
-            <NotificationBell />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="用户菜单"
-                  className="inline-flex size-8 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary"
-                >
-                  {(session.data?.user.displayName ?? '？').slice(0, 1)}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{session.data?.user.email ?? ''}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={() => {
-                    void logout.mutateAsync().then(() => {
-                      queryClient.clear();
-                      router.replace('/login');
-                    });
-                  }}
-                >
-                  登出
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </header>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                aria-label="打开命令面板"
+                className="hidden items-center gap-1.5 rounded-sm border border-border bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:inline-flex"
+              >
+                <span>搜索</span>
+                <kbd className="rounded-xs bg-surface-hover px-1 text-[10px]">Ctrl+K</kbd>
+              </button>
+              <ThemeToggle />
+              <NotificationBell />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="用户菜单"
+                    className="inline-flex size-8 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary"
+                  >
+                    {(session.data?.user.displayName ?? '？').slice(0, 1)}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>{session.data?.user.email ?? ''}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      void logout.mutateAsync().then(() => {
+                        queryClient.clear();
+                        router.replace('/login');
+                      });
+                    }}
+                  >
+                    登出
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
+        ) : null}
 
-        <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
+        <main className={cn('min-w-0 flex-1', !chromeHidden && 'p-4 md:p-8')}>{children}</main>
       </div>
 
-      <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
-        <DrawerContent className="p-4">
-          <DrawerHeader>
-            <DrawerTitle className="text-sm font-bold tracking-widest text-primary">
-              ATLAS
-            </DrawerTitle>
-          </DrawerHeader>
-          <DrawerBody className="space-y-4">
-            <WorkspaceSwitcher />
-            <SidebarNav onNavigate={() => setMobileOpen(false)} />
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
+      {!chromeHidden ? (
+        <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
+          <DrawerContent className="p-4">
+            <DrawerHeader>
+              <DrawerTitle className="text-sm font-bold tracking-widest text-primary">
+                ATLAS
+              </DrawerTitle>
+            </DrawerHeader>
+            <DrawerBody className="space-y-4">
+              <WorkspaceSwitcher />
+              <SidebarNav onNavigate={() => setMobileOpen(false)} />
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
+      ) : null}
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>

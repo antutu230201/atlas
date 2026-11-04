@@ -4,21 +4,42 @@
 
 /* 组件库以 TS 源码形态参与编译，其类名需纳入 Tailwind 扫描 */
 @source '../../../../packages/ui/src';
-@source '../../../../modules/*/src/web';
+/* 模块 web 源码同理；目录型通配不被 Tailwind 扫描器展开，
+   必须落到文件级 glob（曾导致大屏专用类全部丢失、图标巨型化） */
+@source '../../../../modules/**/src/web/**/*.{ts,tsx}';
 
-/* OriginOS 7 风格玻璃态工具类（需在主 CSS 入口定义，不能在 @import 的文件中） */
+/* OriginOS 7 风格玻璃态工具类（需在主 CSS 入口定义，不能在 @import 的文件中）；
+   视觉值全部来自 tokens.css 的 --glass-* 主题变量，亮暗三态自动切换 */
 @utility glass {
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--glass-bg);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 2px 16px rgba(60, 50, 30, 0.06);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 @utility glass-strong {
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--glass-strong-bg);
   backdrop-filter: blur(28px) saturate(200%);
   -webkit-backdrop-filter: blur(28px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 4px 24px rgba(60, 50, 30, 0.08);
+  border: 1px solid var(--glass-strong-border);
+  box-shadow: var(--glass-strong-shadow);
+}
+
+/* 大屏滚动头条：位移 50%（内容渲染两遍拼接），实际时长按内容长度以内联变量传入；
+   悬停暂停 + 尊重 prefers-reduced-motion（tokens.css 全局降级） */
+@keyframes screen-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@utility screen-marquee {
+  animation: screen-marquee var(--marquee-duration, 60s) linear infinite;
+  &:hover {
+    animation-play-state: paused;
+  }
 }

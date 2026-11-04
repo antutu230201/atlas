@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button } from '@atlas/ui';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
 import { useEnabledModules } from '@/lib/queries';
 import { getModuleWidget } from '@/lib/module-registry';
@@ -18,6 +20,7 @@ const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 export default function TodayPage() {
   const { workspace, user } = useActiveWorkspace();
   const modules = useEnabledModules(workspace?.slug ?? null);
+  const queryClient = useQueryClient();
   const enabled = modules.data ?? [];
   const now = new Date();
   const dateStr = `${now.getMonth() + 1} 月 ${now.getDate()} 日 · 周${WEEKDAYS[now.getDay()]}`;
@@ -38,7 +41,35 @@ export default function TodayPage() {
         </p>
       </header>
 
-      {workspace && enabled.length === 0 ? (
+      {workspace && modules.isError ? (
+        <section className="rounded-md border border-err/30 bg-err-soft p-8 text-center">
+          <p className="text-sm font-semibold text-err">模块状态加载失败</p>
+          <p className="mt-2 text-xs text-muted">请确认服务是否正常，然后重试。</p>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-4"
+            onClick={() =>
+              void queryClient.invalidateQueries({ queryKey: ['module-status', workspace.slug] })
+            }
+          >
+            重试
+          </Button>
+        </section>
+      ) : null}
+
+      {workspace && modules.isPending ? (
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold tracking-widest text-muted">小组件</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1].map((index) => (
+              <div key={index} className="h-32 animate-pulse rounded-md bg-surface-hover" />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {workspace && !modules.isPending && !modules.isError && enabled.length === 0 ? (
         <section className="rounded-md border border-dashed border-border bg-surface p-8 text-center">
           <p className="text-sm font-semibold">启用第一个模块，开始使用 Atlas</p>
           <p className="mt-2 text-xs text-muted">
@@ -58,23 +89,19 @@ export default function TodayPage() {
           <section className="space-y-3">
             <h2 className="text-xs font-semibold tracking-widest text-muted">小组件</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {modules.isPending
-                ? [0, 1].map((index) => (
-                    <div key={index} className="h-32 animate-pulse rounded-md bg-surface-hover" />
-                  ))
-                : enabled.map((module) =>
-                    module.widgets?.map((widget) => {
-                      const Widget = getModuleWidget(module.name, widget.component);
-                      if (!Widget || !workspace) return null;
-                      return (
-                        <Widget
-                          key={`${module.name}/${widget.id}`}
-                          workspaceSlug={workspace.slug}
-                          moduleName={module.name}
-                        />
-                      );
-                    }),
-                  )}
+              {enabled.map((module) =>
+                module.widgets?.map((widget) => {
+                  const Widget = getModuleWidget(module.name, widget.component);
+                  if (!Widget || !workspace) return null;
+                  return (
+                    <Widget
+                      key={`${module.name}/${widget.id}`}
+                      workspaceSlug={workspace.slug}
+                      moduleName={module.name}
+                    />
+                  );
+                }),
+              )}
             </div>
           </section>
 

@@ -78,6 +78,20 @@
 
   /* OriginOS 7 风格渐变背景 */
   --bg-gradient: linear-gradient(145deg, #faf7f1 0%, #f5efe5 30%, #eee6d8 60%, #f0e8dc 100%);
+
+  /* 玻璃态（glass / glass-strong 工具类的视觉来源，亮色 = 晨白纸感） */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.35);
+  --glass-shadow: 0 2px 16px rgba(60, 50, 30, 0.06);
+  --glass-strong-bg: rgba(255, 255, 255, 0.75);
+  --glass-strong-border: rgba(255, 255, 255, 0.4);
+  --glass-strong-shadow: 0 4px 24px rgba(60, 50, 30, 0.08);
+
+  /* 个人大屏（dashboard 模块）氛围令牌：壁纸遮罩 + 极光底色 */
+  --screen-scrim: rgba(250, 247, 241, 0.82);
+  --screen-aurora-1: #5b66e0;
+  --screen-aurora-2: #3aa4c9;
+  --screen-aurora-3: #c17ad6;
 }
 
 /* ---------- 暗色主题（晨白暗色 = 暖夜） ---------- */
@@ -111,6 +125,19 @@
   --shadow-glow: 0 0 0 1px rgba(152, 162, 242, 0.1), 0 4px 20px rgba(152, 162, 242, 0.08);
 
   --bg-gradient: linear-gradient(145deg, #1a1814 0%, #201d18 30%, #25221c 60%, #1e1b16 100%);
+
+  /* 暖夜玻璃态：深色半透明底 + 暖白细描边（暗色玻璃拟态不用纯白底，避免整块发白） */
+  --glass-bg: rgba(37, 34, 28, 0.55);
+  --glass-border: rgba(241, 237, 228, 0.1);
+  --glass-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+  --glass-strong-bg: rgba(30, 27, 22, 0.78);
+  --glass-strong-border: rgba(241, 237, 228, 0.14);
+  --glass-strong-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+
+  --screen-scrim: rgba(12, 11, 9, 0.68);
+  --screen-aurora-1: #35418f;
+  --screen-aurora-2: #1d6377;
+  --screen-aurora-3: #6f3c85;
 }
 
 /* system 主题：跟随系统偏好在两种取值间切换 */
@@ -145,6 +172,18 @@
     --shadow-glow: 0 0 0 1px rgba(152, 162, 242, 0.1), 0 4px 20px rgba(152, 162, 242, 0.08);
 
     --bg-gradient: linear-gradient(145deg, #1a1814 0%, #201d18 30%, #25221c 60%, #1e1b16 100%);
+
+    --glass-bg: rgba(37, 34, 28, 0.55);
+    --glass-border: rgba(241, 237, 228, 0.1);
+    --glass-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+    --glass-strong-bg: rgba(30, 27, 22, 0.78);
+    --glass-strong-border: rgba(241, 237, 228, 0.14);
+    --glass-strong-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+
+    --screen-scrim: rgba(12, 11, 9, 0.68);
+    --screen-aurora-1: #35418f;
+    --screen-aurora-2: #1d6377;
+    --screen-aurora-3: #6f3c85;
   }
 }
 

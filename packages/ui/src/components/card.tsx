@@ -12,9 +12,7 @@ export function Card({
       ref={ref}
       className={cn(
         'rounded-[var(--radius-md)] p-5 transition-all duration-[var(--duration-base)]',
-        variant === 'glass'
-          ? 'glass border-white/30 shadow-soft'
-          : 'border border-border bg-surface shadow-soft',
+        variant === 'glass' ? 'glass shadow-soft' : 'border border-border bg-surface shadow-soft',
         'hover:shadow-md',
         className,
       )}
