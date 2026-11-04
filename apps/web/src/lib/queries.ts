@@ -61,15 +61,25 @@ export function useWorkspaces(enabled = true) {
   });
 }
 
-export function useEnabledModules(slug: string | null) {
+/**
+ * 统一模块状态查询：侧边栏和设置页共用同一缓存条目。
+ * 设置页启停模块后 invalidate 此 key，侧边栏立即更新。
+ */
+export function useModuleStatus(slug: string | null) {
   return useQuery({
-    queryKey: ['modules-enabled', slug],
-    queryFn: () =>
-      api<ModuleStatus[]>(`/modules/workspaces/${slug}`).then((list) =>
-        list.filter((m) => m.enabled),
-      ),
+    queryKey: ['module-status', slug],
+    queryFn: () => api<ModuleStatus[]>(`/modules/workspaces/${slug}`),
     enabled: Boolean(slug),
   });
+}
+
+/** 便捷 hook：只返回已启用的模块 */
+export function useEnabledModules(slug: string | null) {
+  const query = useModuleStatus(slug);
+  return {
+    ...query,
+    data: query.data?.filter((m) => m.enabled) ?? undefined,
+  };
 }
 
 export function useNotifications(enabled = true) {

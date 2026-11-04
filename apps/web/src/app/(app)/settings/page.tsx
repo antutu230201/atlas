@@ -12,6 +12,7 @@ import {
   Field,
   Input,
   Skeleton,
+  useToast,
   Table,
   TBody,
   TD,
@@ -86,6 +87,7 @@ export default function SettingsPage() {
 }
 
 function MembersTab({ slug, me }: { slug: string; me: string }) {
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const members = useQuery({
     queryKey: ['members', slug],
@@ -101,6 +103,7 @@ function MembersTab({ slug, me }: { slug: string; me: string }) {
     onSuccess: () => {
       setError(null);
       setEmail('');
+      toast({ title: '邀请已发送', description: email, variant: 'ok' });
       void queryClient.invalidateQueries({ queryKey: ['members', slug] });
     },
     onError: (e: Error) => setError(e.message),
@@ -112,7 +115,10 @@ function MembersTab({ slug, me }: { slug: string; me: string }) {
         method: 'PATCH',
         json: { role: input.role },
       }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['members', slug] }),
+    onSuccess: () => {
+      toast({ title: '角色已更新', variant: 'ok' });
+      void queryClient.invalidateQueries({ queryKey: ['members', slug] });
+    },
   });
 
   const remove = useMutation({
@@ -217,7 +223,7 @@ interface ModuleStatus {
 function ModulesTab({ slug }: { slug: string }) {
   const queryClient = useQueryClient();
   const modules = useQuery({
-    queryKey: ['modules-status', slug],
+    queryKey: ['module-status', slug],
     queryFn: () => api<ModuleStatus[]>(`/modules/workspaces/${slug}`),
   });
 
@@ -227,8 +233,7 @@ function ModulesTab({ slug }: { slug: string }) {
         method: 'POST',
       }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['modules-status', slug] });
-      void queryClient.invalidateQueries({ queryKey: ['modules-enabled', slug] });
+      void queryClient.invalidateQueries({ queryKey: ['module-status', slug] });
     },
   });
 

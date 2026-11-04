@@ -22,6 +22,7 @@ import {
   cn,
 } from '@atlas/ui';
 import { api } from '@/lib/api';
+import { NotificationBell } from './notification-bell';
 import { useEnabledModules, useLogout, useSession } from '@/lib/queries';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
 import { useUiStore } from '@/lib/store';
@@ -267,12 +268,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
               <kbd className="rounded-xs bg-surface-hover px-1 text-[10px]">Ctrl+K</kbd>
             </button>
             <ThemeToggle />
-            <Link
-              href="/notifications"
-              className="rounded-sm px-2 py-1 text-sm text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              通知
-            </Link>
+            <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
