@@ -1,6 +1,6 @@
 # Atlas · 个人成长系统
 
-平台内核 + 可插拔模块的个人长期成长型系统。设计全文见 `docs/design/总体设计（原始）.md`，项目宪法见 [AGENTS.md](./AGENTS.md)，当前进度见 [docs/roadmap.md](./docs/roadmap.md)。
+平台内核 + 可插拔模块的个人长期成长型系统。设计全文见 `docs/design/总体设计（原始）.md`，项目宪法见 [AGENTS.md](./AGENTS.md)，当前进度见 [docs/roadmap.md](./docs/roadmap.md)。 换电脑或新会话开工，先读 [docs/guide/开发环境手册.md](./docs/guide/开发环境手册.md)。
 
 ## 快速开始（三条命令）
 
