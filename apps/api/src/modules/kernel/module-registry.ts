@@ -21,9 +21,12 @@ export interface LoadedModule {
 export class ModuleRegistryService {
   private cache: Promise<Map<string, LoadedModule>> | null = null;
 
-  /** 首次调用时发现并缓存；后续同步返回 */
+  /** 首次调用时发现并缓存；失败不缓存（模块包修复/构建完成后下次调用自动重试） */
   async loaded(): Promise<Map<string, LoadedModule>> {
-    this.cache ??= this.discover();
+    this.cache ??= this.discover().catch((error: unknown) => {
+      this.cache = null;
+      throw error;
+    });
     return this.cache;
   }
 
