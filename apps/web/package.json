@@ -4,9 +4,9 @@
   "private": true,
   "description": "Atlas 前端应用（阶段 0：外壳占位与健康状态展示）",
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "next dev",
     "build": "next build",
-    "start": "next start --port 3000",
+    "start": "next start",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test"
   },
@@ -20,7 +20,8 @@
     "react-dom": "^19.3.0",
     "zustand": "^5.0.16",
     "@atlas/module-sample-note": "workspace:*",
-    "@atlas/module-todo-notes": "workspace:*"
+    "@atlas/module-todo-notes": "workspace:*",
+    "@atlas/module-dashboard": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

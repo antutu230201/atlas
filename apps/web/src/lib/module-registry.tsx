@@ -2,6 +2,7 @@
 
 import type { ComponentType } from 'react';
 import { SampleNoteListPage } from '@atlas/module-sample-note/web';
+import { DashboardScreenPage } from '@atlas/module-dashboard/web';
 import { TodoListPage, TodoTodayWidget, TodoTrashPage } from '@atlas/module-todo-notes/web';
 
 /**
@@ -19,6 +20,7 @@ export interface ModulePageProps {
 export const moduleWebRegistry: Record<string, Record<string, ComponentType<ModulePageProps>>> = {
   sample_note: { list: SampleNoteListPage },
   todo_notes: { list: TodoListPage, trash: TodoTrashPage },
+  dashboard: { screen: DashboardScreenPage },
 };
 
 export const moduleWidgetRegistry: Record<

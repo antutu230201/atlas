@@ -20,13 +20,14 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
     await page.getByRole('button', { name: '创建', exact: true }).click();
     await expect(page.getByText('当前在「外壳验收空间」')).toBeVisible({ timeout: 10_000 });
 
-    // 启用示例模块（设置 → 模块页签）
+    // 启用示例模块（设置 → 模块页签；按 testid 定位，不依赖模块卡片顺序）
     await page.goto('/settings');
     await page.getByRole('button', { name: '模块', exact: true }).click();
-    const enableButton = page.getByRole('button', { name: '启用', exact: true }).first();
+    const sampleCard = page.getByTestId('module-card-sample_note');
+    const enableButton = sampleCard.getByRole('button', { name: '启用', exact: true });
     await expect(enableButton).toBeVisible({ timeout: 10_000 });
     await enableButton.click();
-    await expect(page.getByRole('button', { name: '停用', exact: true }).first()).toBeVisible();
+    await expect(sampleCard.getByRole('button', { name: '停用', exact: true })).toBeVisible();
 
     // 动态模块页直达（导航入口会在挂载重取后出现）
     await page.goto('/m/sample_note/list');

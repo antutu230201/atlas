@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@atlas/core": "workspace:*",
+    "@atlas/module-dashboard": "workspace:*",
     "@atlas/module-sample-note": "workspace:*",
     "@atlas/module-todo-notes": "workspace:*",
     "@atlas/sdk": "workspace:*",
