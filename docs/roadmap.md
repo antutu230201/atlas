@@ -145,6 +145,71 @@
 4. 大屏卡片 widget 化输出到首页（manifest widgets），保持"新增功能 = 新增模块"铁律
 5. 性能与体验：壁纸懒加载/降分辨率、热榜虚拟滚动、全屏模式轮播布局（ TV/平板挂墙场景）
 
+## 大屏 Personal OS 视觉重构（2026-11-05）
+
+- [x] 参考深色 Knowledge OS / 玻璃拟态仪表盘，建立独立于全站晨白主题的 `.dashboard-screen` 暗夜语义层；颜色、圆角、阴影、动效时长仍统一在 `packages/tokens/tokens.css`。
+- [x] 重排为「顶部信号流 → 时间核心 + 天气 → AI 摘要 / 热力图 → 五源热榜 → 倒计时」的 Bento 层级；保留五源热榜、排名变化、健康状态、全屏、设置和城市引导等既有能力。
+- [x] 动效：极光漂移、网格背景、时间轨道旋转 / 呼吸核心 / 脉冲环、卡片交错入场、天气曲线描边、热榜悬停位移；全局 `prefers-reduced-motion` 自动降级。
+- [x] 新增纯 CSS/SVG 视觉组件，无新增前端依赖；天气逐时列表改为 SVG 曲线，热榜源增加彩色标识，倒计时空状态改为横向紧凑表单。
+- [x] 验收：`pnpm typecheck` / `pnpm lint` / `pnpm --filter @atlas/web build`、适配器单测 7/7、大屏 e2e 2/2 通过；浏览器实测 1920×1080、全页、390px 手机宽、亮/暗/system 三态及 reduced-motion，桌面无横向溢出。
+
+## 大屏性能 / 主题 / 天气联动（2026-11-05 第二轮）
+
+用户反馈三件事：渲染比之前更卡、要保留亮暗切换、天气要能带动整页场景。逐项处理如下。
+
+### 卡顿根因与修复
+
+- 根因：3 个 `filter: blur(100px)` 极光层常驻漂移 + 天气/AI/时间核心的 `blur-2xl/3xl` 光斑 + 12 张大阴影卡片，`backdrop-filter` 虽被支持但被 Tailwind 类覆盖。
+- 处理：**全部实时模糊清零**（`blur()` 元素数 6 → 0），改用预柔化径向渐变 `screen-sky`；`screen-card` 去掉 `backdrop-filter` 并加 `contain: paint style`；`transition` 不再动 `box-shadow`；常驻动画从 26 个降到 ~9 个（其余为一次性入场）；保留 `will-change: transform` 只给天气层。
+- 实测（1920×1080、Chromium、5 秒采样）：静止稳定 58–60fps，DOM 内 `blur=0`、`backdrop=0`。
+
+### 滚动掉帧（第二轮下半场，真正的卡顿主因）
+
+首轮只测了「静止 fps」，漏了「滚动 fps」，所以误判为已解决。补测后复现了用户的真实体感：
+
+| 指标（滚动 3 秒） | 修复前 | 修复后（dev） | 修复后（prod） |
+| ----------------- | ------ | ------------- | -------------- |
+| fps               | 37     | 60            | 60             |
+| p95 帧耗时        | 49.6ms | 18.5ms        | 17.4ms         |
+| 超时帧（>33ms）   | 40     | 0             | 0              |
+| Layout            | 60ms   | 43ms          | 51ms           |
+| RecalcStyle       | 56ms   | 37ms          | 59ms           |
+| Script            | 69ms   | 39ms          | 41ms           |
+
+- 根因：`screen-sky` / `screen-grid` / `screen-weather` 三层全屏层都是 `position: absolute`，跟着文档流滚，**每滚动一帧就要重绘整屏渐变 + 整屏网格 + 雨雪瓦片**。
+- 修复：三层改 `position: fixed`（背景容器 `fixed inset-0`，`.screen-weather` 同步改 fixed）。滚动时只需合成已缓存的光栅层，不再重绘。
+- 教训：动效类页面的性能门禁必须包含**滚动采样**，只测静止 fps 会漏掉画布重绘成本。
+
+### 主题三态（light / dark / system）
+
+- `packages/tokens/tokens.css` 改为**亮色默认** + `[data-theme='dark']` 与 `@media (prefers-color-scheme: dark) { [data-theme='system'] }` 两份暗夜覆盖；`.dashboard-screen` 只做语义映射，不再强制 `color-scheme: dark`。
+- 三态持久化沿用 `atlas-theme`（`THEME_INIT_SCRIPT` 首屏防闪烁）；大屏头部在沉浸态提供一份 `ThemeToggle`，非沉浸态复用外壳顶栏的那一份，避免同一页面出现两个相同开关。
+
+### 天气联动场景
+
+- 新增 `modules/dashboard/src/web/weather-atmosphere.tsx`：`sun/partly/overcast/fog/drizzle/rain/heavy-rain/snow/sleet/thunder` → `clear | partly | cloudy | fog | rain | snow | storm` 七种场景。
+- 背景层：晴空光晕、云层漂移、薄雾横向流动；前景层（仅雨/雪/雷雨）：雨丝、雪点、闪电泛光横跨内容，透明度压到 0.38–0.5 保证可读。
+- 实现只用重复线性/径向渐变 + `transform` 动画，不引入 Canvas / rAF 常驻引擎，也不产生新的 `blur` 开销。
+- 雪点用三层互不成倍数的小瓦片（137×149 / 211×173 / 97×263）+ 前后景不同时长（11s / 19s 带横向摆动），消除单瓦片平铺的规则点阵感；雨分近远两层同向下落（1.15s / 2.4s）形成纵深，避免两层对穿。
+
+### 同轮附带的密度修复
+
+- 热力图空格原本用 `--screen-panel-hover`，与卡片底色几乎同值导致整片格子"消失"；新增 `--screen-cell` 令牌 + `screen-cell` 工具类，格子改为 `aspect-square` 自适应铺满卡片宽度（约 85%）。
+- 一言卡改横向满宽排版（大号「+ 右列 DAILY QUOTE/HITOKOTO 元信息），并与 AI 摘要卡一起撑满左栏，使左右两栏底边齐平。
+
+### 验收
+
+- `pnpm typecheck` 14/14、`pnpm lint`、`pnpm format:check`、`pnpm --filter @atlas/web build`、大屏 e2e 2/2 全绿。
+- 浏览器实测 8 个组合（晴/雨/雪/雾/雷雨 × 亮暗 + 390px 移动端 + reduced-motion）：`blur=0`、`backdrop=0`、无横向溢出、无控制台报错、60fps；reduced-motion 下动画时长降至 0.01ms（等效停播）。
+
+### 环境教训：不要把假数据源留在日常实例上
+
+- 排障时用 `ATLAS_DASHBOARD_FAKE=1` 起过 API，之后忘记摘掉，导致用户看到「热搜全是测试热搜」「定位返回杭州假坐标」。
+- 现在区分两套环境：
+  - 日常实例：`3001`，**不带** `ATLAS_DASHBOARD_FAKE`，走微博/抖音/B站/百度/头条真实源 + open-meteo 天气 + ip-api/ipwho.is 定位。
+  - E2E 实例：`3011`（API）+ `3010`（web），带 fake，`E2E_API_PORT=3011 E2E_WEB_PORT=3010` 跑；因为 e2e 断言的是「测试热搜第 N 条」，拿真实源跑必然失败。
+- 改完数据源要顺手验一遍：`POST .../dashboard/call/detectLocation` 返回的城市、`snapshot.hot.*.payload[0].title` 是否为真实标题。
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。

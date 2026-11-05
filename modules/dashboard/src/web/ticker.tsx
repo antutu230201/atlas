@@ -33,14 +33,20 @@ export function Ticker({ sources }: { sources: Record<string, SourceEnvelope<Hot
   return (
     <div className="overflow-hidden" role="marquee" aria-label="滚动头条">
       <div
-        className="screen-marquee flex w-max items-center gap-8"
+        className="screen-marquee flex w-max items-center gap-0"
         style={{ '--marquee-duration': `${duration}s` } as React.CSSProperties}
       >
         {[0, 1].map((copy) => (
-          <ul key={copy} className="flex items-center gap-8" aria-hidden={copy === 1}>
+          <ul key={copy} className="flex items-center" aria-hidden={copy === 1}>
             {entries.map((entry, index) => (
-              <li key={`${copy}-${index}`} className="flex items-center gap-2 text-xs">
-                <span className="rounded-xs bg-primary-soft px-1.5 py-0.5 font-semibold text-[10px] text-primary">
+              <li
+                key={`${copy}-${index}`}
+                className="mr-8 flex shrink-0 items-center gap-2 text-[11px]"
+              >
+                <span className="font-mono text-[9px] text-muted/50">
+                  {String(entry.item.rank).padStart(2, '0')}
+                </span>
+                <span className="rounded-xs border border-border bg-primary-soft px-1.5 py-0.5 font-semibold text-[9px] text-primary">
                   {entry.sourceLabel}
                 </span>
                 {entry.item.url ? (
@@ -48,13 +54,14 @@ export function Ticker({ sources }: { sources: Record<string, SourceEnvelope<Hot
                     href={entry.item.url}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="max-w-64 truncate transition-colors hover:text-primary"
+                    className="max-w-64 truncate text-muted transition-colors hover:text-primary"
                   >
                     {entry.item.title}
                   </a>
                 ) : (
-                  <span className="max-w-64 truncate">{entry.item.title}</span>
+                  <span className="max-w-64 truncate text-muted">{entry.item.title}</span>
                 )}
+                <span className="ml-4 size-1 rounded-full bg-border" aria-hidden />
               </li>
             ))}
           </ul>

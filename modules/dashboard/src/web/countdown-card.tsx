@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button, Input, useToast } from '@atlas/ui';
 import type { CountdownItem } from './types';
+import { ScreenIcon } from './icons';
 
 function daysFromToday(targetDate: string): number | null {
   const target = new Date(`${targetDate}T00:00:00`);
@@ -50,18 +51,36 @@ export function CountdownSection({
   };
 
   return (
-    <section aria-label="倒计时与纪念日" className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold tracking-widest text-muted">倒计时 · 纪念日</h2>
-        <span className="text-[10px] text-muted">{items.length} 个</span>
+    <section
+      aria-label="倒计时与纪念日"
+      className="screen-reveal space-y-3"
+      style={{ '--screen-index': 10 } as React.CSSProperties}
+    >
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <ScreenIcon name="calendar" className="size-4 text-primary" />
+          <div>
+            <h2 className="text-sm font-semibold">倒计时与纪念日</h2>
+            <p className="screen-label mt-0.5 !text-[8px]">Moments worth waiting for</p>
+          </div>
+        </div>
+        <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[9px] text-muted">
+          {String(items.length).padStart(2, '0')}
+        </span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div
+        className={
+          items.length === 0
+            ? 'grid gap-3 sm:grid-cols-2'
+            : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4'
+        }
+      >
         {items.map((item) => {
           const days = daysFromToday(item.targetDate);
           const urgent = days !== null && days >= 0 && days <= 7;
           return (
-            <div key={item.id} className="glass relative rounded-md p-4">
+            <article key={item.id} className="screen-card group p-4 hover:-translate-y-0.5">
               <div className="flex items-start justify-between gap-2">
                 <p className="min-w-0 flex-1 truncate text-sm font-semibold">{item.title}</p>
                 {canWrite ? (
@@ -69,56 +88,88 @@ export function CountdownSection({
                     type="button"
                     aria-label={item.pinned ? '取消置顶' : '置顶'}
                     onClick={() => togglePin(item)}
-                    className={`text-sm transition-colors hover:text-primary ${item.pinned ? 'text-warn' : 'text-muted'}`}
+                    className={`rounded-xs p-1 transition-colors hover:bg-primary-soft hover:text-primary ${item.pinned ? 'text-warn' : 'text-muted'}`}
                   >
-                    {item.pinned ? '★' : '☆'}
+                    <ScreenIcon name="pin" className="size-3.5" />
                   </button>
                 ) : null}
               </div>
-              <p className="mt-2 flex items-baseline gap-2">
+              <p className="mt-3 flex items-baseline gap-2">
                 <span
-                  className={`font-mono text-2xl font-semibold tabular-nums ${urgent ? 'text-err' : ''}`}
+                  className={`font-mono text-3xl font-medium tracking-tight tabular-nums ${urgent ? 'text-err' : 'text-primary'}`}
                 >
                   {days === 0 ? '今天' : Math.abs(days ?? 0)}
                 </span>
-                <span className="text-xs text-muted">{daysText(days)}</span>
+                <span className="text-[11px] text-muted">{daysText(days)}</span>
               </p>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] text-muted">{item.targetDate}</span>
+              <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                <span className="font-mono text-[9px] text-muted">{item.targetDate}</span>
                 {canWrite ? (
                   <button
                     type="button"
                     aria-label={`删除 ${item.title}`}
                     onClick={() => remove(item.id)}
-                    className="text-xs text-muted transition-colors hover:text-err"
+                    className="flex items-center gap-1 text-[10px] text-muted transition-colors hover:text-err"
                   >
-                    删除
+                    <ScreenIcon name="trash" className="size-3" /> 删除
                   </button>
                 ) : null}
               </div>
-            </div>
+            </article>
           );
         })}
 
         {canWrite ? (
-          <div className="glass rounded-md p-4">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="事项名称，如：生日"
-              aria-label="倒计时名称"
-              className="mb-2"
-            />
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              aria-label="目标日期"
-              className="mb-2"
-            />
-            <Button size="sm" className="w-full" loading={creating} onClick={submit}>
-              添加倒计时
-            </Button>
+          <div
+            className={`screen-card border-dashed p-4 ${items.length === 0 ? 'sm:col-span-2' : ''}`}
+          >
+            {items.length === 0 ? (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="mb-1 flex shrink-0 items-center gap-2 pr-2 text-[11px] text-muted sm:mb-0">
+                  <ScreenIcon name="plus" className="size-3.5" /> 标记下一个重要时刻
+                </div>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="事项名称，如：生日"
+                  aria-label="倒计时名称"
+                  className="min-w-0 flex-1"
+                />
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  aria-label="目标日期"
+                  className="sm:w-44"
+                />
+                <Button size="sm" className="sm:w-32" loading={creating} onClick={submit}>
+                  添加倒计时
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="mb-3 flex items-center gap-2 text-[11px] text-muted">
+                  <ScreenIcon name="plus" className="size-3.5" /> 标记下一个重要时刻
+                </div>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="事项名称，如：生日"
+                  aria-label="倒计时名称"
+                  className="mb-2"
+                />
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  aria-label="目标日期"
+                  className="mb-2"
+                />
+                <Button size="sm" className="w-full" loading={creating} onClick={submit}>
+                  添加倒计时
+                </Button>
+              </>
+            )}
           </div>
         ) : null}
       </div>

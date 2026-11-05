@@ -43,3 +43,417 @@
     animation-play-state: paused;
   }
 }
+
+/* Personal OS 大屏：所有颜色、圆角、阴影与时长均来自 tokens.css */
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes screen-orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes screen-core-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes screen-line-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes screen-pulse-ring {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+@utility screen-card {
+  position: relative;
+  isolation: isolate;
+  contain: paint style;
+  overflow: hidden;
+  border: 1px solid var(--screen-border);
+  border-radius: var(--screen-radius);
+  background: var(--screen-panel);
+  box-shadow: var(--screen-card-shadow);
+  transition:
+    transform var(--duration-base) var(--ease-out-soft),
+    border-color var(--duration-base) var(--ease-out-soft),
+    background var(--duration-base) var(--ease-out-soft);
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--screen-text) 5.5%, transparent),
+      transparent 38%
+    );
+  }
+  &:hover {
+    border-color: var(--screen-border-bright);
+    background: var(--screen-panel-hover);
+    box-shadow: var(--screen-card-shadow-hover);
+  }
+}
+
+@utility screen-reveal {
+  animation: screen-enter var(--screen-enter-duration) var(--ease-out-soft) both;
+  animation-delay: calc(var(--screen-index, 0) * var(--screen-stagger));
+}
+
+@utility screen-label {
+  color: var(--screen-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+@utility screen-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--screen-border);
+  border-radius: var(--screen-radius-inner);
+  background: color-mix(in srgb, var(--screen-text) 3.5%, transparent);
+  color: var(--screen-muted);
+  font-size: 12px;
+  transition: all var(--duration-fast) var(--ease-out-soft);
+  &:hover {
+    border-color: var(--screen-border-bright);
+    background: color-mix(in srgb, var(--screen-text) 7.5%, transparent);
+    color: var(--screen-text);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--screen-accent);
+    outline-offset: 2px;
+  }
+  &:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+}
+
+@utility screen-grid {
+  background-image:
+    linear-gradient(var(--screen-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--screen-grid) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, var(--screen-text), transparent 82%);
+}
+
+/* 热力图空格：走专用令牌，避免用面板 hover 色导致格子融进卡片底色 */
+@utility screen-cell {
+  background: var(--screen-cell);
+}
+
+/* 预柔化天空：用径向渐变替代大面积 filter: blur，避免每帧重新采样像素 */
+@utility screen-sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(70% 55% at 0% 0%, rgba(var(--screen-accent-rgb), 0.16), transparent 70%),
+    radial-gradient(50% 45% at 100% 0%, rgba(var(--screen-cyan-rgb), 0.12), transparent 70%),
+    radial-gradient(45% 40% at 60% 100%, rgba(var(--screen-pink-rgb), 0.07), transparent 70%);
+}
+
+/* ---------- 天气场景：只动 transform / opacity，叠加低透明度纹理 ---------- */
+@keyframes weather-rain-fall {
+  from {
+    transform: translate3d(0, -180px, 0);
+  }
+  to {
+    transform: translate3d(0, 180px, 0);
+  }
+}
+
+@keyframes weather-snow-fall {
+  from {
+    transform: translate3d(0, -160px, 0);
+  }
+  to {
+    transform: translate3d(0, 160px, 0);
+  }
+}
+
+/* 远景雪带轻微横向摆动，避免两层同速平移时又叠成规则阵 */
+@keyframes weather-snow-drift {
+  from {
+    transform: translate3d(-10px, -160px, 0);
+  }
+  to {
+    transform: translate3d(10px, 160px, 0);
+  }
+}
+
+@keyframes weather-cloud-drift {
+  from {
+    transform: translate3d(-2%, 0, 0);
+  }
+  to {
+    transform: translate3d(2%, 0, 0);
+  }
+}
+
+@keyframes weather-fog-drift {
+  from {
+    transform: translate3d(-6%, 0, 0);
+  }
+  to {
+    transform: translate3d(6%, 0, 0);
+  }
+}
+
+@keyframes weather-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes weather-flash {
+  0%,
+  91%,
+  100% {
+    opacity: 0;
+  }
+  92%,
+  95% {
+    opacity: 0.78;
+  }
+  93%,
+  96% {
+    opacity: 0.18;
+  }
+}
+
+.screen-weather {
+  /* fixed：背景/雨雪不随页面滚动重绘，滚动时只做合成 */
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: paint;
+  background: var(--weather-tint);
+  transition: background var(--duration-slow) var(--ease-out-soft);
+}
+
+.screen-weather.screen-weather-front {
+  z-index: 20;
+  background: transparent;
+}
+
+.screen-weather-front .screen-weather-rain {
+  opacity: 0.38;
+}
+
+.screen-weather-front .screen-weather-snow {
+  opacity: 0.5;
+}
+
+.screen-weather-rain {
+  position: absolute;
+  inset: -20%;
+  background-image: repeating-linear-gradient(
+    112deg,
+    transparent 0 26px,
+    var(--weather-rain) 26px 27px,
+    transparent 27px 62px
+  );
+  background-size: 156px 180px;
+  opacity: 0.8;
+  animation: weather-rain-fall 1.15s linear infinite;
+  will-change: transform;
+}
+
+/* 远景雨：同向下落，更慢、更疏，形成纵深而不是两层对穿 */
+.screen-weather-rain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    106deg,
+    transparent 0 41px,
+    var(--weather-rain) 41px 42px,
+    transparent 42px 94px
+  );
+  background-size: 230px 180px;
+  opacity: 0.5;
+  animation: weather-rain-fall 2.4s linear infinite;
+}
+
+/* 三层互不成倍数的小瓦片，合成周期极长，看不出点阵 */
+.screen-weather-snow {
+  position: absolute;
+  inset: -22%;
+  background-image:
+    radial-gradient(circle at 22% 38%, var(--weather-snow) 0 1.5px, transparent 2.6px),
+    radial-gradient(circle at 68% 12%, var(--weather-snow) 0 1.1px, transparent 2px),
+    radial-gradient(circle at 45% 76%, var(--weather-snow) 0 0.8px, transparent 1.6px);
+  background-position:
+    0 0,
+    47px 83px,
+    91px 19px;
+  background-size:
+    137px 149px,
+    211px 173px,
+    97px 263px;
+  opacity: 0.75;
+  animation: weather-snow-fall 11s linear infinite;
+  will-change: transform;
+}
+
+.screen-weather-snow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 60% 30%, var(--weather-snow) 0 1px, transparent 1.9px),
+    radial-gradient(circle at 16% 72%, var(--weather-snow) 0 0.7px, transparent 1.5px);
+  background-position:
+    31px 57px,
+    113px 5px;
+  background-size:
+    179px 191px,
+    127px 233px;
+  opacity: 0.55;
+  animation: weather-snow-drift 19s linear infinite;
+}
+
+.screen-weather-fog {
+  position: absolute;
+  inset: 10% -15% -15%;
+  background:
+    linear-gradient(90deg, transparent, var(--weather-fog) 25%, transparent 55%),
+    linear-gradient(270deg, transparent, var(--weather-fog) 20%, transparent 58%);
+  background-size:
+    75% 45%,
+    65% 32%;
+  background-position:
+    0 35%,
+    100% 72%;
+  background-repeat: no-repeat;
+  opacity: 0.9;
+  animation: weather-fog-drift 24s var(--ease-out-soft) infinite alternate;
+  will-change: transform;
+}
+
+.screen-weather-cloud {
+  position: absolute;
+  inset: -6% -10% 30%;
+  background:
+    radial-gradient(ellipse at 25% 42%, var(--weather-cloud), transparent 55%),
+    radial-gradient(ellipse at 72% 30%, var(--weather-cloud), transparent 50%);
+  background-size:
+    72% 48%,
+    55% 38%;
+  background-position:
+    0 20%,
+    100% 0;
+  background-repeat: no-repeat;
+  opacity: 0.7;
+  animation: weather-cloud-drift 38s var(--ease-out-soft) infinite alternate;
+  will-change: transform;
+}
+
+.screen-weather-sun {
+  position: absolute;
+  top: -18%;
+  right: -8%;
+  width: 56vw;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--weather-sun), transparent 68%);
+  animation: weather-glow 9s var(--ease-out-soft) infinite;
+}
+
+.screen-weather[data-day='night'] .screen-weather-sun {
+  background: radial-gradient(circle, rgba(var(--screen-cyan-rgb), 0.16), transparent 68%);
+  animation: none;
+}
+
+.screen-weather-flash {
+  position: absolute;
+  inset: 0;
+  background: var(--weather-flash);
+  opacity: 0;
+  animation: weather-flash 8s steps(1, end) infinite;
+}
+
+.screen-weather-clear {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(var(--screen-cyan-rgb), 0.04), transparent 65%);
+}
+
+@media (max-width: 767px) {
+  .screen-weather-rain::after,
+  .screen-weather-snow::after {
+    display: none;
+  }
+
+  .screen-weather-cloud {
+    opacity: 0.5;
+  }
+}
+@utility screen-orbit {
+  animation: screen-orbit-spin var(--screen-orbit-duration) linear infinite;
+  transform-origin: center;
+}
+
+@utility screen-core {
+  animation: screen-core-breathe calc(var(--screen-ambient-duration) / 3) var(--ease-out-soft)
+    infinite;
+  transform-origin: center;
+}
+
+@utility screen-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: screen-line-draw var(--screen-enter-duration) var(--ease-out-soft) forwards;
+}
+
+@utility screen-pulse-ring {
+  animation: screen-pulse-ring calc(var(--screen-ambient-duration) / 4) var(--ease-out-soft)
+    infinite;
+  transform-origin: center;
+}

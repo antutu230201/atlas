@@ -2,20 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Skeleton, useToast } from '@atlas/ui';
+import { Button, Skeleton, ThemeToggle, useToast } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
 import { useUiStore } from '@/lib/store';
 import { ActivityCard } from './activity-card';
-import { ClockCard } from './clock-card';
+import { ClockCard, TimeOrbit } from './clock-card';
 import { CountdownSection } from './countdown-card';
-import { HealthDot, WeatherIcon } from './icons';
+import { AtlasMark, HealthDot, ScreenIcon, WeatherIcon } from './icons';
 import { HotlistCard } from './hotlist-card';
 import { QuoteCard } from './quote-card';
 import { SettingsDrawer } from './settings-drawer';
 import { SummaryCard } from './summary-card';
 import { Ticker } from './ticker';
 import { WeatherCard } from './weather-card';
+import { WeatherAtmosphere } from './weather-atmosphere';
 import { HOT_SOURCE_LABELS, type DashboardSnapshot, type CountdownItem } from './types';
 
 /** 氛围背景：必应壁纸（可关，onError 自动降级）→ 极光渐变兜底；视觉值全部来自 tokens */
@@ -29,35 +30,47 @@ function ScreenBackground({
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = wallpaperUrl !== undefined && wallpaperUrl.length > 0 && !imageFailed;
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden bg-bg">
       {showImage ? (
         <>
           {/* 外部每日壁纸直接用 img：域名每日变化，Next Image 域名白名单不可预知 */}
           <img
             src={wallpaperUrl}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full scale-105 object-cover opacity-[var(--screen-wallpaper-opacity)]"
             onError={() => setImageFailed(true)}
           />
           {copyright ? (
-            <span className="absolute right-3 bottom-2 z-10 text-[10px] text-muted/80">
+            <span className="absolute right-3 bottom-2 z-10 text-[9px] text-muted/60">
               {copyright}
             </span>
           ) : null}
         </>
       ) : null}
-      {/* 极光层：壁纸之上再叠一层，保证玻璃卡片的层次感 */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(55% 70% at 12% 18%, var(--screen-aurora-1) 0%, transparent 62%),' +
-            'radial-gradient(45% 60% at 88% 12%, var(--screen-aurora-2) 0%, transparent 58%),' +
-            'radial-gradient(50% 65% at 70% 92%, var(--screen-aurora-3) 0%, transparent 60%)',
-          opacity: showImage ? 0.22 : 0.35,
-        }}
-      />
+      <div className="screen-sky" />
+      <div className="screen-grid absolute inset-0" />
       <div className="absolute inset-0" style={{ background: 'var(--screen-scrim)' }} />
+    </div>
+  );
+}
+
+function HeroMetric({
+  value,
+  label,
+  accent = false,
+}: {
+  value: number;
+  label: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="border-l border-border pl-3 first:border-l-0 first:pl-0 max-sm:border-l-0 max-sm:pl-0">
+      <dd
+        className={`font-mono text-2xl font-medium tracking-tight tabular-nums ${accent ? 'text-primary' : ''}`}
+      >
+        {String(value).padStart(2, '0')}
+      </dd>
+      <dt className="mt-1 text-[10px] text-muted">{label}</dt>
     </div>
   );
 }
@@ -141,16 +154,16 @@ export function DashboardScreenPage({
 
   const data = snapshot.data;
   const enabledSources = data ? Object.entries(data.hot) : [];
+  // 无任何热榜数据时不渲染空的热搜条
+  const hasTicker = enabledSources.some(([, envelope]) => (envelope.payload?.length ?? 0) > 0);
   const weather = data?.weather;
 
   return (
-    // 负 margin 用于抵消外壳 padding 让壁纸贴边；全屏态外壳无 padding，负 margin 会反而撑出横向滚动
+    // 负 margin 用于抵消外壳 padding 让背景贴边；全屏态外壳无 padding，负 margin 会撑出横向滚动
     <div
-      className={
-        chromeHidden
-          ? 'relative overflow-hidden'
-          : 'relative -mx-4 -my-4 overflow-hidden md:-mx-8 md:-my-8'
-      }
+      className={`dashboard-screen relative min-h-screen overflow-hidden bg-bg text-text ${
+        chromeHidden ? '' : '-mx-4 -my-4 md:-mx-8 md:-my-8'
+      }`}
     >
       <ScreenBackground
         wallpaperUrl={
@@ -160,49 +173,92 @@ export function DashboardScreenPage({
         }
         copyright={data?.wallpaper.payload?.copyright}
       />
+      {weather?.payload ? (
+        <WeatherAtmosphere icon={weather.payload.now.icon} isDay={weather.payload.now.isDay} />
+      ) : null}
 
-      <div className="relative mx-auto w-full max-w-7xl space-y-5 p-4 md:p-8">
-        {/* 顶栏：标题与操作 */}
-        <header className="flex items-center justify-between gap-3">
-          <h1 className="flex items-center gap-2 text-sm font-semibold tracking-widest text-muted">
-            <HealthDot status={snapshot.isError ? 'error' : 'fresh'} />
-            个人大屏
-          </h1>
-          {canWrite ? (
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={refresh.isPending}
-                onClick={() => refresh.mutate()}
-              >
-                刷新
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)}>
-                设置
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setChromeHidden(!chromeHidden)}>
-                {chromeHidden ? '退出全屏' : '全屏'}
-              </Button>
+      <div
+        className={`relative z-10 mx-auto w-full space-y-5 p-4 md:p-5 xl:p-6 ${chromeHidden ? 'max-w-[1920px]' : 'max-w-[1600px]'}`}
+      >
+        <header className="screen-reveal flex flex-wrap items-center justify-between gap-4 py-1">
+          <div className="flex items-center gap-3">
+            <AtlasMark className="size-10 text-primary" />
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-sm font-semibold tracking-[0.16em]">个人大屏</h1>
+                <span className="hidden rounded-xs border border-border px-1.5 py-0.5 font-mono text-[8px] tracking-widest text-muted sm:inline">
+                  PERSONAL OS
+                </span>
+              </div>
+              <p className="screen-label mt-1 !text-[8px]">
+                Atlas command center · {workspace?.name ?? workspaceSlug}
+              </p>
             </div>
-          ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="mr-1 hidden items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-[9px] tracking-wider text-muted sm:flex">
+              <HealthDot status={snapshot.isError ? 'error' : 'fresh'} />
+              {snapshot.isFetching ? 'SYNCING' : 'ALL SYSTEMS LIVE'}
+            </div>
+            {/* 非沉浸态由外壳顶栏提供主题切换，沉浸态外壳隐藏，这里补一份 */}
+            {chromeHidden ? <ThemeToggle /> : null}
+            {canWrite ? (
+              <>
+                <button
+                  type="button"
+                  className="screen-icon-button"
+                  disabled={refresh.isPending}
+                  onClick={() => refresh.mutate()}
+                >
+                  <ScreenIcon
+                    name="refresh"
+                    className={`size-3.5 ${refresh.isPending ? 'animate-spin' : ''}`}
+                  />
+                  <span className="hidden sm:inline">刷新</span>
+                </button>
+                <button
+                  type="button"
+                  className="screen-icon-button"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <ScreenIcon name="settings" className="size-3.5" />
+                  <span className="hidden sm:inline">设置</span>
+                </button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              className="screen-icon-button"
+              onClick={() => setChromeHidden(!chromeHidden)}
+            >
+              <ScreenIcon name={chromeHidden ? 'collapse' : 'fullscreen'} className="size-3.5" />
+              <span className="hidden sm:inline">{chromeHidden ? '退出全屏' : '全屏'}</span>
+            </button>
+          </div>
         </header>
 
         {snapshot.isPending ? (
           <div className="space-y-4">
-            <Skeleton className="h-10 w-full rounded-md" />
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Skeleton className="h-56 rounded-md lg:col-span-2" />
-              <Skeleton className="h-56 rounded-md" />
+            <Skeleton className="h-14 w-full rounded-md" />
+            <div className="grid gap-4 xl:grid-cols-12">
+              <Skeleton className="h-96 rounded-md xl:col-span-8" />
+              <Skeleton className="h-96 rounded-md xl:col-span-4" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+              {[0, 1, 2, 3, 4].map((index) => (
+                <Skeleton key={index} className="h-80 rounded-md" />
+              ))}
             </div>
           </div>
         ) : snapshot.isError ? (
-          <div className="glass rounded-md p-8 text-center" role="alert">
-            <p className="text-sm font-semibold">大屏加载失败</p>
-            <p className="mt-1 text-xs text-muted">
+          <div className="screen-card mx-auto max-w-xl p-10 text-center" role="alert">
+            <AtlasMark className="mx-auto mb-5 size-12 text-err" />
+            <p className="text-base font-semibold">大屏加载失败</p>
+            <p className="mt-2 text-xs text-muted">
               {snapshot.error instanceof Error ? snapshot.error.message : '请确认模块已启用后重试'}
             </p>
-            <Button size="sm" className="mt-4" onClick={() => void snapshot.refetch()}>
+            <Button size="sm" className="mt-5" onClick={() => void snapshot.refetch()}>
               重试
             </Button>
           </div>
@@ -210,29 +266,60 @@ export function DashboardScreenPage({
           <>
             {/* 城市引导（guest 看到只读提示） */}
             {cityMissing ? (
-              <div className="glass rounded-md p-4 text-sm" role="status">
+              <div
+                className="screen-card screen-reveal flex items-center gap-3 p-4 text-xs text-muted"
+                role="status"
+              >
+                <WeatherIcon icon="cloud" className="size-5 shrink-0 text-warn" />
                 {canWrite
                   ? '选择天气城市后即可看到天气卡片——点击右上角「设置」用定位或搜索选择。'
                   : '天气未配置，请联系工作空间管理员在设置中选择城市。'}
               </div>
             ) : null}
 
-            {/* 滚动头条 */}
-            <div className="glass rounded-md px-4 py-2.5">
-              <Ticker sources={data.hot} />
-            </div>
-
-            {/* 时钟 + 天气 */}
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="glass rounded-md p-6 lg:col-span-2">
-                <ClockCard displayName={user?.displayName} />
+            {/* 滚动信号流 */}
+            {hasTicker ? (
+              <div
+                className="screen-card screen-reveal flex items-center gap-4 px-4 py-3"
+                style={{ '--screen-index': 1 } as React.CSSProperties}
+              >
+                <div className="hidden shrink-0 items-center gap-2 border-r border-border pr-4 text-info md:flex">
+                  <ScreenIcon name="signal" className="size-3.5" />
+                  <span className="screen-label !text-[8px] !text-info">Signal feed</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Ticker sources={data.hot} />
+                </div>
               </div>
-              {/* min-w-0：grid 子项默认 min-width:auto，会被逐小时横滚内容撑破视口（移动端实测） */}
-              <div className="min-w-0">
+            ) : null}
+
+            {/* 时间核心 + 天气 */}
+            <div className="grid gap-4 xl:grid-cols-12">
+              <section
+                className="screen-card screen-reveal p-6 md:p-7 xl:col-span-8"
+                style={{ '--screen-index': 1 } as React.CSSProperties}
+              >
+                <div className="flex items-center gap-6">
+                  <div className="min-w-0 flex-1">
+                    <ClockCard displayName={user?.displayName} />
+                  </div>
+                  <TimeOrbit />
+                </div>
+                <dl className="mt-7 grid grid-cols-2 gap-y-5 border-t border-border pt-5 sm:grid-cols-4">
+                  <HeroMetric value={data.activity.todayCount} label="今日完成" accent />
+                  <HeroMetric value={data.activity.streak} label="连续打卡 · 天" />
+                  <HeroMetric value={enabledSources.length} label="实时热榜源" />
+                  <HeroMetric value={data.countdowns.length} label="期待中的日子" />
+                </dl>
+              </section>
+              <div
+                className="screen-reveal min-w-0 xl:col-span-4"
+                style={{ '--screen-index': 2 } as React.CSSProperties}
+              >
                 {weather && weather.status !== 'empty' ? (
                   <WeatherCard envelope={weather} cityName={data.city?.name} />
                 ) : (
-                  <div className="glass flex h-full min-h-48 flex-col items-center justify-center gap-2 rounded-md p-4 text-center">
+                  <div className="screen-card flex h-full min-h-64 flex-col items-center justify-center gap-3 p-6 text-center">
                     <WeatherIcon icon="cloud" className="size-10 text-muted" />
                     <p className="text-xs text-muted">
                       {cityMissing ? '天气待配置' : '天气暂不可用'}
@@ -242,14 +329,51 @@ export function DashboardScreenPage({
               </div>
             </div>
 
-            {/* AI 每日摘要（服务端按天缓存） */}
-            <SummaryCard envelope={data.summary} />
+            {/* AI 摘要 / 一言 + 成长热力图 */}
+            <div className="grid items-stretch gap-4 xl:grid-cols-12">
+              <div className="flex flex-col gap-4 xl:col-span-7">
+                <SummaryCard envelope={data.summary} />
+                {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
+              </div>
+              <div className="xl:col-span-5">
+                <ActivityCard stats={data.activity} />
+              </div>
+            </div>
 
-            {/* 成长打卡热力图（事件订阅累积） */}
-            <ActivityCard stats={data.activity} />
-
-            {/* 一言 */}
-            {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
+            {/* 实时热榜 */}
+            {enabledSources.length > 0 ? (
+              <section aria-label="热榜" className="space-y-3 pt-2">
+                <div
+                  className="screen-reveal flex items-end justify-between px-1"
+                  style={{ '--screen-index': 4 } as React.CSSProperties}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <ScreenIcon name="layers" className="size-4 text-primary" />
+                      <h2 className="text-sm font-semibold">实时热榜</h2>
+                    </div>
+                    <p className="screen-label mt-1 !text-[8px]">
+                      Real-time pulse · Across the internet
+                    </p>
+                  </div>
+                  <span className="font-mono text-[9px] tracking-wider text-muted">
+                    {String(enabledSources.length).padStart(2, '0')} SOURCES
+                  </span>
+                </div>
+                {/* 保留全屏五列；较窄容器自动降列，标题最多两行 */}
+                <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+                  {enabledSources.map(([key, envelope], index) => (
+                    <HotlistCard
+                      key={key}
+                      sourceKey={key}
+                      index={index}
+                      label={HOT_SOURCE_LABELS[key] ?? key}
+                      envelope={envelope}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             {/* 倒计时 */}
             <CountdownSection
@@ -263,21 +387,12 @@ export function DashboardScreenPage({
               }}
             />
 
-            {/* 热榜 */}
-            {enabledSources.length > 0 ? (
-              <section aria-label="热榜" className="space-y-3">
-                <h2 className="text-xs font-semibold tracking-widest text-muted">实时热榜</h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                  {enabledSources.map(([key, envelope]) => (
-                    <HotlistCard
-                      key={key}
-                      label={HOT_SOURCE_LABELS[key] ?? key}
-                      envelope={envelope}
-                    />
-                  ))}
-                </div>
-              </section>
-            ) : null}
+            <footer className="flex flex-wrap items-center justify-between gap-2 px-1 pt-3 text-[9px] tracking-wider text-muted/60">
+              <span>ATLAS PERSONAL OS · DESIGNED FOR YOUR EVERYDAY</span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-1 rounded-full bg-ok" /> DATA ENCRYPTED · WORKSPACE ISOLATED
+              </span>
+            </footer>
           </>
         ) : null}
       </div>

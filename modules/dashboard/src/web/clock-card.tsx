@@ -44,39 +44,133 @@ export function ClockCard({ displayName }: { displayName?: string }) {
   const dateText = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日 · 周${WEEKDAYS[now.getDay()]}`;
 
   return (
-    <section className="flex h-full flex-col justify-between gap-4">
-      <div className="flex items-baseline gap-2 text-xs text-muted">
-        <span>{dateText}</span>
-        <span aria-hidden>·</span>
-        <span>{lunarInfo.lunarDate}</span>
-        <span className="hidden sm:inline">{lunarInfo.ganzhi}</span>
-      </div>
-
-      <div className="flex items-end gap-2" role="timer" aria-label="当前时间">
-        <p className="font-mono text-6xl font-semibold tracking-tight tabular-nums sm:text-7xl">
-          {time}
-          <span className="ml-1 align-baseline text-2xl font-normal text-muted sm:text-3xl">
-            {seconds}
+    <section className="relative z-10 flex h-full flex-col justify-between gap-5">
+      <div>
+        <div className="flex items-center gap-2">
+          <span className="size-1.5 rounded-full bg-info shadow-[var(--screen-glow)]" />
+          <p className="screen-label">Local time · Living in the moment</p>
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-muted">
+          {dateText}
+          <span className="mx-2 opacity-40">/</span>
+          {lunarInfo.lunarDate}
+          <span className="hidden xl:inline">
+            <span className="mx-2 opacity-40">/</span>
+            {lunarInfo.ganzhi}
           </span>
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <p className="text-sm font-semibold">
+      <div className="flex items-end gap-3" role="timer" aria-label="当前时间">
+        <p className="font-mono text-[clamp(3.8rem,7vw,7.2rem)] font-medium leading-[0.88] tracking-[-0.075em] tabular-nums">
+          {time}
+        </p>
+        <span className="mb-1 rounded-sm border border-border bg-primary-soft px-2 py-1 font-mono text-lg font-normal text-primary tabular-nums">
+          {seconds}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <p className="text-base font-medium tracking-tight">
           {greetingOf(now.getHours())}
           {displayName ? `，${displayName}` : ''}
+          <span className="ml-2 text-muted">今天也保持自己的节奏。</span>
         </p>
         {lunarInfo.jieqi ? (
-          <span className="rounded-xs bg-primary-soft px-1.5 py-0.5 text-[11px] text-primary">
+          <span className="rounded-xs bg-primary-soft px-2 py-1 text-[10px] font-semibold text-primary">
             {lunarInfo.jieqi}
           </span>
         ) : null}
         {lunarInfo.festival ? (
-          <span className="rounded-xs bg-info-soft px-1.5 py-0.5 text-[11px] text-info">
+          <span className="rounded-xs bg-info-soft px-2 py-1 text-[10px] font-semibold text-info">
             {lunarInfo.festival}
           </span>
         ) : null}
       </div>
     </section>
+  );
+}
+
+/** 无依赖的时间核心：旋转轨道、呼吸光晕与脉冲环，reduced-motion 自动静止。 */
+export function TimeOrbit() {
+  return (
+    <div
+      className="pointer-events-none relative hidden aspect-square w-full max-w-64 items-center justify-center md:flex"
+      aria-hidden
+    >
+      <svg viewBox="0 0 240 240" className="size-full overflow-visible">
+        <defs>
+          <linearGradient id="screen-orbit-line" x1="0" y1="0" x2="1" y2="1">
+            <stop stopColor="var(--screen-accent)" stopOpacity=".7" />
+            <stop offset=".5" stopColor="var(--screen-cyan)" stopOpacity=".16" />
+            <stop offset="1" stopColor="var(--screen-accent)" stopOpacity=".5" />
+          </linearGradient>
+          <radialGradient id="screen-orbit-core">
+            <stop stopColor="var(--screen-accent)" stopOpacity=".32" />
+            <stop offset="1" stopColor="var(--screen-accent)" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <circle cx="120" cy="120" r="74" fill="url(#screen-orbit-core)" className="screen-core" />
+        <circle
+          cx="120"
+          cy="120"
+          r="52"
+          fill="none"
+          stroke="var(--screen-border-bright)"
+          strokeDasharray="1 7"
+        />
+        <g className="screen-orbit">
+          <ellipse
+            cx="120"
+            cy="120"
+            rx="91"
+            ry="62"
+            fill="none"
+            stroke="url(#screen-orbit-line)"
+            strokeWidth="1.2"
+            transform="rotate(-24 120 120)"
+          />
+          <circle cx="37" cy="82" r="4" fill="var(--screen-cyan)" />
+          <circle
+            cx="37"
+            cy="82"
+            r="10"
+            fill="none"
+            stroke="var(--screen-cyan)"
+            strokeOpacity=".25"
+            className="screen-pulse-ring"
+          />
+        </g>
+        <g>
+          <ellipse
+            cx="120"
+            cy="120"
+            rx="70"
+            ry="96"
+            fill="none"
+            stroke="url(#screen-orbit-line)"
+            strokeOpacity=".6"
+            transform="rotate(38 120 120)"
+          />
+          <circle cx="178" cy="69" r="3" fill="var(--screen-accent)" opacity=".7" />
+        </g>
+        <circle
+          cx="120"
+          cy="120"
+          r="27"
+          fill="var(--screen-panel-solid)"
+          stroke="var(--screen-border-bright)"
+        />
+        <path
+          d="M120 102v18l12 8"
+          fill="none"
+          stroke="var(--screen-text)"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+        <circle cx="120" cy="120" r="3" fill="var(--screen-cyan)" />
+      </svg>
+      <span className="screen-label absolute right-0 bottom-[12%]">Sync · 01</span>
+    </div>
   );
 }
