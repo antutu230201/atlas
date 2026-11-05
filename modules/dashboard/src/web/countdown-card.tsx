@@ -61,7 +61,7 @@ export function CountdownSection({
           <ScreenIcon name="calendar" className="size-4 text-primary" />
           <div>
             <h2 className="text-sm font-semibold">倒计时与纪念日</h2>
-            <p className="screen-label mt-0.5 !text-[8px]">Moments worth waiting for</p>
+            <p className="screen-label mt-0.5 !text-[9px]">Moments worth waiting for</p>
           </div>
         </div>
         <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[9px] text-muted">

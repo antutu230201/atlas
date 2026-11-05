@@ -1,10 +1,11 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { Skeleton } from '@atlas/ui';
 import type { SourceEnvelope, WeatherData } from './types';
-import { WeatherIcon } from './icons';
+import { ScreenIcon, WeatherIcon } from './icons';
 import { getWeatherScene, WEATHER_SCENE_LABELS } from './weather-atmosphere';
+import { WeatherDetailsDialog } from './weather-details';
 
 function aqiText(usAqi: number): { text: string; tone: string } {
   if (usAqi <= 50) return { text: '优', tone: 'text-ok' };
@@ -96,6 +97,8 @@ export function WeatherCard({
   envelope: SourceEnvelope<WeatherData>;
   cityName?: string;
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   if (envelope.status === 'empty') return null;
 
   if (envelope.payload === null) {
@@ -113,82 +116,107 @@ export function WeatherCard({
   const scene = getWeatherScene(data.now.icon);
 
   return (
-    <div className="screen-card group flex h-full flex-col gap-4 p-5">
-      <header className="relative flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="size-1.5 rounded-full bg-info" />
-          <p className="screen-label">Atmosphere · Live</p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="hidden items-center gap-1 text-[9px] text-info sm:inline-flex">
-            <span className="size-1 rounded-full bg-info" />
-            {WEATHER_SCENE_LABELS[scene]}
-          </span>
-          <span className="rounded-xs border border-border px-2 py-1 text-[10px] text-muted">
-            {cityName ?? '当前位置'}
-          </span>
-        </div>
-      </header>
-
-      <div className="relative flex items-start justify-between gap-3">
-        <div>
-          <p className="flex items-start font-mono font-medium tracking-[-0.07em] tabular-nums">
-            <span className="text-6xl leading-none">{Math.round(data.now.temperature)}</span>
-            <span className="mt-1 ml-1 text-xl tracking-normal text-muted">°</span>
-          </p>
-          <p className="mt-2 text-sm font-medium">{data.now.text}</p>
-        </div>
-        <div className="rounded-md border border-border bg-info-soft p-3 text-info transition-transform duration-[var(--duration-slow)] group-hover:rotate-3 group-hover:scale-105">
-          <WeatherIcon icon={data.now.icon} className="size-12 shrink-0" />
-        </div>
-      </div>
-
-      <div className="relative flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
-        {data.now.apparent !== undefined ? (
-          <span>体感 {Math.round(data.now.apparent)}°</span>
-        ) : null}
-        {data.now.humidity !== undefined ? <span>湿度 {data.now.humidity}%</span> : null}
-        {wind ? (
-          <span>
-            {wind} {Math.round(data.now.windSpeed ?? 0)} km/h
-          </span>
-        ) : null}
-        {air && data.air?.usAqi !== undefined ? (
-          <span>
-            AQI {Math.round(data.air.usAqi)}{' '}
-            <span className={`font-semibold ${air.tone}`}>{air.text}</span>
-          </span>
-        ) : null}
-      </div>
-
-      <HourlyChart data={data.hourly} />
-
-      <div
-        className="relative grid grid-cols-4 gap-2 border-t border-border pt-3"
-        aria-label="未来几天预报"
-      >
-        {data.days.slice(1, 5).map((day) => (
-          <div
-            key={day.date}
-            className="flex flex-col items-center gap-1.5 rounded-sm py-1 text-[11px] transition-colors hover:bg-surface-hover"
-          >
-            <span className="text-muted">
-              {(() => {
-                const d = new Date(`${day.date}T00:00:00`);
-                return Number.isNaN(d.getTime()) ? day.date.slice(5) : `周${WEEKDAY[d.getDay()]}`;
-              })()}
-            </span>
-            <WeatherIcon icon={day.icon} className="size-5 text-muted" />
-            <span className="font-mono tabular-nums">
-              {Math.round(day.min)}° <span className="text-muted">/ {Math.round(day.max)}°</span>
-            </span>
-            {day.precipProb !== undefined && day.precipProb >= 30 ? (
-              <span className="text-[9px] text-info">降水 {day.precipProb}%</span>
-            ) : null}
+    <>
+      <section className="screen-card group flex h-full flex-col gap-4 p-5" aria-label="实时天气">
+        <header className="relative flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="size-1.5 rounded-full bg-info" />
+            <p className="screen-label">Atmosphere · Live</p>
           </div>
-        ))}
-      </div>
-    </div>
+          <div className="flex items-center gap-1.5">
+            <span className="hidden items-center gap-1 text-[9px] text-info sm:inline-flex">
+              <span className="size-1 rounded-full bg-info" />
+              {WEATHER_SCENE_LABELS[scene]}
+            </span>
+            <span className="rounded-xs border border-border px-2 py-1 text-[11px] text-muted">
+              {cityName ?? '当前位置'}
+            </span>
+            <button
+              type="button"
+              aria-label="查看天气详情"
+              onClick={() => setDetailsOpen(true)}
+              className="inline-flex items-center gap-1 rounded-xs px-1.5 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              详情
+              <ScreenIcon name="arrow" className="size-3" />
+            </button>
+          </div>
+        </header>
+
+        <button
+          type="button"
+          aria-label="查看实时天气详情"
+          onClick={() => setDetailsOpen(true)}
+          className="relative flex items-start justify-between gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <div>
+            <p className="flex items-start font-mono font-medium tracking-[-0.07em] tabular-nums">
+              <span className="text-7xl leading-none">{Math.round(data.now.temperature)}</span>
+              <span className="mt-1 ml-1 text-xl tracking-normal text-muted">°</span>
+            </p>
+            <p className="mt-2 text-sm font-medium">{data.now.text}</p>
+          </div>
+          <div className="rounded-md border border-border bg-info-soft p-3 text-info transition-transform duration-[var(--duration-slow)] group-hover:rotate-3 group-hover:scale-105">
+            <WeatherIcon icon={data.now.icon} className="size-12 shrink-0" />
+          </div>
+        </button>
+
+        <div className="relative flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
+          {data.now.apparent !== undefined ? (
+            <span>体感 {Math.round(data.now.apparent)}°</span>
+          ) : null}
+          {data.now.humidity !== undefined ? <span>湿度 {data.now.humidity}%</span> : null}
+          {wind ? (
+            <span>
+              {wind} {Math.round(data.now.windSpeed ?? 0)} km/h
+            </span>
+          ) : null}
+          {air && data.air?.usAqi !== undefined ? (
+            <span>
+              AQI {Math.round(data.air.usAqi)}{' '}
+              <span className={`font-semibold ${air.tone}`}>{air.text}</span>
+            </span>
+          ) : null}
+        </div>
+
+        <HourlyChart data={data.hourly} />
+
+        <div
+          className="relative grid grid-cols-4 gap-2 border-t border-border pt-3"
+          aria-label="未来几天预报"
+        >
+          {data.days.slice(1, 5).map((day) => (
+            <button
+              type="button"
+              key={day.date}
+              aria-label={`查看 ${day.date} 天气详情`}
+              onClick={() => setDetailsOpen(true)}
+              className="flex flex-col items-center gap-1.5 rounded-sm py-1 text-[11px] transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              <span className="text-muted">
+                {(() => {
+                  const d = new Date(`${day.date}T00:00:00`);
+                  return Number.isNaN(d.getTime()) ? day.date.slice(5) : `周${WEEKDAY[d.getDay()]}`;
+                })()}
+              </span>
+              <WeatherIcon icon={day.icon} className="size-5 text-muted" />
+              <span className="font-mono tabular-nums">
+                {Math.round(day.min)}° <span className="text-muted">/ {Math.round(day.max)}°</span>
+              </span>
+              {day.precipProb !== undefined && day.precipProb >= 30 ? (
+                <span className="text-[10px] text-info">降水 {day.precipProb}%</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      </section>
+      <WeatherDetailsDialog
+        data={data}
+        cityName={cityName}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      />
+    </>
   );
 }
 

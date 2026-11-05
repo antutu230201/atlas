@@ -79,7 +79,7 @@ export function ActivityCard({ stats }: { stats: ActivityStats }) {
           </span>
           <div>
             <h2 className="text-sm font-semibold">成长打卡</h2>
-            <p className="screen-label mt-0.5 !text-[8px]">Momentum · 26 weeks</p>
+            <p className="screen-label mt-0.5 !text-[9px]">Momentum · 26 weeks</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-[9px] text-muted" aria-hidden>

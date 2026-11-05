@@ -28,7 +28,7 @@ export function QuoteCard({ envelope }: { envelope: SourceEnvelope<Quote> }) {
         </figcaption>
       </div>
       <div className="hidden shrink-0 flex-col items-end justify-between border-l border-border pl-4 sm:flex">
-        <span className="screen-label !text-[8px]">Daily quote</span>
+        <span className="screen-label !text-[9px]">Daily quote</span>
         <span className="font-mono text-[9px] tracking-wider text-muted">HITOKOTO</span>
       </div>
     </figure>

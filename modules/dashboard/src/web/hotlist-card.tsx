@@ -77,7 +77,7 @@ export function HotlistCard({
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold tracking-tight">{label}</h3>
-          <p className="screen-label mt-0.5 !text-[8px]">Trending now</p>
+          <p className="screen-label mt-0.5 !text-[9px]">Trending now</p>
         </div>
         <div className="flex items-center gap-1.5 text-[9px] text-muted">
           <HealthDot status={envelope.status} />

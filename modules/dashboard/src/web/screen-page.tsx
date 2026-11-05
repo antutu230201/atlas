@@ -59,21 +59,33 @@ function ScreenBackground({
 function HeroMetric({
   value,
   label,
+  onClick,
   accent = false,
 }: {
   value: number;
   label: string;
+  onClick: () => void;
   accent?: boolean;
 }) {
   return (
-    <div className="border-l border-border pl-3 first:border-l-0 first:pl-0 max-sm:border-l-0 max-sm:pl-0">
-      <dd
-        className={`font-mono text-2xl font-medium tracking-tight tabular-nums ${accent ? 'text-primary' : ''}`}
+    <button
+      type="button"
+      onClick={onClick}
+      className="group/metric rounded-sm border-l border-border py-1 pl-4 text-left transition-colors first:border-l-0 first:pl-0 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:border-l-0 max-sm:pl-0"
+    >
+      <span
+        className={`block font-mono text-3xl font-medium tracking-tight tabular-nums ${accent ? 'text-primary' : ''}`}
       >
         {String(value).padStart(2, '0')}
-      </dd>
-      <dt className="mt-1 text-[10px] text-muted">{label}</dt>
-    </div>
+      </span>
+      <span className="mt-1 flex items-center gap-1 text-[11px] text-muted transition-colors group-hover/metric:text-text">
+        {label}
+        <ScreenIcon
+          name="arrow"
+          className="size-3 opacity-0 transition-opacity group-hover/metric:opacity-100"
+        />
+      </span>
+    </button>
   );
 }
 
@@ -90,12 +102,30 @@ export function DashboardScreenPage({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const chromeHidden = useUiStore((state) => state.chromeHidden);
   const setChromeHidden = useUiStore((state) => state.setChromeHidden);
   const base = `/modules/workspaces/${workspaceSlug}/${moduleName}/call`;
 
-  // 沉浸态随页面卸载复位，避免用户离开大屏后外壳仍隐藏
-  useEffect(() => () => setChromeHidden(false), [setChromeHidden]);
+  // 浏览器全屏与外壳沉浸态同步；Esc 退出时也由 fullscreenchange 恢复侧栏
+  useEffect(() => {
+    const syncFullscreen = () => {
+      const active = document.fullscreenElement !== null;
+      setIsFullscreen(active);
+      setChromeHidden(active);
+    };
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, [setChromeHidden]);
+
+  // 离开大屏时同时复位外壳与浏览器全屏，避免其他页面仍处于沉浸状态
+  useEffect(
+    () => () => {
+      setChromeHidden(false);
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    },
+    [setChromeHidden],
+  );
 
   const snapshot = useQuery({
     queryKey: ['module', moduleName, workspaceSlug, 'snapshot'],
@@ -162,14 +192,40 @@ export function DashboardScreenPage({
   // 无任何热榜数据时不渲染空的热搜条
   const hasTicker = enabledSources.some(([, envelope]) => (envelope.payload?.length ?? 0) > 0);
   const weather = data?.weather;
+  const immersive = isFullscreen || chromeHidden;
+
+  const toggleFullscreen = async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen().catch(() => undefined);
+      return;
+    }
+    if (chromeHidden) {
+      setChromeHidden(false);
+      return;
+    }
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // 浏览器拒绝 Fullscreen API 时仍保留页内沉浸模式，并明确提示不是真全屏
+      setChromeHidden(true);
+      toast({
+        title: '已切换为沉浸模式',
+        description: '浏览器未允许网页全屏，可按 F11 隐藏地址栏。',
+        variant: 'info',
+      });
+    }
+  };
+
+  const scrollToSection = (id: string) => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById(id)?.scrollIntoView({
+      behavior: reducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  };
 
   return (
-    // 负 margin 用于抵消外壳 padding 让背景贴边；全屏态外壳无 padding，负 margin 会撑出横向滚动
-    <div
-      className={`dashboard-screen relative min-h-screen overflow-hidden bg-bg text-text ${
-        chromeHidden ? '' : '-mx-4 -my-4 md:-mx-8 md:-my-8'
-      }`}
-    >
+    <div className="dashboard-screen relative min-h-screen overflow-hidden bg-bg text-text">
       <ScreenBackground
         wallpaperUrl={
           data && data.options.wallpaper && data.wallpaper.payload?.url
@@ -183,31 +239,30 @@ export function DashboardScreenPage({
       ) : null}
 
       <div
-        className={`relative z-10 mx-auto w-full space-y-5 p-4 md:p-5 xl:p-6 ${chromeHidden ? 'max-w-[1920px]' : 'max-w-[1600px]'}`}
+        className={`relative z-10 mx-auto w-full space-y-4 p-4 md:p-5 xl:p-6 ${immersive ? 'max-w-[1920px]' : 'max-w-[1728px]'}`}
       >
-        <header className="screen-reveal flex flex-wrap items-center justify-between gap-4 py-1">
-          <div className="flex items-center gap-3">
-            <AtlasMark className="size-10 text-primary" />
-            <div>
+        <header className="screen-card screen-reveal flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <AtlasMark className="size-9 shrink-0 text-primary" />
+            <div className="min-w-0">
               <div className="flex items-center gap-2.5">
-                <h1 className="text-sm font-semibold tracking-[0.16em]">个人大屏</h1>
-                <span className="hidden rounded-xs border border-border px-1.5 py-0.5 font-mono text-[8px] tracking-widest text-muted sm:inline">
+                <h1 className="text-base font-semibold tracking-[0.12em]">个人大屏</h1>
+                <span className="hidden rounded-xs border border-border px-1.5 py-0.5 font-mono text-[9px] tracking-widest text-muted sm:inline">
                   PERSONAL OS
                 </span>
               </div>
-              <p className="screen-label mt-1 !text-[8px]">
+              <p className="screen-label mt-0.5 truncate !text-[9px]">
                 Atlas command center · {workspace?.name ?? workspaceSlug}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="mr-1 hidden items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-[9px] tracking-wider text-muted sm:flex">
+            <div className="mr-1 hidden items-center gap-2 px-2 text-[10px] tracking-wider text-muted md:flex">
               <HealthDot status={snapshot.isError ? 'error' : 'fresh'} />
-              {snapshot.isFetching ? 'SYNCING' : 'ALL SYSTEMS LIVE'}
+              {snapshot.isFetching ? '正在同步' : '数据在线'}
             </div>
-            {/* 非沉浸态由外壳顶栏提供主题切换，沉浸态外壳隐藏，这里补一份 */}
-            {chromeHidden ? <ThemeToggle /> : null}
+            <ThemeToggle />
             {canWrite ? (
               <>
                 <button
@@ -235,10 +290,14 @@ export function DashboardScreenPage({
             <button
               type="button"
               className="screen-icon-button"
-              onClick={() => setChromeHidden(!chromeHidden)}
+              onClick={() => void toggleFullscreen()}
+              title={isFullscreen ? '退出浏览器全屏（Esc）' : '进入浏览器全屏'}
+              aria-label={immersive ? (isFullscreen ? '退出全屏' : '退出沉浸') : '全屏'}
             >
-              <ScreenIcon name={chromeHidden ? 'collapse' : 'fullscreen'} className="size-3.5" />
-              <span className="hidden sm:inline">{chromeHidden ? '退出全屏' : '全屏'}</span>
+              <ScreenIcon name={immersive ? 'collapse' : 'fullscreen'} className="size-3.5" />
+              <span className="hidden sm:inline">
+                {immersive ? (isFullscreen ? '退出全屏' : '退出沉浸') : '全屏'}
+              </span>
             </button>
           </div>
         </header>
@@ -247,8 +306,8 @@ export function DashboardScreenPage({
           <div className="space-y-4">
             <Skeleton className="h-14 w-full rounded-md" />
             <div className="grid gap-4 xl:grid-cols-12">
-              <Skeleton className="h-96 rounded-md xl:col-span-8" />
-              <Skeleton className="h-96 rounded-md xl:col-span-4" />
+              <Skeleton className="h-96 rounded-md xl:col-span-7" />
+              <Skeleton className="h-96 rounded-md xl:col-span-5" />
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
               {[0, 1, 2, 3, 4].map((index) => (
@@ -290,7 +349,7 @@ export function DashboardScreenPage({
               >
                 <div className="hidden shrink-0 items-center gap-2 border-r border-border pr-4 text-info md:flex">
                   <ScreenIcon name="signal" className="size-3.5" />
-                  <span className="screen-label !text-[8px] !text-info">Signal feed</span>
+                  <span className="screen-label !text-[9px] !text-info">Signal feed</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <Ticker sources={data.hot} />
@@ -301,7 +360,7 @@ export function DashboardScreenPage({
             {/* 时间核心 + 天气 */}
             <div className="grid gap-4 xl:grid-cols-12">
               <section
-                className="screen-card screen-reveal p-6 md:p-7 xl:col-span-8"
+                className="screen-card screen-reveal p-6 md:p-7 xl:col-span-7"
                 style={{ '--screen-index': 1 } as React.CSSProperties}
               >
                 <div className="flex items-center gap-6">
@@ -310,15 +369,32 @@ export function DashboardScreenPage({
                   </div>
                   <TimeOrbit />
                 </div>
-                <dl className="mt-7 grid grid-cols-2 gap-y-5 border-t border-border pt-5 sm:grid-cols-4">
-                  <HeroMetric value={data.activity.todayCount} label="今日完成" accent />
-                  <HeroMetric value={data.activity.streak} label="连续打卡 · 天" />
-                  <HeroMetric value={enabledSources.length} label="实时热榜源" />
-                  <HeroMetric value={data.countdowns.length} label="期待中的日子" />
-                </dl>
+                <div className="mt-7 grid grid-cols-2 gap-y-5 border-t border-border pt-5 sm:grid-cols-4">
+                  <HeroMetric
+                    value={data.activity.todayCount}
+                    label="今日完成"
+                    onClick={() => scrollToSection('activity-section')}
+                    accent
+                  />
+                  <HeroMetric
+                    value={data.activity.streak}
+                    label="连续打卡 · 天"
+                    onClick={() => scrollToSection('activity-section')}
+                  />
+                  <HeroMetric
+                    value={enabledSources.length}
+                    label="实时热榜源"
+                    onClick={() => scrollToSection('hotlist-section')}
+                  />
+                  <HeroMetric
+                    value={data.countdowns.length}
+                    label="期待中的日子"
+                    onClick={() => scrollToSection('countdown-section')}
+                  />
+                </div>
               </section>
               <div
-                className="screen-reveal min-w-0 xl:col-span-4"
+                className="screen-reveal min-w-0 xl:col-span-5"
                 style={{ '--screen-index': 2 } as React.CSSProperties}
               >
                 {weather && weather.status !== 'empty' ? (
@@ -340,14 +416,18 @@ export function DashboardScreenPage({
                 <SummaryCard envelope={data.summary} />
                 {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
               </div>
-              <div className="xl:col-span-5">
+              <div id="activity-section" className="scroll-mt-6 xl:col-span-5">
                 <ActivityCard stats={data.activity} />
               </div>
             </div>
 
             {/* 实时热榜 */}
             {enabledSources.length > 0 ? (
-              <section aria-label="热榜" className="space-y-3 pt-2">
+              <section
+                id="hotlist-section"
+                aria-label="热榜"
+                className="scroll-mt-6 space-y-3 pt-2"
+              >
                 <div
                   className="screen-reveal flex items-end justify-between px-1"
                   style={{ '--screen-index': 4 } as React.CSSProperties}
@@ -357,7 +437,7 @@ export function DashboardScreenPage({
                       <ScreenIcon name="layers" className="size-4 text-primary" />
                       <h2 className="text-sm font-semibold">实时热榜</h2>
                     </div>
-                    <p className="screen-label mt-1 !text-[8px]">
+                    <p className="screen-label mt-1 !text-[9px]">
                       Real-time pulse · Across the internet
                     </p>
                   </div>
@@ -381,16 +461,18 @@ export function DashboardScreenPage({
             ) : null}
 
             {/* 倒计时 */}
-            <CountdownSection
-              items={data.countdowns}
-              handlers={{
-                canWrite,
-                create: (input) => createCountdown.mutate(input),
-                remove: (id) => deleteCountdown.mutate(id),
-                togglePin: (item) => togglePin.mutate(item),
-                creating: createCountdown.isPending,
-              }}
-            />
+            <div id="countdown-section" className="scroll-mt-6">
+              <CountdownSection
+                items={data.countdowns}
+                handlers={{
+                  canWrite,
+                  create: (input) => createCountdown.mutate(input),
+                  remove: (id) => deleteCountdown.mutate(id),
+                  togglePin: (item) => togglePin.mutate(item),
+                  creating: createCountdown.isPending,
+                }}
+              />
+            </div>
 
             <footer className="flex flex-wrap items-center justify-between gap-2 px-1 pt-3 text-[9px] tracking-wider text-muted/60">
               <span>ATLAS PERSONAL OS · DESIGNED FOR YOUR EVERYDAY</span>

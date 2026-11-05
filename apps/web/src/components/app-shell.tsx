@@ -193,9 +193,11 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function ShellBody({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const collapsed = useUiStore((state) => state.sidebarCollapsed);
   const toggle = useUiStore((state) => state.toggleSidebar);
   const chromeHidden = useUiStore((state) => state.chromeHidden);
+  const isDashboardScreen = /^\/m\/dashboard\/screen\/?$/.test(pathname);
   const session = useSession();
   const router = useRouter();
   const logout = useLogout();
@@ -250,7 +252,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {!chromeHidden ? (
+        {!chromeHidden && !isDashboardScreen ? (
           <header className="glass sticky top-0 z-[var(--z-sticky)] flex h-14 items-center justify-between gap-3 px-4 md:px-6">
             <div className="flex items-center gap-2">
               <button
@@ -305,7 +307,9 @@ function ShellBody({ children }: { children: React.ReactNode }) {
           </header>
         ) : null}
 
-        <main className={cn('min-w-0 flex-1', !chromeHidden && 'p-4 md:p-8')}>{children}</main>
+        <main className={cn('min-w-0 flex-1', !chromeHidden && !isDashboardScreen && 'p-4 md:p-8')}>
+          {children}
+        </main>
       </div>
 
       {!chromeHidden ? (

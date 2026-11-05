@@ -40,6 +40,24 @@ test.describe('个人大屏模块（假数据源）', () => {
     await expect(page.getByRole('heading', { name: '个人大屏' })).toBeVisible();
     await expect(page.getByText('杭州').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('晴间多云').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: '打开命令面板' })).toHaveCount(0);
+
+    // 天气卡可打开完整详情，包含逐时与逐日预报
+    await page.getByRole('button', { name: '查看天气详情', exact: true }).click();
+    const weatherDialog = page.getByRole('dialog', { name: '杭州 · 天气详情' });
+    await expect(weatherDialog).toBeVisible();
+    await expect(weatherDialog.getByRole('heading', { name: '逐时天气' })).toBeVisible();
+    await expect(weatherDialog.getByRole('heading', { name: '未来几天' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(weatherDialog).not.toBeVisible();
+
+    // 调用浏览器 Fullscreen API；退出后恢复应用外壳
+    await page.getByRole('button', { name: '全屏', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true);
+    await expect(page.getByRole('navigation', { name: '主导航' })).toHaveCount(0);
+    await page.getByRole('button', { name: '退出全屏', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+    await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
 
     // 时钟走时（role=timer）
     await expect(page.getByRole('timer', { name: '当前时间' })).toBeVisible();

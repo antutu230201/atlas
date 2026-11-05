@@ -22,7 +22,7 @@ export function SummaryCard({ envelope }: { envelope: SourceEnvelope<DailySummar
           </span>
           <div>
             <h2 className="text-sm font-semibold">每日小结</h2>
-            <p className="screen-label mt-0.5 !text-[8px]">Atlas intelligence</p>
+            <p className="screen-label mt-0.5 !text-[9px]">Atlas intelligence</p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-border bg-primary-soft px-2.5 py-1 text-[9px] text-primary">
