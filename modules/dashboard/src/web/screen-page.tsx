@@ -37,6 +37,8 @@ function ScreenBackground({
           <img
             src={wallpaperUrl}
             alt=""
+            fetchPriority="high"
+            decoding="async"
             className="absolute inset-0 h-full w-full scale-105 object-cover opacity-[var(--screen-wallpaper-opacity)]"
             onError={() => setImageFailed(true)}
           />
@@ -99,6 +101,9 @@ export function DashboardScreenPage({
     queryKey: ['module', moduleName, workspaceSlug, 'snapshot'],
     queryFn: () => api<DashboardSnapshot>(`${base}/snapshot`, { method: 'POST', json: {} }),
     refetchInterval: 10 * 60_000,
+    // 窗口失焦回来不重复闪加载；10 分钟轮询 + 手动刷新仍在
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const fail = (e: Error) => toast({ title: '操作失败', description: e.message, variant: 'err' });

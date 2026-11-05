@@ -149,7 +149,11 @@ function withInflight<T>(key: string, fn: () => Promise<T>): Promise<T> {
   return promise;
 }
 
-/** 快照里对单个数据源的拉取/回退决策（fresh 命中缓存则不触网） */
+/**
+ * 快照里对单个数据源的拉取/回退决策。
+ * 缓存新鲜：直接返回；缓存过期：**先返回缓存（stale），后台异步刷新**，
+ * 避免 open-meteo（实测 4s+）这类慢源把整屏 LCP 拖到 6 秒以上。
+ */
 async function resolveSource<T>(
   ctx: ModuleContext,
   key: string,
@@ -166,6 +170,15 @@ async function resolveSource<T>(
         payload: cached.payload as T,
       };
     }
+    // stale-while-revalidate：先让页面上数据，再悄悄换新
+    void withInflight(`${ctx.workspaceId}:${key}`, fetcher)
+      .then((payload) => writeCache(ctx, key, payload))
+      .catch(() => undefined);
+    return {
+      status: 'stale',
+      fetchedAt: cached.fetchedAt.toISOString(),
+      payload: cached.payload as T,
+    };
   }
   try {
     const payload = await withInflight(`${ctx.workspaceId}:${key}`, fetcher);
@@ -173,14 +186,6 @@ async function resolveSource<T>(
     return { status: 'fresh', fetchedAt: new Date().toISOString(), payload };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (cached) {
-      return {
-        status: 'stale',
-        fetchedAt: cached.fetchedAt.toISOString(),
-        payload: cached.payload as T,
-        error: message,
-      };
-    }
     return { status: 'error', fetchedAt: null, payload: null, error: message };
   }
 }
@@ -330,55 +335,53 @@ export const definition: ModuleDefinition = {
         const enabledHotSources = HOT_SOURCES.filter(
           (source) => sourcesEnabled[source.key] !== false,
         );
-        const results = await Promise.all(
-          enabledHotSources.map((source) =>
-            resolveSource<HotItem[]>(ctx, `hot:${source.key}`, source.ttlMs, source.fetchList),
-          ),
-        );
+        const emptyEnvelope = { status: 'empty', fetchedAt: null, payload: null } as const;
+        const todayDay = localDay();
 
-        const weather = weatherCity
-          ? await resolveSource<WeatherData>(
-              ctx,
-              weatherCacheKey(weatherCity),
-              30 * 60_000,
-              async () => {
-                if (isFakeMode()) return fakeWeather;
-                return fetchWeather(weatherCity.lat, weatherCity.lon);
-              },
-            )
-          : ({ status: 'empty', fetchedAt: null, payload: null } as SourceEnvelope<WeatherData>);
-
-        const quote = await resolveSource<Quote>(ctx, 'quote', 6 * 3_600_000, async () => {
-          if (isFakeMode()) return fakeQuote;
-          return fetchQuote();
-        });
-
-        const wallpaper =
-          settings.wallpaper === false
-            ? ({ status: 'empty', fetchedAt: null, payload: null } as SourceEnvelope<Wallpaper>)
-            : await resolveSource<Wallpaper>(ctx, 'wallpaper', 12 * 3_600_000, async () => {
-                if (isFakeMode()) return { ...fakeWallpaper, url: '' };
-                return fetchWallpaper();
-              });
+        // 所有外部源与本地查询并行：串行时天气 4s+ 会把首屏 LCP 拖到 6s 以上
+        const [results, weather, quote, wallpaper, countdownRows, recentActivity, summary] =
+          await Promise.all([
+            Promise.all(
+              enabledHotSources.map((source) =>
+                resolveSource<HotItem[]>(ctx, `hot:${source.key}`, source.ttlMs, source.fetchList),
+              ),
+            ),
+            weatherCity
+              ? resolveSource<WeatherData>(
+                  ctx,
+                  weatherCacheKey(weatherCity),
+                  30 * 60_000,
+                  async () => {
+                    if (isFakeMode()) return fakeWeather;
+                    return fetchWeather(weatherCity.lat, weatherCity.lon);
+                  },
+                )
+              : Promise.resolve(emptyEnvelope as SourceEnvelope<WeatherData>),
+            resolveSource<Quote>(ctx, 'quote', 6 * 3_600_000, async () => {
+              if (isFakeMode()) return fakeQuote;
+              return fetchQuote();
+            }),
+            settings.wallpaper === false
+              ? Promise.resolve(emptyEnvelope as SourceEnvelope<Wallpaper>)
+              : resolveSource<Wallpaper>(ctx, 'wallpaper', 12 * 3_600_000, async () => {
+                  if (isFakeMode()) return { ...fakeWallpaper, url: '' };
+                  return fetchWallpaper();
+                }),
+            listCountdownRows(ctx, false),
+            readRecentActivity(ctx, 365),
+            // AI 每日摘要：按天缓存（key 含日期，TTL 6 小时），失败回退旧值，不打断大屏
+            resolveSource<DailySummary>(ctx, `summary:${todayDay}`, 6 * 3_600_000, () =>
+              generateDailySummary(ctx),
+            ),
+          ]);
 
         const hot: Record<string, SourceEnvelope<HotItem[]>> = {};
         enabledHotSources.forEach((source, index) => {
           hot[source.key] = results[index] as SourceEnvelope<HotItem[]>;
         });
 
-        const countdownRows = await listCountdownRows(ctx, false);
-        const recentActivity = await readRecentActivity(ctx, 365);
         const streak = currentStreak(recentActivity);
-        const todayDay = localDay();
         const todayCount = recentActivity.find((d) => d.day === todayDay)?.count ?? 0;
-
-        // AI 每日摘要：按天缓存（key 含日期，TTL 6 小时），失败回退旧值/报错，不打断大屏
-        const summary = await resolveSource<DailySummary>(
-          ctx,
-          `summary:${todayDay}`,
-          6 * 3_600_000,
-          () => generateDailySummary(ctx),
-        );
 
         return {
           serverTime: new Date().toISOString(),
