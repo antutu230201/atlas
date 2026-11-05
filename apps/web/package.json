@@ -21,7 +21,8 @@
     "zustand": "^5.0.16",
     "@atlas/module-sample-note": "workspace:*",
     "@atlas/module-todo-notes": "workspace:*",
-    "@atlas/module-dashboard": "workspace:*"
+    "@atlas/module-dashboard": "workspace:*",
+    "@atlas/module-habits": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

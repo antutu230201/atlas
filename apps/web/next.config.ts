@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     '@atlas/module-sample-note',
     '@atlas/module-todo-notes',
     '@atlas/module-dashboard',
+    '@atlas/module-habits',
   ],
 };
 

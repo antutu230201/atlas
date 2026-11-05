@@ -4,6 +4,7 @@ import type { ComponentType } from 'react';
 import { SampleNoteListPage } from '@atlas/module-sample-note/web';
 import { DashboardScreenPage } from '@atlas/module-dashboard/web';
 import { TodoListPage, TodoTodayWidget, TodoTrashPage } from '@atlas/module-todo-notes/web';
+import { HabitsTodayPage } from '@atlas/module-habits/web';
 
 /**
  * 模块前端注册表（装配点，ADR-0005 §7）：
@@ -21,6 +22,7 @@ export const moduleWebRegistry: Record<string, Record<string, ComponentType<Modu
   sample_note: { list: SampleNoteListPage },
   todo_notes: { list: TodoListPage, trash: TodoTrashPage },
   dashboard: { screen: DashboardScreenPage },
+  habits: { today: HabitsTodayPage },
 };
 
 export const moduleWidgetRegistry: Record<

@@ -129,6 +129,18 @@
 - [x] `pnpm start:all`（build + api `node dist/main` + web `next start`）：日常使用生产模式，避开 dev 编译开销；手册补"日常使用"小节
 - [x] 细滚动条主题化（tokens 驱动，暗色下不再是系统白条）
 
+## 习惯打卡模块交付记录（2026-11-06，modules/habits）
+
+第三个业务模块，"每天用"核心闭环（记 → 打卡 → 连续感）。完全按《如何开发一个模块》流程交付，零内核改动。
+
+- [x] 数据模型：`modules.habits` 下 habit（软删除归档）+ habit_log（habit+day 唯一，一天一条）；迁移 0000 + 0001_rls（GRANT + RLS 租户隔离模板）
+- [x] 动作：snapshot / createHabit / renameHabit / toggleCheck（幂等打卡与取消）/ archiveHabit / restoreHabit，全部返回新快照省一次往返
+- [x] 连续天数与近 7 天热力格在服务端组装（本地时区 day 口径与 dashboard.activity 一致）
+- [x] 事件：habit.created/renamed/checked/unchecked/archived/restored 落 outbox，供其他模块订阅（大屏衔接预留）
+- [x] 前端：今日打卡视图（进度概览/习惯行/emoji 选择/归档区/空态/加载态/错误态），亮暗主题浏览器实测
+- [x] 接线：api/web 依赖注册、next.config transpilePackages、module-registry 页面登记
+- [x] 测试：集成测试 7 个（含 guest 只读、越权隔离、幂等语义）+ e2e 1 条（启用→创建→打卡→取消→归档→恢复），全套 10/10 通过
+
 ### 协同交付中修复的横切问题（2026-11-05，提交 1b84412 / 404c818 / 634552b）
 
 - 玻璃态令牌化：`--glass-*` 亮暗变量 + @source 文件级 glob（此前模块类名全丢、暗色发白，详见手册 §5）
