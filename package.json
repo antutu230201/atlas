@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "start:all": "pnpm build && turbo run start",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",

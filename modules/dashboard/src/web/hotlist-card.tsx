@@ -67,7 +67,7 @@ export function HotlistCard({
   return (
     <article
       className="screen-card screen-reveal group/card flex h-full flex-col hover:-translate-y-1"
-      style={{ '--screen-index': index + 4 } as React.CSSProperties}
+      style={{ '--screen-index': index + 3 } as React.CSSProperties}
     >
       <header className="flex items-center gap-3 border-b border-border px-4 py-3.5">
         <span

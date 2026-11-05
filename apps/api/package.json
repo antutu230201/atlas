@@ -5,6 +5,7 @@
   "description": "Atlas 后端服务：平台内核 API（阶段 0：健康检查与迁移体系）",
   "scripts": {
     "dev": "nest start --watch",
+    "start": "node dist/main",
     "build": "nest build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

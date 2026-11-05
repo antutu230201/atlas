@@ -30,7 +30,11 @@ function ScreenBackground({
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = wallpaperUrl !== undefined && wallpaperUrl.length > 0 && !imageFailed;
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden bg-bg">
+    /* absolute（而非 fixed）：限制在大屏区域内，避免盖住 app 外壳的左侧导航 */
+    <div
+      aria-hidden
+      className="screen-backdrop pointer-events-none absolute inset-0 overflow-hidden bg-bg"
+    >
       {showImage ? (
         <>
           {/* 外部每日壁纸直接用 img：域名每日变化，Next Image 域名白名单不可预知 */}
@@ -54,6 +58,30 @@ function ScreenBackground({
       <div className="absolute inset-0" style={{ background: 'var(--screen-scrim)' }} />
     </div>
   );
+}
+
+/** 滚动中置 true、停止约 350ms 后复位：驱动 data-scrolling 移除装饰动画（globals.css）。
+    同时监听 wheel——滚到边界后同位置滚动不再触发 scroll，若只听 scroll 状态会闪烁，
+    每次闪烁都要销毁/重建动画合成层，比动画本身更贵。setState 相同值跳过渲染，
+    因此滚动过程只在开始/结束各渲染一次。 */
+function useScrollActive() {
+  const [scrolling, setScrolling] = useState(false);
+  useEffect(() => {
+    let timer = 0;
+    const onActive = () => {
+      setScrolling(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setScrolling(false), 350);
+    };
+    window.addEventListener('scroll', onActive, { passive: true });
+    window.addEventListener('wheel', onActive, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onActive);
+      window.removeEventListener('wheel', onActive);
+      window.clearTimeout(timer);
+    };
+  }, []);
+  return scrolling;
 }
 
 function HeroMetric({
@@ -89,6 +117,32 @@ function HeroMetric({
   );
 }
 
+/** 时间核心卡：时钟与轨道是纯客户端渲染、不依赖 snapshot——加载中也即时显示，指标行由调用方给（数据或骨架） */
+function HeroClockCard({
+  displayName,
+  metrics,
+}: {
+  displayName?: string;
+  metrics: React.ReactNode;
+}) {
+  return (
+    <section
+      className="screen-card screen-reveal p-6 md:p-7 xl:col-span-7"
+      style={{ '--screen-index': 1 } as React.CSSProperties}
+    >
+      <div className="flex items-center gap-6">
+        <div className="min-w-0 flex-1">
+          <ClockCard displayName={displayName} />
+        </div>
+        <TimeOrbit />
+      </div>
+      <div className="mt-7 grid grid-cols-2 gap-y-5 border-t border-border pt-5 sm:grid-cols-4">
+        {metrics}
+      </div>
+    </section>
+  );
+}
+
 /** 个人大屏主页：时钟农历 / 天气 / 滚动头条 / 多源热榜 / 一言 / 倒计时 / 氛围壁纸 */
 export function DashboardScreenPage({
   workspaceSlug,
@@ -103,6 +157,7 @@ export function DashboardScreenPage({
   const { toast } = useToast();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const scrolling = useScrollActive();
   const chromeHidden = useUiStore((state) => state.chromeHidden);
   const setChromeHidden = useUiStore((state) => state.setChromeHidden);
   const base = `/modules/workspaces/${workspaceSlug}/${moduleName}/call`;
@@ -225,7 +280,10 @@ export function DashboardScreenPage({
   };
 
   return (
-    <div className="dashboard-screen relative min-h-screen overflow-hidden bg-bg text-text">
+    <div
+      className="dashboard-screen relative min-h-screen overflow-hidden bg-bg text-text"
+      data-scrolling={scrolling || undefined}
+    >
       <ScreenBackground
         wallpaperUrl={
           data && data.options.wallpaper && data.wallpaper.payload?.url
@@ -304,10 +362,26 @@ export function DashboardScreenPage({
 
         {snapshot.isPending ? (
           <div className="space-y-4">
-            <Skeleton className="h-14 w-full rounded-md" />
+            {/* 时钟不依赖 snapshot：加载中也即时可见，指标行与天气/热榜先给骨架 */}
             <div className="grid gap-4 xl:grid-cols-12">
-              <Skeleton className="h-96 rounded-md xl:col-span-7" />
-              <Skeleton className="h-96 rounded-md xl:col-span-5" />
+              <HeroClockCard
+                displayName={user?.displayName}
+                metrics={
+                  <>
+                    {[0, 1, 2, 3].map((index) => (
+                      <Skeleton key={index} className="h-14 rounded-sm" />
+                    ))}
+                  </>
+                }
+              />
+              <div
+                className="screen-reveal min-w-0 xl:col-span-5"
+                style={{ '--screen-index': 2 } as React.CSSProperties}
+              >
+                <div className="screen-card flex h-full min-h-64 items-center justify-center p-6">
+                  <Skeleton className="h-full w-full rounded-sm" />
+                </div>
+              </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
               {[0, 1, 2, 3, 4].map((index) => (
@@ -359,40 +433,34 @@ export function DashboardScreenPage({
 
             {/* 时间核心 + 天气 */}
             <div className="grid gap-4 xl:grid-cols-12">
-              <section
-                className="screen-card screen-reveal p-6 md:p-7 xl:col-span-7"
-                style={{ '--screen-index': 1 } as React.CSSProperties}
-              >
-                <div className="flex items-center gap-6">
-                  <div className="min-w-0 flex-1">
-                    <ClockCard displayName={user?.displayName} />
-                  </div>
-                  <TimeOrbit />
-                </div>
-                <div className="mt-7 grid grid-cols-2 gap-y-5 border-t border-border pt-5 sm:grid-cols-4">
-                  <HeroMetric
-                    value={data.activity.todayCount}
-                    label="今日完成"
-                    onClick={() => scrollToSection('activity-section')}
-                    accent
-                  />
-                  <HeroMetric
-                    value={data.activity.streak}
-                    label="连续打卡 · 天"
-                    onClick={() => scrollToSection('activity-section')}
-                  />
-                  <HeroMetric
-                    value={enabledSources.length}
-                    label="实时热榜源"
-                    onClick={() => scrollToSection('hotlist-section')}
-                  />
-                  <HeroMetric
-                    value={data.countdowns.length}
-                    label="期待中的日子"
-                    onClick={() => scrollToSection('countdown-section')}
-                  />
-                </div>
-              </section>
+              <HeroClockCard
+                displayName={user?.displayName}
+                metrics={
+                  <>
+                    <HeroMetric
+                      value={data.activity.todayCount}
+                      label="今日完成"
+                      onClick={() => scrollToSection('activity-section')}
+                      accent
+                    />
+                    <HeroMetric
+                      value={data.activity.streak}
+                      label="连续打卡 · 天"
+                      onClick={() => scrollToSection('activity-section')}
+                    />
+                    <HeroMetric
+                      value={enabledSources.length}
+                      label="实时热榜源"
+                      onClick={() => scrollToSection('hotlist-section')}
+                    />
+                    <HeroMetric
+                      value={data.countdowns.length}
+                      label="期待中的日子"
+                      onClick={() => scrollToSection('countdown-section')}
+                    />
+                  </>
+                }
+              />
               <div
                 className="screen-reveal min-w-0 xl:col-span-5"
                 style={{ '--screen-index': 2 } as React.CSSProperties}
@@ -410,18 +478,7 @@ export function DashboardScreenPage({
               </div>
             </div>
 
-            {/* AI 摘要 / 一言 + 成长热力图 */}
-            <div className="grid items-stretch gap-4 xl:grid-cols-12">
-              <div className="flex flex-col gap-4 xl:col-span-7">
-                <SummaryCard envelope={data.summary} />
-                {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
-              </div>
-              <div id="activity-section" className="scroll-mt-6 xl:col-span-5">
-                <ActivityCard stats={data.activity} />
-              </div>
-            </div>
-
-            {/* 实时热榜 */}
+            {/* 实时热榜：紧跟两大核心卡片 */}
             {enabledSources.length > 0 ? (
               <section
                 id="hotlist-section"
@@ -430,7 +487,7 @@ export function DashboardScreenPage({
               >
                 <div
                   className="screen-reveal flex items-end justify-between px-1"
-                  style={{ '--screen-index': 4 } as React.CSSProperties}
+                  style={{ '--screen-index': 3 } as React.CSSProperties}
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -459,6 +516,17 @@ export function DashboardScreenPage({
                 </div>
               </section>
             ) : null}
+
+            {/* AI 摘要 / 一言 + 成长热力图 */}
+            <div className="grid items-stretch gap-4 xl:grid-cols-12">
+              <div className="flex flex-col gap-4 xl:col-span-7">
+                <SummaryCard envelope={data.summary} />
+                {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
+              </div>
+              <div id="activity-section" className="scroll-mt-6 xl:col-span-5">
+                <ActivityCard stats={data.activity} />
+              </div>
+            </div>
 
             {/* 倒计时 */}
             <div id="countdown-section" className="scroll-mt-6">

@@ -26,6 +26,28 @@
   box-shadow: var(--glass-strong-shadow);
 }
 
+/* 细滚动条：颜色跟随主题令牌，暗色主题下不再是系统默认的白色粗条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+  background-color: var(--color-border);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-muted);
+}
+
 /* 大屏滚动头条：位移 50%（内容渲染两遍拼接），实际时长按内容长度以内联变量传入；
    悬停暂停 + 尊重 prefers-reduced-motion（tokens.css 全局降级） */
 @keyframes screen-marquee {
@@ -266,8 +288,8 @@
 }
 
 .screen-weather {
-  /* fixed：背景/雨雪不随页面滚动重绘，滚动时只做合成 */
-  position: fixed;
+  /* absolute：限制在大屏容器内，避免盖住 app 外壳的左侧导航 */
+  position: absolute;
   inset: 0;
   z-index: 1;
   overflow: hidden;
@@ -456,4 +478,22 @@
   animation: screen-pulse-ring calc(var(--screen-ambient-duration) / 4) var(--ease-out-soft)
     infinite;
   transform-origin: center;
+}
+
+/* ---------- 滚动性能（实测：软渲染基准下滚动 44→72 FPS）----------
+   滚动中由 screen-page 置 data-scrolling（scroll+wheel 双事件驱动，350ms 防抖，
+   防止滚到边界后状态闪烁反复销毁动画合成层），移除**持续循环**的装饰动画。
+   注意三点（均实测）：
+   1. 不能用 play-state:paused 或 visibility:hidden——动画一旦存在（即使暂停/不可见），
+      合成器每帧仍要处理，与不关一样卡；
+   2. 不能用 `*` 通配——会把一次性入场动画（screen-reveal）也移除，滚动停止后
+      全部卡片重播入场动画，视觉上像整页刷新；入场动画播完即静止、无持续成本，必须保留；
+   3. 天气层只停动画不隐藏，避免底色跳变。 */
+.dashboard-screen[data-scrolling] .screen-marquee,
+.dashboard-screen[data-scrolling] .screen-orbit,
+.dashboard-screen[data-scrolling] .screen-core,
+.dashboard-screen[data-scrolling] .screen-pulse-ring,
+.dashboard-screen[data-scrolling] .screen-weather,
+.dashboard-screen[data-scrolling] .screen-weather * {
+  animation: none !important;
 }
