@@ -106,13 +106,11 @@ describe('OpenAICompatProvider', () => {
   it('空内容与网络错误均有可读错误信息', async () => {
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ choices: [{ message: { content: '' } }] }), {
-            status: 200,
-          }),
-        ),
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ choices: [{ message: { content: '' } }] }), {
+          status: 200,
+        }),
+      ),
     );
     const provider = new OpenAICompatProvider({
       baseUrl: 'https://example.com/v1',
