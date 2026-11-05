@@ -34,6 +34,14 @@ const envSchema = z.object({
     .default('true')
     .transform((value) => value !== 'false'),
   EVENT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(8),
+  /** AI 供应商（OpenAI 兼容协议，阶段 5）：API 密钥为空时回落 MockAIProvider，零配置可跑 */
+  AI_API_KEY: z.string().default(''),
+  /** OpenAI 兼容 base URL：TokenRhythm / DeepSeek / OpenAI / 智谱等 */
+  AI_BASE_URL: z.string().default('https://tokenrhythm.studio/v1'),
+  /** 模型名，以供应商 /v1/models 实际返回为准 */
+  AI_MODEL: z.string().default('deepseek-v4.1-flash-1017'),
+  /** AI 单次请求超时（毫秒） */
+  AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
 });
 
 export type ApiEnv = z.infer<typeof envSchema>;

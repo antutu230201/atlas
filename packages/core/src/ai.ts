@@ -57,3 +57,81 @@ export class MockAIProvider implements AIAdapter {
     };
   }
 }
+
+/**
+ * OpenAI 兼容供应商（阶段 5）：适用于任何实现 /chat/completions 协议的服务——
+ * TokenRhythm（https://tokenrhythm.studio/v1）、DeepSeek、OpenAI、智谱等，换供应商只改 env。
+ * 用原生 fetch，不引入 SDK 依赖；密钥只从环境变量注入，不落代码。
+ */
+export class OpenAICompatProvider implements AIAdapter {
+  readonly name: string;
+
+  constructor(
+    private readonly options: {
+      baseUrl: string;
+      apiKey: string;
+      model: string;
+      /** 注册名（如 ai-tokenrhythm），用于日志与用量追踪 */
+      name?: string;
+      timeoutMs?: number;
+    },
+  ) {
+    this.name = options.name ?? 'ai-openai-compat';
+  }
+
+  isReady(): boolean {
+    return this.options.apiKey.length > 0;
+  }
+
+  async complete(request: AICompletionRequest): Promise<AICompletionResponse> {
+    const { baseUrl, apiKey, model, timeoutMs = 30_000 } = this.options;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            ...(request.system ? [{ role: 'system', content: request.system }] : []),
+            { role: 'user', content: request.prompt },
+          ],
+          ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
+          ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error(`AI 供应商返回 ${response.status}：${detail.slice(0, 200)}`);
+      }
+      const data = (await response.json()) as {
+        model?: string;
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+      };
+      const text = data.choices?.[0]?.message?.content ?? '';
+      if (!text) throw new Error('AI 供应商返回了空内容');
+      return {
+        text,
+        model: data.model ?? model,
+        usage: {
+          promptTokens: data.usage?.prompt_tokens ?? 0,
+          completionTokens: data.usage?.completion_tokens ?? 0,
+        },
+      };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`AI 请求超时（${timeoutMs}ms）`);
+      }
+      throw error instanceof Error ? error : new Error(String(error));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}

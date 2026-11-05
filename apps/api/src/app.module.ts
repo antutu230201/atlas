@@ -21,7 +21,8 @@ import { EntitlementService } from './modules/kernel/entitlement.service';
 import { SecurityHeadersMiddleware } from './auth/security-headers.middleware';
 import { HealthController } from './modules/health/health.controller';
 import { HealthService } from './modules/health/health.service';
-import { ConsoleMailAdapter, MockAIProvider } from '@atlas/core';
+import { ConsoleMailAdapter, MockAIProvider, OpenAICompatProvider } from '@atlas/core';
+import type { AIAdapter } from '@atlas/core';
 import { WorkspaceController } from './workspace/workspace.controller';
 import { WorkspaceService } from './workspace/workspace.service';
 import {
@@ -111,8 +112,21 @@ import {
     { provide: EVENT_OUTBOX_SERVICE_TOKEN, useExisting: EventOutboxService },
     { provide: ConsoleMailAdapter, useFactory: () => new ConsoleMailAdapter() },
     { provide: MAIL_ADAPTER_TOKEN, useExisting: ConsoleMailAdapter },
-    { provide: MockAIProvider, useFactory: () => new MockAIProvider() },
-    { provide: AI_ADAPTER_TOKEN, useExisting: MockAIProvider },
+    {
+      // 阶段 5：配置了 AI_API_KEY 即走真实供应商（OpenAI 兼容），否则回落 Mock，零配置可跑
+      provide: AI_ADAPTER_TOKEN,
+      useFactory: (env: ApiEnv): AIAdapter =>
+        env.AI_API_KEY
+          ? new OpenAICompatProvider({
+              baseUrl: env.AI_BASE_URL,
+              apiKey: env.AI_API_KEY,
+              model: env.AI_MODEL,
+              name: 'ai-openai-compat',
+              timeoutMs: env.AI_TIMEOUT_MS,
+            })
+          : new MockAIProvider(),
+      inject: [ENV_TOKEN],
+    },
     {
       provide: NotificationService,
       useFactory: (db: Db, mail: ConsoleMailAdapter) => new NotificationService(db, mail),
@@ -155,7 +169,7 @@ import {
         audit: AuditService,
         outbox: EventOutboxService,
         registry: ModuleRegistryService,
-        ai: MockAIProvider,
+        ai: AIAdapter,
       ) => new ModuleService(db, adminDb, audit, outbox, registry, ai),
       inject: [
         DB_TOKEN,
