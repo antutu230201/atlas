@@ -1,12 +1,22 @@
-import { Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import type { Request } from 'express';
 import { AuthGuard, type RequestUser } from '../auth/guards';
 import { AI_ADAPTER_TOKEN } from '../tokens';
-import type { AIAdapter } from '@atlas/core';
+import { ConfigurableAIProvider } from './ai-config.service';
 
 const chatSchema = z.object({
   message: z.string().min(1).max(2000),
+});
+
+/**
+ * AI 配置表单补丁：apiKey 三态——undefined 保持不变；null/'' 清除（回落 env/Mock）；非空设置。
+ */
+const configPatchSchema = z.object({
+  apiKey: z.string().max(400).optional().nullable(),
+  baseUrl: z.string().url('Base URL 必须是合法 URL').max(300).optional(),
+  model: z.string().trim().min(1, '模型名不能为空').max(120).optional(),
+  timeoutMs: z.coerce.number().int().min(1000).max(120_000).optional(),
 });
 
 const buildSystemPrompt = (name: string) => `你是 Atlas 的个人成长助手，用户是 ${name}。你帮助用户：
@@ -22,9 +32,10 @@ const buildSystemPrompt = (name: string) => `你是 Atlas 的个人成长助手�
 @Controller('ai')
 @UseGuards(AuthGuard)
 export class AIController {
-  constructor(@Inject(AI_ADAPTER_TOKEN) private readonly ai: AIAdapter) {}
+  constructor(@Inject(AI_ADAPTER_TOKEN) private readonly ai: ConfigurableAIProvider) {}
 
   @Post('chat')
+  @HttpCode(200)
   async chat(@Req() request: Request, @Body() body: { message: string }) {
     const parsed = chatSchema.safeParse(body);
     if (!parsed.success) {
@@ -38,5 +49,52 @@ export class AIController {
       temperature: 0.7,
     });
     return { data: { text: result.text, model: result.model } };
+  }
+
+  /** 当前 AI 配置（key 只回掩码，明文永不出库） */
+  @Get('config')
+  getConfig() {
+    return { data: this.ai.describe() };
+  }
+
+  /** 保存配置：登录即可改（部署级，自用阶段），写入审计由全局 interceptor 覆盖，key 已脱敏 */
+  @Put('config')
+  @HttpCode(200)
+  async putConfig(@Req() request: Request, @Body() body: unknown) {
+    const parsed = configPatchSchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      return { error: 'atlas.ai.invalid-config', message: parsed.error.issues[0]?.message };
+    }
+    const user = request.user as RequestUser;
+    const view = await this.ai.applyPatch(parsed.data, user.id);
+    return { data: view };
+  }
+
+  /** 测试连接：用提交的表单值（不落库、不切换）发一条最小请求 */
+  @Post('config/test')
+  async testConfig(@Body() body: unknown) {
+    const parsed = configPatchSchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      return { data: { ok: false, error: parsed.error.issues[0]?.message ?? '参数错误' } };
+    }
+    const probe = this.ai.probePatch(parsed.data);
+    if (!probe) {
+      return { data: { ok: false, error: '尚未填写 API Key' } };
+    }
+    try {
+      const result = await probe.complete({
+        prompt: '连接测试：请只回复"连接成功"四个字。',
+        maxTokens: 16,
+        temperature: 0,
+      });
+      return { data: { ok: true, model: result.model, sample: result.text.slice(0, 80) } };
+    } catch (error) {
+      return {
+        data: {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
   }
 }

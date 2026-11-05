@@ -74,16 +74,20 @@ describe('习惯打卡模块', () => {
   it('新建 → snapshot 返回打卡项，默认图标与今日未打卡', async () => {
     const result = await call(ownerCookie, 'createHabit', { name: '读书 10 分钟' });
     expect(result.status).toBe(200);
-    const snap = result.body.data as { habits: { icon: string; checkedToday: boolean }[] };
+    const snap = result.body.data as {
+      habits: { icon: string; checkedToday: boolean }[];
+      totalToday: number;
+    };
     expect(snap.habits).toHaveLength(1);
-    expect(snap.habits[0].icon).toBe('✅');
-    expect(snap.habits[0].checkedToday).toBe(false);
+    expect(snap.habits[0]?.icon).toBe('✅');
+    expect(snap.habits[0]?.checkedToday).toBe(false);
     expect(snap.totalToday).toBe(1);
   });
 
   it('改名 + 指定图标生效', async () => {
     const before = await snapshot(ownerCookie);
-    const habitId = before.habits[0].id;
+    const habitId = before.habits[0]?.id;
+    if (!habitId) throw new Error('snapshot 缺少习惯');
     const result = await call(ownerCookie, 'renameHabit', {
       habitId,
       name: '跑步 20 分钟',
@@ -91,36 +95,36 @@ describe('习惯打卡模块', () => {
     });
     expect(result.status).toBe(200);
     const snap = result.body.data as { habits: { name: string; icon: string }[] };
-    expect(snap.habits[0].name).toBe('跑步 20 分钟');
-    expect(snap.habits[0].icon).toBe('🏃');
+    expect(snap.habits[0]?.name).toBe('跑步 20 分钟');
+    expect(snap.habits[0]?.icon).toBe('🏃');
   });
 
   it('打卡 → checkedToday/streak=1，重复打卡幂等，取消后归零', async () => {
     const before = await snapshot(ownerCookie);
-    const habitId = before.habits[0].id;
+    const habitId = before.habits[0]?.id ?? '';
     const first = (await call(ownerCookie, 'toggleCheck', { habitId })).body.data as {
       habits: { checkedToday: boolean; streak: number }[];
       doneToday: number;
     };
-    expect(first.habits[0].checkedToday).toBe(true);
-    expect(first.habits[0].streak).toBe(1);
+    expect(first.habits[0]?.checkedToday).toBe(true);
+    expect(first.habits[0]?.streak).toBe(1);
     expect(first.doneToday).toBe(1);
 
     const again = (await call(ownerCookie, 'toggleCheck', { habitId })).body.data as {
       habits: { checkedToday: boolean; streak: number }[];
     };
-    expect(again.habits[0].checkedToday).toBe(false);
-    expect(again.habits[0].streak).toBe(0);
+    expect(again.habits[0]?.checkedToday).toBe(false);
+    expect(again.habits[0]?.streak).toBe(0);
 
     const third = (await call(ownerCookie, 'toggleCheck', { habitId })).body.data as {
       habits: { checkedToday: boolean }[];
     };
-    expect(third.habits[0].checkedToday).toBe(true);
+    expect(third.habits[0]?.checkedToday).toBe(true);
   });
 
   it('归档 → 从活跃列表消失进入归档区，恢复后回来且今日打卡态保留', async () => {
     const before = await snapshot(ownerCookie);
-    const habitId = before.habits[0].id;
+    const habitId = before.habits[0]?.id ?? '';
     const archived = (await call(ownerCookie, 'archiveHabit', { habitId })).body.data as {
       habits: unknown[];
       archived: { id: string }[];
@@ -155,7 +159,7 @@ describe('习惯打卡模块', () => {
   it('guest 只读：写操作被拒，snapshot 可读', async () => {
     const snap = await snapshot(guestCookie);
     expect(snap.totalToday).toBe(2);
-    const denied = await call(guestCookie, 'toggleCheck', { habitId: snap.habits[0].id });
+    const denied = await call(guestCookie, 'toggleCheck', { habitId: snap.habits[0]?.id ?? '' });
     expect(denied.status).toBe(403);
   });
 
@@ -175,7 +179,7 @@ describe('习惯打卡模块', () => {
     // 外人拿到自己空间的空快照，尝试操作他人 habitId 被拒
     const ownerSnap = await snapshot(ownerCookie);
     const cross = await call(outsiderCookie, 'toggleCheck', {
-      habitId: ownerSnap.habits[0].id,
+      habitId: ownerSnap.habits[0]?.id ?? '',
     });
     expect([400, 404]).toContain(cross.status);
   });

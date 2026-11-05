@@ -141,6 +141,14 @@
 - [x] 接线：api/web 依赖注册、next.config transpilePackages、module-registry 页面登记
 - [x] 测试：集成测试 7 个（含 guest 只读、越权隔离、幂等语义）+ e2e 1 条（启用→创建→打卡→取消→归档→恢复），全套 10/10 通过
 
+## AI 配置界面化 + 真实供应商（2026-11-06）
+
+- [x] AI 接入：core 新增 OpenAICompatProvider（原生 fetch，零新依赖，OpenAI 兼容协议适配 TokenRhythm/DeepSeek/智谱等），6 单测
+- [x] 界面化配置：platform.app_setting 键值表 + ConfigurableAIProvider（启动读库→界面保存即热切换，无需重启）；设置页新增「AI 配置」分区（Base URL/模型/Key/超时 + 测试连接）
+- [x] 安全：key 只存库不回显明文（GET 回掩码 sk_xxx***abcd），审计脱敏正则补 api_?key；无库配置回落 env，再无 key 回落 Mock（零配置可跑）
+- [x] 测试：集成 5 个（本地 OpenAI 兼容 mock 上游全链路：热切换/掩码/清除回落/非法表单），单测 113 + e2e 10 全绿
+- [ ] 待用户提供 TokenRhythm API Key → 界面填入即用（模型默认 deepseek-v4.1-flash-1017，可随时在界面改）
+
 ### 协同交付中修复的横切问题（2026-11-05，提交 1b84412 / 404c818 / 634552b）
 
 - 玻璃态令牌化：`--glass-*` 亮暗变量 + @source 文件级 glob（此前模块类名全丢、暗色发白，详见手册 §5）

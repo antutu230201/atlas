@@ -23,7 +23,7 @@ import {
 import { api, ApiError } from '@/lib/api';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
 
-type Tab = 'members' | 'modules' | 'audit';
+type Tab = 'members' | 'modules' | 'audit' | 'ai';
 
 interface MemberRow {
   userId: string;
@@ -66,6 +66,7 @@ export default function SettingsPage() {
             ['members', '成员'],
             ['modules', '模块'],
             ['audit', '审计日志'],
+            ['ai', 'AI 配置'],
           ] as Array<[Tab, string]>
         ).map(([key, label]) => (
           <Button
@@ -82,6 +83,7 @@ export default function SettingsPage() {
       {tab === 'members' ? <MembersTab slug={workspace.slug} me={user?.id ?? ''} /> : null}
       {tab === 'modules' ? <ModulesTab slug={workspace.slug} /> : null}
       {tab === 'audit' ? <AuditTab slug={workspace.slug} /> : null}
+      {tab === 'ai' ? <AiConfigTab /> : null}
     </div>
   );
 }
@@ -351,5 +353,208 @@ function AuditTab({ slug }: { slug: string }) {
         ))}
       </TBody>
     </Table>
+  );
+}
+
+/* ---------------- AI 配置 ---------------- */
+
+interface AiConfigView {
+  source: 'db' | 'env' | 'mock';
+  baseUrl: string;
+  model: string;
+  timeoutMs: number;
+  hasKey: boolean;
+  keyMasked: string | null;
+}
+
+const SOURCE_LABELS: Record<AiConfigView['source'], string> = {
+  db: '界面配置',
+  env: '环境变量',
+  mock: '未配置（本地 Mock）',
+};
+
+function AiConfigTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const config = useQuery({
+    queryKey: ['ai-config'],
+    queryFn: () => api<AiConfigView>('/ai/config'),
+  });
+
+  const [baseUrl, setBaseUrl] = useState('');
+  const [model, setModel] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [timeoutMs, setTimeoutMs] = useState('30000');
+  const [initialized, setInitialized] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // 首次加载后用服务端当前值初始化表单（后续重置不再覆盖用户输入）
+  if (config.data && !initialized) {
+    setBaseUrl(config.data.baseUrl);
+    setModel(config.data.model);
+    setTimeoutMs(String(config.data.timeoutMs));
+    setInitialized(true);
+  }
+
+  const save = useMutation({
+    mutationFn: () =>
+      api<AiConfigView>('/ai/config', {
+        method: 'PUT',
+        json: {
+          baseUrl,
+          model,
+          // 留空 = 保持现有 key 不变（服务端 apiKey undefined 语义）
+          apiKey: apiKey.length > 0 ? apiKey : undefined,
+          timeoutMs: Number(timeoutMs) || 30000,
+        },
+      }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['ai-config'], data);
+      setApiKey('');
+      setTestResult(null);
+      toast({ title: 'AI 配置已保存，立即生效', variant: 'ok' });
+    },
+    onError: (e: Error) => toast({ title: '保存失败', description: e.message, variant: 'err' }),
+  });
+
+  const test = useMutation({
+    mutationFn: () =>
+      api<{ ok: boolean; error?: string; model?: string; sample?: string }>('/ai/config/test', {
+        method: 'POST',
+        json: {
+          baseUrl,
+          model,
+          apiKey: apiKey.length > 0 ? apiKey : undefined,
+          timeoutMs: Number(timeoutMs) || 30000,
+        },
+      }),
+    onSuccess: (data) => {
+      setTestResult(
+        data.ok
+          ? { ok: true, text: `连接成功（${data.model}）：${data.sample ?? ''}` }
+          : { ok: false, text: data.error ?? '连接失败' },
+      );
+    },
+    onError: (e: Error) => setTestResult({ ok: false, text: e.message }),
+  });
+
+  if (config.isPending) {
+    return <Skeleton className="h-64 w-full rounded-md" />;
+  }
+  if (config.isError) {
+    return (
+      <p className="rounded-md border border-err/30 bg-err-soft p-4 text-sm text-err" role="alert">
+        AI 配置加载失败：{config.error instanceof Error ? config.error.message : '请重试'}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>AI 供应商</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted">
+            当前来源：
+            <Badge variant={config.data.source === 'mock' ? 'neutral' : 'info'}>
+              {SOURCE_LABELS[config.data.source]}
+            </Badge>
+            {config.data.hasKey ? (
+              <span className="ml-2">
+                Key{' '}
+                <code className="rounded-xs bg-surface-hover px-1">{config.data.keyMasked}</code>
+              </span>
+            ) : null}
+            。适配任意 OpenAI 兼容服务（TokenRhythm / DeepSeek / OpenAI / 智谱等）；保存后立即生效，
+            无需重启。密钥仅存数据库与后端内存，界面与审计日志只显示掩码。
+          </p>
+
+          <Field id="ai-base-url" label="Base URL" hint="OpenAI 兼容接口根地址，以 /v1 结尾">
+            <Input
+              value={baseUrl}
+              onChange={(event) => setBaseUrl(event.target.value)}
+              placeholder="https://tokenrhythm.studio/v1"
+              id="ai-base-url"
+              aria-label="Base URL"
+            />
+          </Field>
+          <Field id="ai-model" label="模型名" hint="以供应商 /v1/models 实际返回为准">
+            <Input
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              placeholder="deepseek-v4.1-flash-1017"
+              id="ai-model"
+              aria-label="模型名"
+            />
+          </Field>
+          <Field
+            id="ai-api-key"
+            label="API Key"
+            hint={
+              config.data.hasKey
+                ? `已配置（${config.data.keyMasked}），留空表示保持不变`
+                : '仅在创建时完整展示一次，请妥善保存'
+            }
+          >
+            <Input
+              type="password"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              placeholder={config.data.hasKey ? '••••••••（留空保持不变）' : 'sk_...'}
+              id="ai-api-key"
+              aria-label="API Key"
+              autoComplete="off"
+            />
+          </Field>
+          <Field id="ai-timeout" label="超时（毫秒）" hint="单次 AI 请求超时，1000–120000">
+            <Input
+              type="number"
+              value={timeoutMs}
+              onChange={(event) => setTimeoutMs(event.target.value)}
+              id="ai-timeout"
+              aria-label="超时毫秒"
+              min={1000}
+              max={120000}
+              className="w-40"
+            />
+          </Field>
+
+          {testResult ? (
+            <p
+              role="status"
+              className={`rounded-sm border p-3 text-xs ${
+                testResult.ok
+                  ? 'border-ok/30 bg-ok-soft text-ok'
+                  : 'border-err/30 bg-err-soft text-err'
+              }`}
+            >
+              {testResult.text}
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={test.isPending}
+              disabled={!baseUrl || !model}
+              onClick={() => test.mutate()}
+            >
+              测试连接
+            </Button>
+            <Button
+              size="sm"
+              loading={save.isPending}
+              disabled={!baseUrl || !model}
+              onClick={() => save.mutate()}
+            >
+              保存
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

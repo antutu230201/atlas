@@ -52,7 +52,7 @@ export class AuditService {
 }
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-const SENSITIVE_KEY = /password|token|secret|authorization/i;
+const SENSITIVE_KEY = /password|token|secret|authorization|api_?key/i;
 
 function sanitize(value: unknown, depth = 0): unknown {
   if (depth > 4 || value === null || typeof value !== 'object') {
