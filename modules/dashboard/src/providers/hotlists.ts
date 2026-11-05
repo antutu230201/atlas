@@ -119,6 +119,10 @@ interface BaiduEntry {
   url?: string;
   hotScore?: number | string;
   isTop?: boolean;
+  /** PC 接口字段：榜单序号（0 起）/ 热标（"0"无 "1"热 "3"新）/ 涨跌 */
+  index?: number;
+  hotTag?: string;
+  hotChange?: string;
 }
 
 interface BaiduResponse {
@@ -128,6 +132,9 @@ interface BaiduResponse {
     }>;
   };
 }
+
+/** PC 接口用数字编码热标，直接显示会变成 "1"，这里映射成中文 */
+const BAIDU_TAG: Record<string, string> = { '1': '热', '3': '新' };
 
 /** 百度 cards 存在两层嵌套（tabTextList → content[].content[]），统一拍平 */
 export function normalizeBaidu(raw: BaiduResponse): HotItem[] {
@@ -141,11 +148,13 @@ export function normalizeBaidu(raw: BaiduResponse): HotItem[] {
   return compact(
     entries.map((entry, index): HotItem | null => {
       if (!entry.word) return null;
+      const heatRaw = entry.hotScore;
+      const heat = typeof heatRaw === 'string' ? Number(heatRaw) : heatRaw;
       return {
-        rank: index + 1,
+        rank: typeof entry.index === 'number' ? entry.index + 1 : index + 1,
         title: entry.word,
-        heat: typeof entry.hotScore === 'string' ? Number(entry.hotScore) : entry.hotScore,
-        tag: entry.isTop ? '置顶' : undefined,
+        heat: heat !== undefined && Number.isFinite(heat) ? heat : undefined,
+        tag: BAIDU_TAG[entry.hotTag ?? ''] ?? (entry.isTop ? '置顶' : undefined),
         url: entry.url ?? `https://www.baidu.com/s?wd=${encodeURIComponent(entry.word)}`,
       };
     }),
@@ -221,7 +230,8 @@ export const HOT_SOURCES: HotSourceDef[] = [
     fetchList: async () => {
       if (isFakeMode()) return fakeHotLists.baidu;
       const raw = await fetchJson<BaiduResponse>(
-        'https://top.baidu.com/api/board?platform=wise&tab=realtime',
+        // PC 榜单才带 hotScore（wise 只给 word/url），热度数字全靠它
+        'https://top.baidu.com/api/board?platform=pc&tab=realtime',
         { referer: 'https://top.baidu.com/board' },
       );
       return normalizeBaidu(raw);
