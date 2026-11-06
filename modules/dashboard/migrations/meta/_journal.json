@@ -29,6 +29,20 @@
       "when": 1793810281977,
       "tag": "0003_activity_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794052800000,
+      "tag": "0004_netease_binding",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794052801000,
+      "tag": "0005_netease_binding_rls",
+      "breakpoints": true
     }
   ]
 }

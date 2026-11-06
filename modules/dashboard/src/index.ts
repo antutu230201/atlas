@@ -25,6 +25,16 @@ import {
 import { isFakeMode } from './providers/http';
 import { fetchNeteaseLyrics } from './providers/lyrics';
 import {
+  fetchLikedTracks,
+  fetchProfile,
+  fetchSongUrl,
+  qrCheck,
+  qrUnikey,
+  type NeteaseTrack,
+} from './providers/netease';
+import { open as openSealed, seal as sealSecret } from './providers/secret-box';
+import { neteaseBinding } from './db/schema';
+import {
   fakeLocation,
   fakeLyrics,
   fakeQuote,
@@ -53,6 +63,8 @@ const manifest = moduleManifestSchema.parse({
       'dashboard.countdown.updated',
       'dashboard.countdown.deleted',
       'dashboard.countdown.restored',
+      'dashboard.netease.bound',
+      'dashboard.netease.unbound',
     ],
     // 事件总线订阅（模块间唯一数据通道，不直读 todo_notes 表）：完成待办 = 成长打卡
     subscribes: [{ event: 'todo.completed', handler: 'onTodoCompleted' }],
@@ -95,6 +107,27 @@ const updateCountdownSchema = z.object({
 const refreshSchema = z.object({ sources: z.array(z.string().max(40)).max(10).optional() });
 const searchCitySchema = z.object({ q: z.string().min(1, '请输入城市名').max(60) });
 const lyricsSchema = z.object({ id: z.number().int().positive() });
+const neteaseSongUrlSchema = z.object({ id: z.number().int().positive() });
+/** unikey 为网易云签发的 uuid；只用于轮询，不落库 */
+const neteaseQrPollSchema = z.object({ unikey: z.string().min(10).max(64) });
+
+/** 当前用户在本工作空间的活跃绑定（含解密 cookie；仅限模块内使用，绝不进返回值/日志） */
+async function activeBinding(ctx: ModuleContext) {
+  const rows = await ctx.db
+    .select()
+    .from(neteaseBinding)
+    .where(
+      and(
+        eq(neteaseBinding.workspaceId, ctx.workspaceId),
+        eq(neteaseBinding.userId, ctx.userId),
+        isNull(neteaseBinding.deletedAt),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return { ...row, cookie: openSealed(row.cookieSealed) };
+}
 
 function bad(message: string): never {
   throw new ModuleActionError(`输入不合法：${message}`);
@@ -427,6 +460,128 @@ export const definition: ModuleDefinition = {
       },
     },
 
+    /* ---------------- 网易云账号（ADR-0006：非官方接口，适配器可替换） ---------------- */
+
+    /** 发起扫码登录：返回 unikey 与扫码地址；二维码由浏览器本地渲染（unikey 不出本系统） */
+    neteaseQrStart: {
+      permission: 'dashboard:write',
+      handler: async () => {
+        if (isFakeMode()) {
+          return { unikey: 'fake-unikey-0001', qrUrl: 'https://music.163.com/login?codekey=fake' };
+        }
+        return qrUnikey();
+      },
+    },
+
+    /** 轮询扫码状态：confirmed 时加密落库绑定并发事件；cookie 明文只在内存流转 */
+    neteaseQrPoll: {
+      permission: 'dashboard:write',
+      handler: async (ctx, input) => {
+        const parsed = neteaseQrPollSchema.safeParse(input ?? {});
+        if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
+        // 假数据模式不模拟绑定成功（避免与固定未绑定的 liked/净库语义打架）；绑定路径由 e2e 路由拦截覆盖
+        if (isFakeMode()) return { status: 'waiting' };
+        const poll = await qrCheck(parsed.data.unikey);
+        if (poll.status !== 'confirmed' || !poll.cookie) return { status: poll.status };
+        const profile = await fetchProfile(poll.cookie);
+        await ctx.db
+          .insert(neteaseBinding)
+          .values({
+            workspaceId: ctx.workspaceId,
+            userId: ctx.userId,
+            neteaseUid: profile.uid,
+            neteaseNickname: profile.nickname,
+            cookieSealed: sealSecret(poll.cookie),
+          })
+          .onConflictDoUpdate({
+            // 唯一索引是部分的（deleted_at is null），冲突推断需带同谓词
+            target: [neteaseBinding.workspaceId, neteaseBinding.userId],
+            targetWhere: sql`deleted_at is null`,
+            set: {
+              neteaseUid: profile.uid,
+              neteaseNickname: profile.nickname,
+              cookieSealed: sealSecret(poll.cookie),
+              deletedAt: null,
+              updatedAt: new Date(),
+            },
+          });
+        await ctx.events.publish('dashboard.netease.bound', {
+          uid: profile.uid,
+          nickname: profile.nickname,
+        });
+        return { status: 'confirmed', uid: profile.uid, nickname: profile.nickname };
+      },
+    },
+
+    /** 绑定状态查询（不含任何凭据信息），供播放器决定曲目来源与是否显示登录入口 */
+    neteaseBinding: {
+      permission: 'dashboard:read',
+      handler: async (ctx) => {
+        if (isFakeMode()) return { bound: false };
+        const row = await ctx.db
+          .select({ uid: neteaseBinding.neteaseUid, nickname: neteaseBinding.neteaseNickname })
+          .from(neteaseBinding)
+          .where(
+            and(
+              eq(neteaseBinding.workspaceId, ctx.workspaceId),
+              eq(neteaseBinding.userId, ctx.userId),
+              isNull(neteaseBinding.deletedAt),
+            ),
+          )
+          .limit(1);
+        const binding = row[0];
+        return binding
+          ? { bound: true, uid: binding.uid, nickname: binding.nickname }
+          : { bound: false };
+      },
+    },
+
+    /** 喜欢列表：最近喜欢在前；未绑定返回 bound:false 由前端回退内置歌单。
+     * 假数据模式固定未绑定：播放器回退内置精选，绑定路径由 e2e 路由拦截覆盖。 */
+    neteaseLiked: {
+      permission: 'dashboard:read',
+      handler: async (ctx) => {
+        if (isFakeMode()) return { bound: false, tracks: [] satisfies NeteaseTrack[] };
+        const binding = await activeBinding(ctx);
+        if (!binding) return { bound: false, tracks: [] satisfies NeteaseTrack[] };
+        const tracks = await fetchLikedTracks(binding.cookie, binding.neteaseUid);
+        return { bound: true, nickname: binding.neteaseNickname, tracks };
+      },
+    },
+
+    /** 单首可播 CDN 地址（链接有时效，前端现取现用、短缓存）；url 为 null 表示版权/VIP 限制 */
+    neteaseSongUrl: {
+      permission: 'dashboard:read',
+      handler: async (ctx, input) => {
+        const parsed = neteaseSongUrlSchema.safeParse(input ?? {});
+        if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
+        if (isFakeMode()) return { url: 'https://example.com/fake-audio.mp3', type: 'mp3' };
+        const binding = await activeBinding(ctx);
+        if (!binding) return { url: null, type: null };
+        return fetchSongUrl(binding.cookie, parsed.data.id);
+      },
+    },
+
+    /** 解绑：软删除并轮换密文（旧密文不可查询即失效）；发事件留痕 */
+    neteaseUnbind: {
+      permission: 'dashboard:write',
+      handler: async (ctx) => {
+        const rows = await ctx.db
+          .update(neteaseBinding)
+          .set({ deletedAt: new Date(), cookieSealed: 'unbound', updatedAt: new Date() })
+          .where(
+            and(
+              eq(neteaseBinding.workspaceId, ctx.workspaceId),
+              eq(neteaseBinding.userId, ctx.userId),
+              isNull(neteaseBinding.deletedAt),
+            ),
+          )
+          .returning({ uid: neteaseBinding.neteaseUid });
+        if (rows[0]) await ctx.events.publish('dashboard.netease.unbound', { uid: rows[0].uid });
+        return { unbound: rows.length > 0 };
+      },
+    },
+
     /** 手动强刷：跳过 TTL 重新拉取指定源（缺省为全部），失败抛 400 并说明 */
     refresh: {
       permission: 'dashboard:write',
@@ -702,3 +857,12 @@ export {
 } from './providers/hotlists';
 export { describeWeatherCode } from './providers/weather';
 export { parseLrc } from './providers/lyrics';
+export { seal as sealSecret, open as openSecret } from './providers/secret-box';
+export {
+  qrUnikey,
+  qrCheck,
+  fetchProfile,
+  fetchLikedTracks,
+  fetchSongDetails,
+  fetchSongUrl,
+} from './providers/netease';

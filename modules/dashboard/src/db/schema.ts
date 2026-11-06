@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   date,
   index,
@@ -10,6 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 /** 个人大屏模块自有 schema */
 export const moduleSchema = pgSchema('modules.dashboard');
@@ -71,5 +73,31 @@ export const activity = moduleSchema.table(
   (t) => [
     uniqueIndex('activity_ws_day_uq').on(t.workspaceId, t.day),
     index('activity_ws_day_idx').on(t.workspaceId, t.day),
+  ],
+);
+
+/**
+ * 网易云账号绑定：每 (工作空间, 用户) 一条；cookie_sealed 为 AES-256-GCM 密文
+ * （密钥在环境变量 ATLAS_NETEASE_SECRET，providers/secret-box.ts），明文不落库不落日志。
+ * 解绑为软删除；部分唯一索引保证活跃绑定唯一，解绑后可重新扫码。
+ */
+export const neteaseBinding = moduleSchema.table(
+  'netease_binding',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    neteaseUid: bigint('netease_uid', { mode: 'number' }).notNull(),
+    neteaseNickname: text('netease_nickname').notNull(),
+    cookieSealed: text('cookie_sealed').notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('netease_binding_ws_user_uq')
+      .on(t.workspaceId, t.userId)
+      .where(sql`deleted_at is null`),
+    index('netease_binding_ws_idx').on(t.workspaceId),
   ],
 );

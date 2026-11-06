@@ -85,3 +85,14 @@ export const fakeLyrics = {
     text: `假数据歌词 · 第 ${index + 1} 句`,
   })),
 };
+
+export const fakeNeteaseLikedTracks = Array.from({ length: 6 }, (_, index) => ({
+  id: 900_000 + index,
+  title: `假数据歌曲 ${index + 1}`,
+  artist: `测试歌手 ${index + 1}`,
+  album: '测试专辑',
+  cover: '',
+  durationMs: 200_000 + index * 10_000,
+}));
+
+export const fakeNeteaseProfile = { uid: 10001, nickname: '测试网易云用户' };
