@@ -14,3 +14,4 @@ export type {
   WeatherData,
 } from './types';
 export { DashboardScreenPage } from './screen-page';
+export { FloatingMusicPlayer } from './floating-music-player';

@@ -185,11 +185,27 @@ function formatTime(seconds: number) {
   return `${minutes}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 }
 
-/** 大屏悬浮音乐舱：折叠时始终贴右下角，展开后复用完整黑胶/歌单控制，音频状态不随形态切换重置。 */
-export function FloatingMusicPlayer({ base }: { base: string }) {
+/**
+ * 大屏悬浮音乐舱（系统级全局悬浮层，经 moduleOverlayRegistry 由应用外壳挂载）：
+ * 跨页面常驻不中断播放；折叠时贴右下角，展开后复用完整黑胶/歌单控制；
+ * 刷新后恢复上次曲目与进度并尝试续播（浏览器拦截自动播放时停在原位，不打扰）。
+ */
+export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }) {
+  const base = `/modules/workspaces/${workspaceSlug}/dashboard/call`;
   const audioRef = useRef<HTMLAudioElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
   const resumeAfterChangeRef = useRef(false);
+  const restoreRef = useRef<{
+    trackId?: number;
+    positionSec: number;
+    wasPlaying: boolean;
+    matched: boolean;
+  } | null>(null);
+  const pendingSeekRef = useRef<number | null>(null);
+  const resumeOnMetadataRef = useRef(false);
+  const currentTimeRef = useRef(0);
+  const isPlayingRef = useRef(false);
+  const preferencesReadyRef = useRef(false);
   const [expanded, setExpanded] = useState(false);
   const [trackIndex, setTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -256,6 +272,31 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
     setTrackIndex(0);
   }, [usingNetease]);
 
+  // 刷新续播的曲目匹配：内置列表先试；网易云喜欢列表就绪后再试一次。
+  // 放在来源切换归零 effect 之后，保证匹配结果不被归零覆盖。
+  useEffect(() => {
+    const restore = restoreRef.current;
+    if (!restore || restore.matched || !preferencesReady) return;
+    const index = tracks.findIndex((item) => item.id === restore.trackId);
+    if (index < 0) return;
+    restore.matched = true;
+    setTrackIndex(index);
+    pendingSeekRef.current = restore.positionSec > 0 ? restore.positionSec : null;
+    resumeOnMetadataRef.current = restore.wasPlaying;
+  }, [tracks, preferencesReady]);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    preferencesReadyRef.current = preferencesReady;
+  }, [preferencesReady]);
+
   const lyricsQuery = useQuery({
     queryKey: ['dashboard', 'lyrics', track.id],
     queryFn: () =>
@@ -265,7 +306,8 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
     retry: 1,
   });
 
-  // 只恢复歌曲、音量和播放模式，不恢复播放中状态，避免打开大屏就突然出声。
+  // 恢复本地偏好：曲目/音量/模式之外，还恢复进度与播放意图用于刷新续播。
+  // 是否真的续播由浏览器自动播放策略决定：被拦截就停在恢复的进度上，不打扰。
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(MUSIC_STATE_KEY);
@@ -274,9 +316,15 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
           trackId?: number;
           volume?: number;
           mode?: PlaybackMode;
+          positionSec?: number;
+          wasPlaying?: boolean;
         };
-        const savedIndex = TRACKS.findIndex((item) => item.id === saved.trackId);
-        if (savedIndex >= 0) setTrackIndex(savedIndex);
+        restoreRef.current = {
+          trackId: typeof saved.trackId === 'number' ? saved.trackId : undefined,
+          positionSec: typeof saved.positionSec === 'number' ? saved.positionSec : 0,
+          wasPlaying: saved.wasPlaying === true,
+          matched: false,
+        };
         if (typeof saved.volume === 'number' && saved.volume >= 0 && saved.volume <= 1) {
           setVolume(saved.volume);
         }
@@ -289,7 +337,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
     }
   }, []);
 
-  const playAudio = useCallback(async () => {
+  const playAudio = useCallback(async (options?: { silent?: boolean }) => {
     const audio = audioRef.current;
     if (!audio) return;
     setError('');
@@ -300,16 +348,20 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return;
       setIsPlaying(false);
       setIsBuffering(false);
+      // 刷新续播被浏览器自动播放策略拦下：安静地停在恢复的进度上，不算错误。
+      if (options?.silent) return;
       setError('暂时无法播放这首歌，可切换到下一首或前往网易云收听。');
     }
   }, []);
 
-  // 播放地址就绪（新歌选中或网易云 CDN 地址到达）才 load：地址未就绪时静默等待，
-  // “此前正在播放”或用户主动选歌的意图由 resumeAfterChangeRef 延续；页面初次打开绝不自动播放。
+  // 播放地址就绪（新歌选中或网易云 CDN 地址到达）才 load：地址未就绪时静默等待。
+  // “此前正在播放”或用户主动选歌的意图由 resumeAfterChangeRef 延续；
+  // 刷新续播的跳转与续播在 onLoadedMetadata 里做（需等元数据就绪才能 seek）。
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !audioSrc) return;
     setCurrentTime(0);
+    currentTimeRef.current = 0;
     setDuration(track.durationMs > 0 ? track.durationMs / 1000 : FIRST_TRACK.durationMs / 1000);
     setCoverFailed(false);
     setError('');
@@ -327,18 +379,46 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
     audio.muted = isMuted;
   }, [volume, isMuted]);
 
-  useEffect(() => {
-    // 等恢复完成再写回，否则 React 严格模式的挂载双执行会用默认值覆盖上次偏好。
-    if (!preferencesReady) return;
+  const persistState = useCallback(() => {
+    if (!preferencesReadyRef.current) return;
     try {
       window.localStorage.setItem(
         MUSIC_STATE_KEY,
-        JSON.stringify({ trackId: track.id, volume, mode: playbackMode }),
+        JSON.stringify({
+          trackId: track.id,
+          volume,
+          mode: playbackMode,
+          positionSec: Math.round(currentTimeRef.current * 10) / 10,
+          wasPlaying: isPlayingRef.current,
+        }),
       );
     } catch {
       // 记忆偏好是增强能力，存储不可用时不阻断播放。
     }
-  }, [preferencesReady, track.id, volume, playbackMode]);
+  }, [track.id, volume, playbackMode]);
+
+  useEffect(() => {
+    // 等恢复完成再写回，否则 React 严格模式的挂载双执行会用默认值覆盖上次偏好。
+    if (!preferencesReady) return;
+    persistState();
+  }, [preferencesReady, track.id, volume, playbackMode, persistState]);
+
+  // 播放中定期存进度；暂停/关闭页面时立即落一次。
+  useEffect(() => {
+    if (!isPlaying) return;
+    const timer = window.setInterval(persistState, 5_000);
+    return () => window.clearInterval(timer);
+  }, [isPlaying, persistState]);
+
+  useEffect(() => {
+    if (!isPlaying) persistState();
+  }, [isPlaying, persistState]);
+
+  useEffect(() => {
+    const onPageHide = () => persistState();
+    window.addEventListener('pagehide', onPageHide);
+    return () => window.removeEventListener('pagehide', onPageHide);
+  }, [persistState]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return;
@@ -466,6 +546,19 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
         onLoadedMetadata={(event) => {
           if (Number.isFinite(event.currentTarget.duration)) {
             setDuration(event.currentTarget.duration);
+          }
+          // 刷新续播：元数据就绪后先跳回上次进度，再尝试续播（被自动播放策略
+          // 拦截时静默停在原位）。
+          const audio = event.currentTarget;
+          const seekTo = pendingSeekRef.current;
+          if (seekTo != null && Number.isFinite(audio.duration) && audio.duration > 0) {
+            audio.currentTime = Math.min(seekTo, Math.max(0, audio.duration - 1));
+            setCurrentTime(audio.currentTime);
+            pendingSeekRef.current = null;
+          }
+          if (resumeOnMetadataRef.current) {
+            resumeOnMetadataRef.current = false;
+            void playAudio({ silent: true });
           }
         }}
         onEnded={() => {

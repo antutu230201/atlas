@@ -17,7 +17,6 @@ import { SummaryCard } from './summary-card';
 import { Ticker } from './ticker';
 import { WeatherCard } from './weather-card';
 import { WeatherAtmosphere } from './weather-atmosphere';
-import { FloatingMusicPlayer } from './floating-music-player';
 import { HOT_SOURCE_LABELS, type DashboardSnapshot, type CountdownItem } from './types';
 
 /** 每台设备独立记住挂墙模式：同一账号在墙面屏和笔记本上可有不同取舍。 */
@@ -626,8 +625,6 @@ export function DashboardScreenPage({
           </>
         ) : null}
       </div>
-
-      <FloatingMusicPlayer base={base} />
 
       {canWrite ? (
         <SettingsDrawer

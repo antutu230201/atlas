@@ -22,10 +22,12 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${webPort}`,
     trace: 'retain-on-failure',
-    // 内网环境 Playwright 浏览器下载可能失败；允许复用本机 Chrome/Edge，CI 仍使用自带 Chromium。
-    ...(process.env.E2E_CHROME_PATH
-      ? { launchOptions: { executablePath: process.env.E2E_CHROME_PATH } }
-      : {}),
+    // 播放器刷新续播是产品行为，测试里放开自动播放限制使断言确定。
+    launchOptions: {
+      args: ['--autoplay-policy=no-user-gesture-required'],
+      // 内网环境 Playwright 浏览器下载可能失败；允许复用本机 Chrome/Edge，CI 仍使用自带 Chromium。
+      ...(process.env.E2E_CHROME_PATH ? { executablePath: process.env.E2E_CHROME_PATH } : {}),
+    },
   },
   webServer: [
     {

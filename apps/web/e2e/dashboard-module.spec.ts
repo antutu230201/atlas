@@ -337,7 +337,8 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByRole('button', { name: '收起播放器', exact: true }).click();
     await expect(page.getByRole('button', { name: '展开播放器', exact: true })).toBeVisible();
 
-    // 刷新只恢复歌曲和播放模式，不恢复播放状态，避免页面打开突然出声。
+    // 刷新恢复曲目与进度并续播（刷新前正在播放；测试浏览器放开自动播放限制，
+    // 真实浏览器被策略拦截时则停在恢复的进度上，不打扰）。
     await page.reload();
     // 测试账号未设城市，刷新会自动拉起设置抽屉；关掉后再检查播放器恢复结果。
     await page
@@ -347,12 +348,14 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: '展开 起风了 播放详情' })).toBeVisible();
     await expect
-      .poll(() =>
-        page
-          .locator('[data-testid="vinyl-player"] audio')
-          .evaluate((audio) => (audio as HTMLAudioElement).paused),
+      .poll(
+        () =>
+          page
+            .locator('[data-testid="vinyl-player"] audio')
+            .evaluate((audio) => (audio as HTMLAudioElement).paused),
+        { timeout: 15_000 },
       )
-      .toBe(true);
+      .toBe(false);
     await page.getByRole('button', { name: '展开播放器', exact: true }).click();
     await expect(page.getByRole('button', { name: '播放模式：随机播放，点击切换' })).toBeVisible();
   });
@@ -485,5 +488,83 @@ test.describe('个人大屏模块（假数据源）', () => {
     await player.getByRole('button', { name: '退出登录' }).click();
     await expect(player.getByText('Atlas 精选 · 未绑定网易云')).toBeVisible();
     await expect(player.getByRole('heading', { name: '消愁' })).toBeVisible();
+  });
+
+  test('播放器全局常驻：跨页面不断播，刷新后恢复曲目与进度并续播', async ({ page }) => {
+    test.setTimeout(90_000);
+    await routeNeteaseAudio(page);
+
+    const email = `dash-e2e-global-${Date.now()}@example.com`;
+    await page.goto('/register');
+    await page.getByLabel('昵称').fill('全局播放验收');
+    await page.getByLabel('邮箱').fill(email);
+    await page.getByLabel('密码').fill(password);
+    await page.getByRole('button', { name: '创建账号' }).click();
+    await page.waitForURL('/');
+
+    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
+    await page.getByLabel('工作空间名称').fill('全局播放空间');
+    await page.getByRole('button', { name: '创建', exact: true }).click();
+    await expect(page.getByText('全局播放空间').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.goto('/settings');
+    await page.getByRole('button', { name: '模块', exact: true }).click();
+    await page
+      .getByTestId('module-card-dashboard')
+      .getByRole('button', { name: '启用' })
+      .click({ timeout: 10_000 });
+
+    // 播放器在任意页面都有（Shell 全局挂载），不局限于大屏页
+    await expect(page.getByTestId('vinyl-player')).toBeVisible();
+
+    await page.goto('/m/dashboard/screen');
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press('Escape');
+
+    const player = page.getByTestId('vinyl-player');
+    const disc = page.getByTestId('vinyl-disc');
+    await player.getByRole('button', { name: '播放 消愁', exact: true }).click();
+    await expect(disc).toHaveAttribute('data-playing', 'true');
+    await expect
+      .poll(
+        () => player.locator('audio').evaluate((audio) => (audio as HTMLAudioElement).currentTime),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(1);
+
+    // 切到「今天」页：组件不卸载，播放不中断、进度继续走
+    await page.getByRole('link', { name: '今天' }).click();
+    await expect(page.getByTestId('vinyl-player')).toBeVisible();
+    await expect(disc).toHaveAttribute('data-playing', 'true');
+    const beforeNavigate = await player
+      .locator('audio')
+      .evaluate((audio) => (audio as HTMLAudioElement).currentTime);
+    await page.waitForTimeout(1_200);
+    const afterNavigate = await player
+      .locator('audio')
+      .evaluate((audio) => (audio as HTMLAudioElement).currentTime);
+    expect(afterNavigate).toBeGreaterThan(beforeNavigate);
+
+    // 刷新：恢复同曲目与进度并自动续播（测试浏览器放开自动播放限制；
+    // 真实浏览器被拦截时则停在恢复的进度上，不打扰）
+    const beforeReload = await player
+      .locator('audio')
+      .evaluate((audio) => (audio as HTMLAudioElement).currentTime);
+    await page.reload();
+    // 测试账号未设城市，刷新会自动拉起设置抽屉；关掉后再检查续播结果。
+    await page
+      .getByRole('dialog')
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .catch(() => undefined);
+    await page.keyboard.press('Escape');
+    const restored = page.getByTestId('vinyl-player');
+    await expect(restored.getByRole('button', { name: /暂停 消愁/ })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect
+      .poll(() =>
+        restored.locator('audio').evaluate((audio) => (audio as HTMLAudioElement).currentTime),
+      )
+      .toBeGreaterThan(beforeReload);
   });
 });

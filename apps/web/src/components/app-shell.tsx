@@ -22,6 +22,7 @@ import {
   cn,
 } from '@atlas/ui';
 import { api } from '@/lib/api';
+import { getModuleOverlay } from '@/lib/module-registry';
 import { NotificationBell } from './notification-bell';
 import { useEnabledModules, useLogout, useSession } from '@/lib/queries';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
@@ -203,6 +204,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
   const logout = useLogout();
   const queryClient = useQueryClient();
   const { workspace } = useActiveWorkspace();
+  const modules = useEnabledModules(workspace?.slug ?? null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -327,6 +329,21 @@ function ShellBody({ children }: { children: React.ReactNode }) {
           </DrawerContent>
         </Drawer>
       ) : null}
+
+      {/* 模块全局悬浮层（如音乐播放器）：跨页面常驻，模块启用即挂载；
+          沉浸模式（挂墙）也保留，大屏需要音乐控制 */}
+      {workspace
+        ? (modules.data ?? []).map((mod) => {
+            const Overlay = getModuleOverlay(mod.name);
+            return Overlay ? (
+              <Overlay
+                key={`${mod.name}-overlay`}
+                workspaceSlug={workspace.slug}
+                moduleName={mod.name}
+              />
+            ) : null;
+          })
+        : null}
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
