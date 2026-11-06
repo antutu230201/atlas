@@ -203,6 +203,7 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
   } | null>(null);
   const pendingSeekRef = useRef<number | null>(null);
   const resumeOnMetadataRef = useRef(false);
+  const resumeOnGestureRef = useRef(false);
   const currentTimeRef = useRef(0);
   const isPlayingRef = useRef(false);
   const preferencesReadyRef = useRef(false);
@@ -222,6 +223,7 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
   const [coverFailed, setCoverFailed] = useState(false);
   const [error, setError] = useState('');
   const [loginOpen, setLoginOpen] = useState(false);
+  const [resumeHint, setResumeHint] = useState(false);
   const queryClient = useQueryClient();
 
   // 网易云绑定状态与喜欢列表：绑定了就用自己的歌单，否则回退内置精选。
@@ -337,7 +339,7 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
     }
   }, []);
 
-  const playAudio = useCallback(async (options?: { silent?: boolean }) => {
+  const playAudio = useCallback(async (options?: { silent?: boolean; onBlocked?: () => void }) => {
     const audio = audioRef.current;
     if (!audio) return;
     setError('');
@@ -348,8 +350,11 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
       if (cause instanceof DOMException && cause.name === 'AbortError') return;
       setIsPlaying(false);
       setIsBuffering(false);
-      // 刷新续播被浏览器自动播放策略拦下：安静地停在恢复的进度上，不算错误。
-      if (options?.silent) return;
+      // 刷新续播被浏览器自动播放策略拦下：不算错误，转交"首次交互即续播"兜底。
+      if (options?.silent) {
+        options.onBlocked?.();
+        return;
+      }
       setError('暂时无法播放这首歌，可切换到下一首或前往网易云收听。');
     }
   }, []);
@@ -420,6 +425,26 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
     return () => window.removeEventListener('pagehide', onPageHide);
   }, [persistState]);
 
+  // 刷新续播被自动播放策略拦截时的兜底：用户在页面上的第一次点击/按键（点菜单、
+  // 切页面、敲键盘都算）即自动续播，无需去找播放按钮。播放器自身的控件事件除外，
+  // 避免与播放/暂停按钮的语义叠加。
+  useEffect(() => {
+    if (!resumeHint) return;
+    const onGesture = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Node && dockRef.current?.contains(target)) return;
+      resumeOnGestureRef.current = false;
+      setResumeHint(false);
+      void playAudio();
+    };
+    document.addEventListener('pointerdown', onGesture, true);
+    document.addEventListener('keydown', onGesture, true);
+    return () => {
+      document.removeEventListener('pointerdown', onGesture, true);
+      document.removeEventListener('keydown', onGesture, true);
+    };
+  }, [resumeHint, playAudio]);
+
   useEffect(() => {
     if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return;
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -450,6 +475,9 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
 
   const selectTrack = useCallback(
     (nextIndex: number, shouldPlay = isPlaying) => {
+      // 用户主动换歌 = 刷新续播的兜底意图已失效，撤掉提示与监听。
+      resumeOnGestureRef.current = false;
+      setResumeHint(false);
       if (nextIndex === trackIndex) {
         if (shouldPlay) void playAudio();
         return;
@@ -540,6 +568,9 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
         onPlay={() => {
           setIsPlaying(true);
           setError('');
+          // 任何途径开始播放（含用户手动点播放）都视为续播兜底已解决。
+          resumeOnGestureRef.current = false;
+          setResumeHint(false);
         }}
         onPause={() => setIsPlaying(false)}
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
@@ -558,7 +589,15 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
           }
           if (resumeOnMetadataRef.current) {
             resumeOnMetadataRef.current = false;
-            void playAudio({ silent: true });
+            void playAudio({
+              silent: true,
+              // 被自动播放策略拦下：等待用户在页面上的第一次交互再续播（浏览器的
+              // 声音播放必须有手势，这是网页应用能做到的最接近自动播放的体验）。
+              onBlocked: () => {
+                resumeOnGestureRef.current = true;
+                setResumeHint(true);
+              },
+            });
           }
         }}
         onEnded={() => {
@@ -815,6 +854,11 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
                     正在获取播放地址…
                   </p>
                 ) : null}
+                {resumeHint ? (
+                  <p className="mt-3 text-[11px] leading-5 text-muted" role="status">
+                    已恢复上次进度，点击页面任意处继续播放
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -975,11 +1019,13 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
             >
               <span className="block truncate text-xs font-medium">{track.title}</span>
               <span className="mt-0.5 block truncate text-[11px] text-muted">
-                {isBuffering
-                  ? '正在载入音频…'
-                  : error
-                    ? '播放失败，点开查看'
-                    : `${track.artist} · ${formatTime(currentTime)} / ${formatTime(duration)}`}
+                {resumeHint
+                  ? '已恢复上次进度，点击页面任意处继续播放'
+                  : isBuffering
+                    ? '正在载入音频…'
+                    : error
+                      ? '播放失败，点开查看'
+                      : `${track.artist} · ${formatTime(currentTime)} / ${formatTime(duration)}`}
               </span>
             </button>
 
