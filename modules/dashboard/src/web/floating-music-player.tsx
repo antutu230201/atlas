@@ -359,12 +359,47 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
     }
   }, []);
 
+  /* ---------------- 听歌心跳（telemetry）：真实播放秒数，30s 一冲，切歌/暂停/关页冲账 ---------------- */
+
+  const listenAccumRef = useRef(0);
+  const listenFirstRef = useRef(false);
+  const listenLastTickRef = useRef(0);
+  const listeningTrackRef = useRef(track);
+
+  const flushListening = useCallback(async () => {
+    const seconds = Math.min(120, Math.round(listenAccumRef.current));
+    listenAccumRef.current = 0;
+    const current = listeningTrackRef.current;
+    if (seconds < 1) return;
+    try {
+      await api(`${base}/listeningHeartbeat`, {
+        method: 'POST',
+        json: {
+          songId: current.id,
+          title: current.title,
+          artist: current.artist,
+          seconds,
+          first: listenFirstRef.current,
+        },
+      });
+      listenFirstRef.current = false;
+    } catch {
+      // 遥测失败静默：不影响播放，下个周期继续累计上报。
+    }
+  }, [base]);
+
   // 播放地址就绪（新歌选中或网易云 CDN 地址到达）才 load：地址未就绪时静默等待。
   // “此前正在播放”或用户主动选歌的意图由 resumeAfterChangeRef 延续；
   // 刷新续播的跳转与续播在 onLoadedMetadata 里做（需等元数据就绪才能 seek）。
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !audioSrc) return;
+    // 切歌先把上一首的听歌秒数冲账，再切换心跳目标并标记"一次播放"
+    if (listeningTrackRef.current.id !== track.id) {
+      void flushListening();
+      listeningTrackRef.current = track;
+      listenFirstRef.current = true;
+    }
     setCurrentTime(0);
     currentTimeRef.current = 0;
     setDuration(track.durationMs > 0 ? track.durationMs / 1000 : FIRST_TRACK.durationMs / 1000);
@@ -375,7 +410,7 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
       resumeAfterChangeRef.current = false;
       void playAudio();
     }
-  }, [audioSrc, track.id, track.durationMs, playAudio]);
+  }, [audioSrc, track.id, track.durationMs, playAudio, flushListening]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -424,6 +459,37 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
     window.addEventListener('pagehide', onPageHide);
     return () => window.removeEventListener('pagehide', onPageHide);
   }, [persistState]);
+
+  // 播放中每 5s 累计真实时长，满 30s 冲一次；暂停（effect 清理）与关页/卸载冲掉零头。
+  useEffect(() => {
+    if (!isPlaying) return;
+    listenLastTickRef.current = Date.now();
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      listenAccumRef.current += (now - listenLastTickRef.current) / 1000;
+      listenLastTickRef.current = now;
+      if (listenAccumRef.current >= 30) void flushListening();
+    }, 5_000);
+    return () => {
+      const now = Date.now();
+      listenAccumRef.current += (now - listenLastTickRef.current) / 1000;
+      listenLastTickRef.current = now;
+      window.clearInterval(timer);
+    };
+  }, [isPlaying, flushListening]);
+
+  useEffect(() => {
+    if (!isPlaying) void flushListening();
+  }, [isPlaying, flushListening]);
+
+  useEffect(() => {
+    const onPageHideFlush = () => void flushListening();
+    window.addEventListener('pagehide', onPageHideFlush);
+    return () => {
+      window.removeEventListener('pagehide', onPageHideFlush);
+      void flushListening();
+    };
+  }, [flushListening]);
 
   // 刷新续播被自动播放策略拦截时的兜底：用户在页面上的第一次点击/按键（点菜单、
   // 切页面、敲键盘都算）即自动续播，无需去找播放按钮。播放器自身的控件事件除外，
