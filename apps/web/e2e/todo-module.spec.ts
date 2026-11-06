@@ -4,7 +4,7 @@ const email = `todo-e2e-${Date.now()}@example.com`;
 const password = 'password123';
 
 test.describe('阶段 3b · 待办与笔记模块', () => {
-  test('注册 → 建空间 → 启用待办 → 创建/完成/筛选/回收站', async ({ page }) => {
+  test('注册 → 启用待办 → 创建/完成/筛选/回收站', async ({ page }) => {
     // 注册并进入外壳
     await page.goto('/register');
     await page.getByLabel('昵称').fill('待办验收');
@@ -14,10 +14,7 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
     await page.waitForURL('/');
 
     // 创建工作空间
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('待办验收空间');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByText('待办验收空间').first()).toBeVisible({ timeout: 10_000 });
+    // 注册即自动开通个人空间与大屏（ADR-0008），无需手动建空间
 
     // 启用待办模块
     await page.goto('/settings');
@@ -68,30 +65,5 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
     // 回到列表确认回来了
     await page.goto('/m/todo_notes/list');
     await expect(page.getByText('交房租')).toBeVisible({ timeout: 5_000 });
-  });
-
-  test('首页显示今日待办 widget', async ({ page }) => {
-    await page.goto('/register');
-    await page.getByLabel('昵称').fill('widget验收');
-    await page.getByLabel('邮箱').fill(`widget-e2e-${Date.now()}@example.com`);
-    await page.getByLabel('密码').fill(password);
-    await page.getByRole('button', { name: '创建账号' }).click();
-    await page.waitForURL('/');
-
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('Widget空间');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await page.waitForTimeout(1_500);
-
-    await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
-    const todoCard = page.getByTestId('module-card-todo_notes');
-    const enable = todoCard.getByRole('button', { name: '启用' });
-    await expect(enable).toBeVisible({ timeout: 10_000 });
-    await enable.click();
-    await page.waitForTimeout(1_000);
-
-    await page.goto('/');
-    await expect(page.getByText('今日待办')).toBeVisible({ timeout: 10_000 });
   });
 });

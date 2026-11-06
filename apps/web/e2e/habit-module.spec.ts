@@ -12,11 +12,7 @@ test.describe('习惯打卡模块', () => {
     await page.getByLabel('密码').fill(password);
     await page.getByRole('button', { name: '创建账号' }).click();
     await page.waitForURL('/');
-
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('习惯空间');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByText('习惯空间').first()).toBeVisible({ timeout: 10_000 });
+    // 注册即自动开通个人空间与大屏（ADR-0008），无需手动建空间
 
     await page.goto('/settings');
     await page.getByRole('button', { name: '模块', exact: true }).click();
@@ -31,7 +27,7 @@ test.describe('习惯打卡模块', () => {
     // 新建习惯（默认图标）
     await page.getByLabel('习惯名称').fill('读书 10 分钟');
     await page.getByRole('button', { name: '添加', exact: true }).click();
-    await expect(page.getByText('读书 10 分钟')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('读书 10 分钟', { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('0/1')).toBeVisible();
 
     // 打卡 → 已打卡 ✓ + 进度 1/1 + 连续 1 天
@@ -53,7 +49,7 @@ test.describe('习惯打卡模块', () => {
     const archivedSection = page.getByRole('region', { name: '已归档' });
     await expect(archivedSection).toBeVisible();
     await archivedSection.getByRole('button', { name: '恢复' }).click();
-    await expect(page.getByText('读书 10 分钟')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('读书 10 分钟', { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(archivedSection).toHaveCount(0);
   });
 });

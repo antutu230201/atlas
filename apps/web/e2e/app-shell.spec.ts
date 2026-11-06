@@ -4,21 +4,22 @@ const email = `shell-e2e-${Date.now()}@example.com`;
 const password = 'password123';
 
 test.describe('阶段 3 · 应用外壳与模块挂载', () => {
-  test('注册 → 登录 → 建空间 → 启用示例模块 → 模块页写笔记', async ({ page }) => {
-    // 注册（测试用户独立邮箱；全局装置会清库，重跑幂等）
+  test('注册（自动个人空间+大屏）→ 启用示例模块 → 模块页写笔记', async ({ page }) => {
+    // 注册（测试用户独立邮箱；全局装置会清库，重跑幂等）。
+    // 注册即自动开通个人工作空间并启用大屏（ADR-0008），落地根路径即个人大屏。
     await page.goto('/register');
     await page.getByLabel('昵称').fill('外壳验收');
     await page.getByLabel('邮箱').fill(email);
     await page.getByLabel('密码').fill(password);
     await page.getByRole('button', { name: '创建账号' }).click();
     await page.waitForURL('/');
-
-    // 首页：零工作空间 → onboarding 创建表单
-    await expect(page.getByText('还没有工作空间')).toBeVisible();
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('外壳验收空间');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByText('当前在「外壳验收空间」')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: '个人大屏' })).toBeVisible({ timeout: 15_000 });
+    // 未设城市 → 首启引导抽屉以模态弹出，先关掉
+    await page
+      .getByRole('dialog')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => undefined);
+    await page.keyboard.press('Escape');
 
     // 启用示例模块（设置 → 模块页签；按 testid 定位，不依赖模块卡片顺序）
     await page.goto('/settings');
@@ -48,6 +49,12 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
     await page.getByRole('button', { name: '创建账号' }).click();
     await page.waitForURL('/');
 
+    // 未设城市 → 首启引导抽屉会弹出并拦截顶栏点击，先关掉
+    await page
+      .getByRole('dialog')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => undefined);
+    await page.keyboard.press('Escape');
     await page.getByRole('button', { name: '用户菜单' }).click();
     await page.getByRole('menuitem', { name: '登出' }).click();
     await page.waitForURL('/login');

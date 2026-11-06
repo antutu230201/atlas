@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  Button,
   Drawer,
   DrawerBody,
   DrawerContent,
@@ -21,7 +20,6 @@ import {
   ToastProvider,
   cn,
 } from '@atlas/ui';
-import { api } from '@/lib/api';
 import { getModuleOverlay } from '@/lib/module-registry';
 import { NotificationBell } from './notification-bell';
 import { useEnabledModules, useLogout, useSession } from '@/lib/queries';
@@ -33,112 +31,6 @@ import { CommandPalette } from './command-palette';
  * 应用外壳（阶段 3）：侧边导航（工作空间切换 + 已启用模块动态生成）+ 顶栏。
  * 桌面固定侧栏、移动端经抽屉展开；导航项完全由启用模块的 manifest 驱动。
  */
-
-function WorkspaceSwitcher({ compact = false }: { compact?: boolean }) {
-  const { workspaces, workspace } = useActiveWorkspace();
-  const setActiveSlug = useUiStore((state) => state.setActiveSlug);
-  const queryClient = useQueryClient();
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
-  if (workspaces.isLoading) {
-    return (
-      <div className={cn('h-9 animate-pulse rounded-sm bg-surface-hover', compact && 'hidden')} />
-    );
-  }
-
-  const list = workspaces.data ?? [];
-
-  return (
-    <div className={cn('space-y-2', compact && 'hidden')}>
-      {list.length === 0 ? (
-        <p className="text-xs text-muted">还没有工作空间，先创建一个。</p>
-      ) : (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between rounded-sm border border-border bg-surface px-3 py-2 text-sm font-semibold text-text transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              <span className="truncate">{workspace?.name ?? '选择工作空间'}</span>
-              <span aria-hidden className="text-muted">
-                ⌄
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel>切换工作空间</DropdownMenuLabel>
-            {list.map((w) => (
-              <DropdownMenuItem
-                key={w.id}
-                onSelect={() => {
-                  setActiveSlug(w.slug);
-                  queryClient.invalidateQueries({ queryKey: ['modules'] });
-                }}
-              >
-                <span className="flex-1">{w.name}</span>
-                <span className="text-xs text-muted">{w.role}</span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-
-      {creating ? (
-        <div className="space-y-2 rounded-sm border border-border bg-surface p-3">
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="工作空间名称"
-            aria-label="工作空间名称"
-            className="h-9 w-full rounded-sm border border-border bg-surface px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          />
-          {error ? <p className="text-xs text-err">{error}</p> : null}
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              className="flex-1"
-              loading={pending}
-              onClick={async () => {
-                setPending(true);
-                setError(null);
-                try {
-                  const created = await api<{ slug: string }>('/workspaces', {
-                    method: 'POST',
-                    json: { name },
-                  });
-                  await queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-                  setActiveSlug(created.slug);
-                  setCreating(false);
-                  setName('');
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : '创建失败');
-                } finally {
-                  setPending(false);
-                }
-              }}
-            >
-              创建
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>
-              取消
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="w-full rounded-sm px-3 py-1.5 text-left text-xs text-muted transition-colors hover:bg-surface-hover hover:text-text"
-        >
-          + 新建工作空间
-        </button>
-      )}
-    </div>
-  );
-}
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -183,9 +75,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       ) : (
         moduleRoutes.map((route) => item(route.href, route.label, pathname === route.href))
       )}
-      <p className="px-3 pb-1 pt-4 text-[11px] font-semibold tracking-widest text-muted">
-        工作空间
-      </p>
+      <p className="px-3 pb-1 pt-4 text-[11px] font-semibold tracking-widest text-muted">更多</p>
       {item('/assistant', 'AI 助手', pathname === '/assistant', '✦')}
       {workspace ? item('/settings', '设置', pathname === '/settings', '⚙') : null}
       {item('/notifications', '通知', pathname === '/notifications', '✉')}
@@ -204,10 +94,13 @@ function ShellBody({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const { workspace } = useActiveWorkspace();
   const modules = useEnabledModules(workspace?.slug ?? null);
-  // 大屏主导（产品定位）：根路径渲染 dashboard 大屏时按大屏页处理（隐藏 Shell 顶栏、去内边距）
-  const dashboardIsHome = (modules.data ?? []).some((mod) => mod.name === 'dashboard');
-  const isDashboardScreen =
-    /^\/m\/dashboard\/screen\/?$/.test(pathname) || (pathname === '/' && dashboardIsHome);
+  // 大屏主导（产品定位，ADR-0008）：根路径渲染 dashboard 大屏时内容全宽（去内边距），
+  // 但保留 Shell 顶栏 —— 用户菜单/通知等系统级操作必须始终可达，也避免顶栏随模块
+  // 查询结果挂载/卸载抖动。仅 /m/dashboard/screen（大屏自己的完整形态）隐藏顶栏。
+  const onDashboardHome =
+    pathname === '/' && (modules.data ?? []).some((mod) => mod.name === 'dashboard');
+  const isImmersiveScreen = /^\/m\/dashboard\/screen\/?$/.test(pathname);
+  const fullBleed = isImmersiveScreen || onDashboardHome;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -249,7 +142,6 @@ function ShellBody({ children }: { children: React.ReactNode }) {
               {collapsed ? '»' : '«'}
             </button>
           </div>
-          <WorkspaceSwitcher compact={collapsed} />
           <div className={cn(collapsed && 'hidden')}>
             <SidebarNav />
           </div>
@@ -257,7 +149,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {!chromeHidden && !isDashboardScreen ? (
+        {!chromeHidden && !isImmersiveScreen ? (
           <header className="glass sticky top-0 z-[var(--z-sticky)] flex h-14 items-center justify-between gap-3 px-4 md:px-6">
             <div className="flex items-center gap-2">
               <button
@@ -312,7 +204,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
           </header>
         ) : null}
 
-        <main className={cn('min-w-0 flex-1', !chromeHidden && !isDashboardScreen && 'p-4 md:p-8')}>
+        <main className={cn('min-w-0 flex-1', !chromeHidden && !fullBleed && 'p-4 md:p-8')}>
           {children}
         </main>
       </div>
@@ -326,7 +218,6 @@ function ShellBody({ children }: { children: React.ReactNode }) {
               </DrawerTitle>
             </DrawerHeader>
             <DrawerBody className="space-y-4">
-              <WorkspaceSwitcher />
               <SidebarNav onNavigate={() => setMobileOpen(false)} />
             </DrawerBody>
           </DrawerContent>

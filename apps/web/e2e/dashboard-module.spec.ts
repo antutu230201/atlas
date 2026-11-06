@@ -55,7 +55,7 @@ function routeNeteaseAudio(page: Page) {
 }
 
 test.describe('个人大屏模块（假数据源）', () => {
-  test('启用 → 首启引导选城市 → 时钟/天气/热榜/滚动头条可见', async ({ page }) => {
+  test('注册即得大屏 → 首启引导选城市 → 时钟/天气/热榜/滚动头条可见', async ({ page }) => {
     test.setTimeout(60_000);
     const email = `dash-e2e-a-${Date.now()}@example.com`;
     await page.goto('/register');
@@ -64,16 +64,7 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByLabel('密码').fill(password);
     await page.getByRole('button', { name: '创建账号' }).click();
     await page.waitForURL('/');
-
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('大屏验收空间A');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByText('大屏验收空间A').first()).toBeVisible({ timeout: 10_000 });
-
-    await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
-    const card = page.getByTestId('module-card-dashboard');
-    await card.getByRole('button', { name: '启用' }).click({ timeout: 10_000 });
+    // 注册即自动开通个人空间与大屏（ADR-0008），无需手动建空间
 
     await page.goto('/m/dashboard/screen');
 
@@ -151,16 +142,7 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByLabel('密码').fill(password);
     await page.getByRole('button', { name: '创建账号' }).click();
     await page.waitForURL('/');
-
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('大屏验收空间B');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByText('大屏验收空间B').first()).toBeVisible({ timeout: 10_000 });
-
-    await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
-    const card = page.getByTestId('module-card-dashboard');
-    await card.getByRole('button', { name: '启用' }).click({ timeout: 10_000 });
+    // 注册即自动开通个人空间与大屏（ADR-0008），无需手动建空间
 
     await page.goto('/m/dashboard/screen');
 
@@ -204,18 +186,8 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByLabel('密码').fill(password);
     await page.getByRole('button', { name: '创建账号' }).click();
     await page.waitForURL('/');
+    // 注册即自动开通个人空间与大屏（ADR-0008），无需手动建空间
 
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('大屏音乐空间');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByText('大屏音乐空间').first()).toBeVisible({ timeout: 10_000 });
-
-    await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
-    await page
-      .getByTestId('module-card-dashboard')
-      .getByRole('button', { name: '启用' })
-      .click({ timeout: 10_000 });
     await page.goto('/m/dashboard/screen');
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 15_000 });
     await page.keyboard.press('Escape');
@@ -439,18 +411,8 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByLabel('密码').fill(password);
     await page.getByRole('button', { name: '创建账号' }).click();
     await page.waitForURL('/');
+    // 注册即自动开通个人空间与大屏（ADR-0008），无需手动建空间
 
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('网易云验收空间');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByText('网易云验收空间').first()).toBeVisible({ timeout: 10_000 });
-
-    await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
-    await page
-      .getByTestId('module-card-dashboard')
-      .getByRole('button', { name: '启用' })
-      .click({ timeout: 10_000 });
     await page.goto('/m/dashboard/screen');
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 15_000 });
     await page.keyboard.press('Escape');
@@ -501,18 +463,7 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByLabel('密码').fill(password);
     await page.getByRole('button', { name: '创建账号' }).click();
     await page.waitForURL('/');
-
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('全局播放空间');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByText('全局播放空间').first()).toBeVisible({ timeout: 10_000 });
-
-    await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
-    await page
-      .getByTestId('module-card-dashboard')
-      .getByRole('button', { name: '启用' })
-      .click({ timeout: 10_000 });
+    // 注册即自动开通个人空间与大屏（ADR-0008），无需手动建空间
 
     // 播放器在任意页面都有（Shell 全局挂载），不局限于大屏页
     await expect(page.getByTestId('vinyl-player')).toBeVisible();
@@ -579,18 +530,7 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByLabel('密码').fill(password);
     await page.getByRole('button', { name: '创建账号' }).click();
     await page.waitForURL('/');
-
-    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
-    await page.getByLabel('工作空间名称').fill('听歌统计空间');
-    await page.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByText('听歌统计空间').first()).toBeVisible({ timeout: 10_000 });
-
-    await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
-    await page
-      .getByTestId('module-card-dashboard')
-      .getByRole('button', { name: '启用' })
-      .click({ timeout: 10_000 });
+    // 注册即自动开通个人空间与大屏（ADR-0008），无需手动建空间
 
     // 大屏主导：注册后的根路径直接渲染个人大屏（不再需要进 /m/dashboard/screen）
     await page.goto('/');
@@ -607,7 +547,7 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByRole('menuitem', { name: /听歌统计/ }).click();
     await expect(page.getByTestId('listening-stats')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('总时长')).toBeVisible();
-    await expect(page.getByText('还没有人听过歌。')).toBeVisible();
+    await expect(page.getByText('全站排名')).toBeVisible();
 
     // 播放一段时间 → 暂停触发冲账 → 时长计入周汇总；今日听歌卡出现并可跳转
     await page.goto('/m/dashboard/screen');
@@ -630,6 +570,8 @@ test.describe('个人大屏模块（假数据源）', () => {
     await expect(page.getByTestId('listening-stats')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('tab', { name: '周', exact: true }).click();
     await expect(page.getByText(/分钟|小时|秒/).first()).toBeVisible({ timeout: 15_000 });
+    // 全站排名里能看到自己（标记（我））
+    await expect(page.getByText('（我）')).toBeVisible({ timeout: 15_000 });
 
     await page.goto('/m/dashboard/screen');
     await expect(page.getByTestId('listening-mini-card')).toBeVisible({ timeout: 15_000 });

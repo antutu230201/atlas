@@ -66,7 +66,12 @@ describe('事件总线与通知（2c，ADR-0005 §8）', () => {
     const before = await eventRow('note.created');
     expect(before.status).toBe('pending');
 
-    const result = await dispatchOnce();
+    // 注册引导（个人空间+大屏启用）会先产生一批事件，可能占满首个派发批次；
+    // 循环派发直到 note.created 被处理（防批次次序脆弱）。
+    let result = await dispatchOnce();
+    for (let i = 0; i < 10 && (await eventRow('note.created')).status === 'pending'; i += 1) {
+      result = await dispatchOnce();
+    }
     expect(result.delivered).toBeGreaterThanOrEqual(1);
 
     // handler 订阅自增 settings.greeted
