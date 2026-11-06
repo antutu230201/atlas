@@ -223,7 +223,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
       {!chromeHidden ? (
         <aside
           className={cn(
-            'glass-strong hidden shrink-0 flex-col gap-6 p-4 transition-[width] duration-[var(--duration-base)] md:flex',
+            'glass-strong hidden shrink-0 flex-col gap-6 p-4 pb-6 transition-[width] duration-[var(--duration-base)] md:sticky md:top-0 md:flex md:h-dvh md:self-start md:overflow-y-auto',
             collapsed ? 'w-16' : 'w-64',
           )}
         >
