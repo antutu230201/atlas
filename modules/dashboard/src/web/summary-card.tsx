@@ -9,6 +9,8 @@ import { ScreenIcon } from './icons';
  * 数据为 MockAI 模板文案时同样可读——配置真实供应商后自动升级（阶段 5 遗留项）。
  */
 export function SummaryCard({ envelope }: { envelope: SourceEnvelope<DailySummary> }) {
+  // Mock 供应商会把完整提示词回显到正文；大屏只展示诚实的预览说明，不把调试文本当 AI 产出。
+  const isMock = envelope.payload?.text.startsWith('[MockAI]') ?? false;
   return (
     <section
       className="screen-card screen-reveal bg-[linear-gradient(135deg,var(--color-primary-soft),transparent_48%)] p-5"
@@ -27,23 +29,36 @@ export function SummaryCard({ envelope }: { envelope: SourceEnvelope<DailySummar
         </div>
         <div className="flex items-center gap-2 rounded-full border border-border bg-primary-soft px-2.5 py-1 text-[9px] text-primary">
           <span className="size-1 animate-pulse rounded-full bg-primary" />
-          AI BRIEFING
+          {isMock ? 'PREVIEW · 待接入' : 'AI BRIEFING'}
         </div>
       </div>
 
       <div className="relative mt-4 border-l border-primary/30 pl-4">
         {envelope.payload ? (
           <>
-            <p className="text-[13px] leading-7 text-text/90">{envelope.payload.text}</p>
+            {isMock ? (
+              <div className="py-1">
+                <p className="text-[13px] leading-6 font-medium text-text/90">
+                  今天也辛苦了。先把手边最要紧的一件事做好，剩下的按自己的节奏来。
+                </p>
+                <p className="mt-1 text-[10px] leading-5 text-muted">
+                  当前为本地预览文案；配置真实 AI 供应商后，会自动结合天气、待办与打卡生成每日小结。
+                </p>
+              </div>
+            ) : (
+              <p className="text-[13px] leading-7 text-text/90">{envelope.payload.text}</p>
+            )}
             <div className="mt-3 flex items-center justify-between gap-3">
-              <p className="text-[10px] text-muted">从今天的天气、进度与节奏里，提炼给你。</p>
+              <p className="text-[10px] text-muted">
+                {isMock ? '预览模式 · 不消耗 AI 配额' : '从今天的天气、进度与节奏里，提炼给你。'}
+              </p>
               {envelope.fetchedAt ? (
                 <span className="shrink-0 font-mono text-[9px] text-muted">
                   {new Date(envelope.fetchedAt).toLocaleTimeString('zh-CN', {
                     hour: '2-digit',
                     minute: '2-digit',
                   })}{' '}
-                  生成
+                  {isMock ? '更新' : '生成'}
                 </span>
               ) : null}
             </div>

@@ -22,6 +22,10 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${webPort}`,
     trace: 'retain-on-failure',
+    // 内网环境 Playwright 浏览器下载可能失败；允许复用本机 Chrome/Edge，CI 仍使用自带 Chromium。
+    ...(process.env.E2E_CHROME_PATH
+      ? { launchOptions: { executablePath: process.env.E2E_CHROME_PATH } }
+      : {}),
   },
   webServer: [
     {

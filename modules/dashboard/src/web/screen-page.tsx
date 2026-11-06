@@ -347,10 +347,34 @@ export function DashboardScreenPage({
             </div>
           </div>
 
+          <nav
+            className="hidden items-center gap-1 rounded-full border border-border bg-surface/50 p-1 2xl:flex"
+            aria-label="大屏区块导航"
+          >
+            {[
+              { id: 'overview-section', label: '今日节奏' },
+              { id: 'hotlist-section', label: '实时热榜' },
+              { id: 'countdown-section', label: '纪念日' },
+            ].map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                className="rounded-full px-3 py-1.5 text-[11px] text-muted transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-2 focus-visible:outline-primary"
+                onClick={() => scrollToSection(section.id)}
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+
           <div className="flex flex-wrap items-center gap-2">
             <div className="mr-1 hidden items-center gap-2 px-2 text-[10px] tracking-wider text-muted md:flex">
               <HealthDot status={snapshot.isError ? 'error' : 'fresh'} />
-              {snapshot.isFetching ? '正在同步' : '数据在线'}
+              {snapshot.isFetching
+                ? '正在同步'
+                : snapshot.dataUpdatedAt > 0
+                  ? `同步 ${new Date(snapshot.dataUpdatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+                  : '数据在线'}
             </div>
             <ThemeToggle />
             <button
@@ -525,7 +549,22 @@ export function DashboardScreenPage({
               </div>
             </div>
 
-            {/* 实时热榜：紧跟两大核心卡片 */}
+            {/* 个人内容优先于外部信息：首屏先回答“我今天怎么样”，再向下浏览热榜。 */}
+            <section
+              id="overview-section"
+              aria-label="今日节奏"
+              className="grid scroll-mt-6 items-stretch gap-4 xl:grid-cols-12"
+            >
+              <div className="flex flex-col gap-4 xl:col-span-7">
+                <SummaryCard envelope={data.summary} />
+                {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
+              </div>
+              <div id="activity-section" className="scroll-mt-6 xl:col-span-5">
+                <ActivityCard stats={data.activity} />
+              </div>
+            </section>
+
+            {/* 实时热榜：个人摘要之后，保持完整五源视野。 */}
             {enabledSources.length > 0 ? (
               <section
                 id="hotlist-section"
@@ -563,17 +602,6 @@ export function DashboardScreenPage({
                 </div>
               </section>
             ) : null}
-
-            {/* AI 摘要 / 一言 + 成长热力图 */}
-            <div className="grid items-stretch gap-4 xl:grid-cols-12">
-              <div className="flex flex-col gap-4 xl:col-span-7">
-                <SummaryCard envelope={data.summary} />
-                {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
-              </div>
-              <div id="activity-section" className="scroll-mt-6 xl:col-span-5">
-                <ActivityCard stats={data.activity} />
-              </div>
-            </div>
 
             {/* 倒计时 */}
             <div id="countdown-section" className="scroll-mt-6">

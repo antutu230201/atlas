@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Input } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { DesktopLyrics, type LyricLine } from './desktop-lyrics';
 import { ScreenIcon } from './icons';
@@ -65,11 +66,117 @@ const TRACKS: MusicTrack[] = [
     cover: 'https://p1.music.126.net/9A9o8KnCftKoJLmfk7jE-A==/1252343744099790.jpg',
     durationMs: 271493,
   },
+  {
+    id: 1436709403,
+    title: '夏天的风',
+    artist: '火羊瞌睡了',
+    album: '夏天的风',
+    cover: 'https://p2.music.126.net/rFUKVdOjqxgwAT6Zi6qv7A==/109951164906689206.jpg',
+    durationMs: 221750,
+  },
+  {
+    id: 1413863166,
+    title: '想去海边',
+    artist: '夏日入侵企画',
+    album: '想去海边',
+    cover: 'https://p2.music.126.net/sLWN-iePq4ESOMPER0IWgQ==/109951164602081973.jpg',
+    durationMs: 267032,
+  },
+  {
+    id: 34380395,
+    title: '途中',
+    artist: '陈鸿宇',
+    album: '浓烟下的诗歌电台',
+    cover: 'https://p2.music.126.net/ryk8Gu64rOhlYn0pc2Q8Ww==/109951168090271827.jpg',
+    durationMs: 259363,
+  },
+  {
+    id: 399354289,
+    title: '不说再见',
+    artist: '好妹妹乐队',
+    album: '不说再见',
+    cover: 'https://p2.music.126.net/vGyVY6gwr-puT406H29QEw==/109951167193047122.jpg',
+    durationMs: 296177,
+  },
+  {
+    id: 1313354324,
+    title: '出山',
+    artist: '花粥 / 王胜娚',
+    album: '粥请客（四）',
+    cover: 'https://p2.music.126.net/xUAfdMHdXhu3BmO4g8nOYA==/109951163573311341.jpg',
+    durationMs: 200388,
+  },
+  {
+    id: 569213220,
+    title: '像我这样的人',
+    artist: '毛不易',
+    album: '平凡的一天',
+    cover: 'https://p2.music.126.net/vmCcDvD1H04e9gm97xsCqg==/109951163350929740.jpg',
+    durationMs: 207466,
+  },
+  {
+    id: 449578813,
+    title: '行歌',
+    artist: '陈鸿宇',
+    album: '一如年少模样',
+    cover: 'https://p2.music.126.net/AlcW5RnCEEP6huXZehdpew==/109951168090254666.jpg',
+    durationMs: 287326,
+  },
+  {
+    id: 450853439,
+    title: '遥不可及的你',
+    artist: '花粥',
+    album: '2017（一）',
+    cover: 'https://p2.music.126.net/_d88fVvtP17B-hV7z1lWzg==/109951162835476747.jpg',
+    durationMs: 150824,
+  },
+  {
+    id: 31445554,
+    title: '七月上',
+    artist: 'Jam',
+    album: '阿敬的单曲集',
+    cover: 'https://p2.music.126.net/uxyYBS5jhmi_DN4xDYy3eg==/7872503255697381.jpg',
+    durationMs: 190093,
+  },
+  {
+    id: 30706318,
+    title: '我想和你虚度时光',
+    artist: '程璧 / 莫西子诗',
+    album: '我想和你虚度时光',
+    cover: 'https://p2.music.126.net/beK0Y-4vgyZoIy21QFXC0A==/7696581394971660.jpg',
+    durationMs: 509621,
+  },
+  {
+    id: 28656174,
+    title: '晴日共剪窗',
+    artist: '程璧',
+    album: '晴日共剪窗',
+    cover: 'https://p2.music.126.net/ZwD6LYIkRoiNFQlM_brBLg==/5990139348644333.jpg',
+    durationMs: 261336,
+  },
+  {
+    id: 2160356141,
+    title: '十二',
+    artist: '留声玩具',
+    album: '十二（Studio version2024）',
+    cover: 'https://p2.music.126.net/iZ965zdEgFDBpG7zYdhr2A==/109951169629610981.jpg',
+    durationMs: 222000,
+  },
 ];
 
 const FIRST_TRACK = TRACKS[0]!;
+const MUSIC_STATE_KEY = 'atlas.dashboard.music-state';
 const audioUrl = (id: number) => `https://music.163.com/song/media/outer/url?id=${id}.mp3`;
 const sourceUrl = (id: number) => `https://music.163.com/#/song?id=${id}`;
+
+type PlaybackMode = 'sequence' | 'repeat' | 'shuffle';
+
+const PLAYBACK_MODES: PlaybackMode[] = ['sequence', 'repeat', 'shuffle'];
+const PLAYBACK_MODE_LABELS: Record<PlaybackMode, string> = {
+  sequence: '顺序播放',
+  repeat: '单曲循环',
+  shuffle: '随机播放',
+};
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -91,10 +198,20 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
   const [volume, setVolume] = useState(0.65);
   const [isMuted, setIsMuted] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
+  const [playlistQuery, setPlaylistQuery] = useState('');
   const [lyricsOpen, setLyricsOpen] = useState(false);
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('sequence');
+  const [preferencesReady, setPreferencesReady] = useState(false);
   const [coverFailed, setCoverFailed] = useState(false);
   const [error, setError] = useState('');
   const track = TRACKS[trackIndex] ?? FIRST_TRACK;
+  const filteredTracks = useMemo(() => {
+    const keyword = playlistQuery.trim().toLocaleLowerCase('zh-CN');
+    if (!keyword) return TRACKS.map((item, index) => ({ item, index }));
+    return TRACKS.map((item, index) => ({ item, index })).filter(({ item }) =>
+      `${item.title} ${item.artist} ${item.album}`.toLocaleLowerCase('zh-CN').includes(keyword),
+    );
+  }, [playlistQuery]);
 
   const lyricsQuery = useQuery({
     queryKey: ['dashboard', 'lyrics', track.id],
@@ -104,6 +221,30 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
     staleTime: Number.POSITIVE_INFINITY,
     retry: 1,
   });
+
+  // 只恢复歌曲、音量和播放模式，不恢复播放中状态，避免打开大屏就突然出声。
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(MUSIC_STATE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          trackId?: number;
+          volume?: number;
+          mode?: PlaybackMode;
+        };
+        const savedIndex = TRACKS.findIndex((item) => item.id === saved.trackId);
+        if (savedIndex >= 0) setTrackIndex(savedIndex);
+        if (typeof saved.volume === 'number' && saved.volume >= 0 && saved.volume <= 1) {
+          setVolume(saved.volume);
+        }
+        if (saved.mode && PLAYBACK_MODES.includes(saved.mode)) setPlaybackMode(saved.mode);
+      }
+    } catch {
+      // 本地偏好损坏或隐私模式不可写时，回退到默认状态，不影响播放。
+    } finally {
+      setPreferencesReady(true);
+    }
+  }, []);
 
   const playAudio = useCallback(async () => {
     const audio = audioRef.current;
@@ -143,6 +284,19 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
   }, [volume, isMuted]);
 
   useEffect(() => {
+    // 等恢复完成再写回，否则 React 严格模式的挂载双执行会用默认值覆盖上次偏好。
+    if (!preferencesReady) return;
+    try {
+      window.localStorage.setItem(
+        MUSIC_STATE_KEY,
+        JSON.stringify({ trackId: track.id, volume, mode: playbackMode }),
+      );
+    } catch {
+      // 记忆偏好是增强能力，存储不可用时不阻断播放。
+    }
+  }, [preferencesReady, track.id, volume, playbackMode]);
+
+  useEffect(() => {
     if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return;
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.title,
@@ -170,14 +324,29 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
     };
   }, [expanded]);
 
-  const selectTrack = (nextIndex: number, shouldPlay = isPlaying) => {
-    if (nextIndex === trackIndex) {
-      if (shouldPlay) void playAudio();
-      return;
-    }
-    resumeAfterChangeRef.current = shouldPlay;
-    setTrackIndex(nextIndex);
-  };
+  const selectTrack = useCallback(
+    (nextIndex: number, shouldPlay = isPlaying) => {
+      if (nextIndex === trackIndex) {
+        if (shouldPlay) void playAudio();
+        return;
+      }
+      resumeAfterChangeRef.current = shouldPlay;
+      setTrackIndex(nextIndex);
+    },
+    [isPlaying, playAudio, trackIndex],
+  );
+
+  const stepTrack = useCallback(
+    (direction: 1 | -1, shouldPlay = isPlaying) => {
+      let nextIndex = (trackIndex + direction + TRACKS.length) % TRACKS.length;
+      if (playbackMode === 'shuffle' && TRACKS.length > 1) {
+        nextIndex = Math.floor(Math.random() * (TRACKS.length - 1));
+        if (nextIndex >= trackIndex) nextIndex += 1;
+      }
+      selectTrack(nextIndex, shouldPlay);
+    },
+    [isPlaying, playbackMode, selectTrack, trackIndex],
+  );
 
   const togglePlay = () => {
     const audio = audioRef.current;
@@ -194,6 +363,21 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
     audio.currentTime = next;
     setCurrentTime(next);
   };
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    const audio = audioRef.current;
+    navigator.mediaSession.setActionHandler('play', () => void playAudio());
+    navigator.mediaSession.setActionHandler('pause', () => audio?.pause());
+    navigator.mediaSession.setActionHandler('previoustrack', () => stepTrack(-1));
+    navigator.mediaSession.setActionHandler('nexttrack', () => stepTrack(1));
+    return () => {
+      navigator.mediaSession.setActionHandler('play', null);
+      navigator.mediaSession.setActionHandler('pause', null);
+      navigator.mediaSession.setActionHandler('previoustrack', null);
+      navigator.mediaSession.setActionHandler('nexttrack', null);
+    };
+  }, [playAudio, stepTrack]);
 
   const progress = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0;
   const statusLabel = isBuffering ? 'LOADING' : isPlaying ? 'PLAYING' : 'READY';
@@ -225,7 +409,14 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
             setDuration(event.currentTarget.duration);
           }
         }}
-        onEnded={() => selectTrack((trackIndex + 1) % TRACKS.length, true)}
+        onEnded={() => {
+          if (playbackMode === 'repeat') {
+            seek(0);
+            void playAudio();
+          } else {
+            stepTrack(1, true);
+          }
+        }}
         onError={() => {
           setIsPlaying(false);
           setIsBuffering(false);
@@ -335,7 +526,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                   <button
                     type="button"
                     className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
-                    onClick={() => selectTrack((trackIndex - 1 + TRACKS.length) % TRACKS.length)}
+                    onClick={() => stepTrack(-1)}
                     aria-label="上一首"
                     title="上一首"
                   >
@@ -356,7 +547,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                   <button
                     type="button"
                     className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
-                    onClick={() => selectTrack((trackIndex + 1) % TRACKS.length)}
+                    onClick={() => stepTrack(1)}
                     aria-label="下一首"
                     title="下一首"
                   >
@@ -365,6 +556,29 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                 </div>
 
                 <span className="mx-1 hidden h-5 w-px bg-border sm:block" aria-hidden />
+
+                <button
+                  type="button"
+                  className={`screen-icon-button !min-h-9 !px-3 ${playbackMode !== 'sequence' ? '!border-primary/40 !text-primary' : ''}`}
+                  onClick={() =>
+                    setPlaybackMode(
+                      PLAYBACK_MODES[
+                        (PLAYBACK_MODES.indexOf(playbackMode) + 1) % PLAYBACK_MODES.length
+                      ]!,
+                    )
+                  }
+                  aria-label={`播放模式：${PLAYBACK_MODE_LABELS[playbackMode]}，点击切换`}
+                  title={`${PLAYBACK_MODE_LABELS[playbackMode]} · 点击切换`}
+                >
+                  <ScreenIcon
+                    name={playbackMode === 'shuffle' ? 'shuffle' : 'repeat'}
+                    className="size-3.5"
+                  />
+                  <span className="hidden lg:inline">{PLAYBACK_MODE_LABELS[playbackMode]}</span>
+                  {playbackMode === 'repeat' ? (
+                    <span className="font-mono text-[9px]">1</span>
+                  ) : null}
+                </button>
 
                 <div className="flex items-center gap-2">
                   <button
@@ -442,53 +656,90 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
 
           {playlistOpen ? (
             <div id="vinyl-playlist" className="mt-4 border-t border-border pt-4">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="screen-label !text-[10px]">Atlas 精选 · 可网页播放</span>
-                <span className="text-[10px] font-medium tracking-wider text-muted">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <span className="screen-label !text-[10px]">Atlas 精选 · 已验证网页音源</span>
+                <span className="shrink-0 font-mono text-[10px] font-medium tracking-wider text-muted">
+                  {playlistQuery ? `${filteredTracks.length} / ` : ''}
                   {TRACKS.length} 首
                 </span>
               </div>
-              <ol className="grid gap-2 sm:grid-cols-2">
-                {TRACKS.map((item, index) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className={`flex w-full items-center gap-3 rounded-sm border px-3 py-3 text-left transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-primary ${
-                        index === trackIndex
-                          ? 'border-primary/35 bg-primary-soft'
-                          : 'border-transparent hover:bg-surface-hover'
-                      }`}
-                      onClick={() => selectTrack(index, true)}
-                      aria-label={`播放 ${item.title} - ${item.artist}`}
-                    >
-                      <span
-                        className={`w-6 shrink-0 text-[11px] font-medium tabular-nums ${index === trackIndex ? 'text-primary' : 'text-muted'}`}
+              <div className="relative mb-3">
+                <ScreenIcon
+                  name="search"
+                  className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted"
+                />
+                <Input
+                  value={playlistQuery}
+                  onChange={(event) => setPlaylistQuery(event.target.value)}
+                  placeholder="搜索歌名、歌手或专辑"
+                  aria-label="搜索内置歌单"
+                  className="bg-surface/60 pl-9 pr-9 text-xs"
+                />
+                {playlistQuery ? (
+                  <button
+                    type="button"
+                    className="absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-hover hover:text-text"
+                    onClick={() => setPlaylistQuery('')}
+                    aria-label="清空歌单搜索"
+                  >
+                    <ScreenIcon name="close" className="size-3.5" />
+                  </button>
+                ) : null}
+              </div>
+              {filteredTracks.length > 0 ? (
+                <ol className="grid gap-1.5 sm:grid-cols-2">
+                  {filteredTracks.map(({ item, index }, resultIndex) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className={`flex w-full items-center gap-3 rounded-sm border px-3 py-2.5 text-left transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-primary ${
+                          index === trackIndex
+                            ? 'border-primary/35 bg-primary-soft'
+                            : 'border-transparent hover:bg-surface-hover'
+                        }`}
+                        onClick={() => selectTrack(index, true)}
+                        aria-label={`播放 ${item.title} - ${item.artist}`}
                       >
-                        {String(index + 1).padStart(2, '0')}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold leading-5">
-                          {item.title}
+                        <span
+                          className={`w-6 shrink-0 text-[11px] font-medium tabular-nums ${index === trackIndex ? 'text-primary' : 'text-muted'}`}
+                        >
+                          {String(resultIndex + 1).padStart(2, '0')}
                         </span>
-                        <span className="mt-1 block truncate text-[11px] leading-4 text-muted">
-                          {item.artist}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold leading-5">
+                            {item.title}
+                          </span>
+                          <span className="mt-0.5 block truncate text-[11px] leading-4 text-muted">
+                            {item.artist}
+                          </span>
                         </span>
-                      </span>
-                      {index === trackIndex && isPlaying ? (
-                        <span className="screen-equalizer text-primary" aria-hidden>
-                          <i />
-                          <i />
-                          <i />
-                        </span>
-                      ) : (
-                        <span className="shrink-0 text-[12px] font-medium tabular-nums text-muted">
-                          {formatTime(item.durationMs / 1000)}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ol>
+                        {index === trackIndex && isPlaying ? (
+                          <span className="screen-equalizer text-primary" aria-hidden>
+                            <i />
+                            <i />
+                            <i />
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-[12px] font-medium tabular-nums text-muted">
+                            {formatTime(item.durationMs / 1000)}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <div className="rounded-sm border border-dashed border-border px-4 py-7 text-center">
+                  <p className="text-xs text-muted">没有找到「{playlistQuery.trim()}」相关歌曲</p>
+                  <button
+                    type="button"
+                    className="mt-2 text-xs text-primary hover:underline"
+                    onClick={() => setPlaylistQuery('')}
+                  >
+                    查看全部 {TRACKS.length} 首
+                  </button>
+                </div>
+              )}
             </div>
           ) : null}
         </section>

@@ -295,8 +295,26 @@ test.describe('个人大屏模块（假数据源）', () => {
     await expect(player.getByRole('heading', { name: '理想三旬' })).toBeVisible();
     await expect(disc).toHaveAttribute('data-playing', 'false');
 
+    // 三种播放模式循环切换，并通过本地偏好保存。
+    await page.getByRole('button', { name: '播放模式：顺序播放，点击切换' }).click();
+    await expect(page.getByRole('button', { name: '播放模式：单曲循环，点击切换' })).toBeVisible();
+    await page.getByRole('button', { name: '播放模式：单曲循环，点击切换' }).click();
+    await expect(page.getByRole('button', { name: '播放模式：随机播放，点击切换' })).toBeVisible();
+
     await page.getByRole('button', { name: '歌单', exact: true }).click();
-    await expect(page.getByText('Atlas 精选 · 可网页播放')).toBeVisible();
+    await expect(page.getByText('Atlas 精选 · 已验证网页音源')).toBeVisible();
+    await expect(page.getByText('18 首', { exact: true })).toBeVisible();
+
+    // 搜索匹配歌名/歌手/专辑，保留原始索引，过滤后选曲仍能播对。
+    await page.getByLabel('搜索内置歌单').fill('陈鸿宇');
+    await expect(player.locator('#vinyl-playlist ol li')).toHaveCount(3);
+    await expect(page.getByRole('button', { name: '播放 途中 - 陈鸿宇' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '播放 行歌 - 陈鸿宇' })).toBeVisible();
+    await page.getByLabel('搜索内置歌单').fill('不存在的歌曲');
+    await expect(page.getByText('没有找到「不存在的歌曲」相关歌曲')).toBeVisible();
+    await page.getByRole('button', { name: '查看全部 18 首' }).click();
+    await expect(player.locator('#vinyl-playlist ol li')).toHaveCount(18);
+
     await page.getByRole('button', { name: /^播放 起风了 - / }).click();
     await expect(player.getByRole('heading', { name: '起风了' })).toBeVisible();
     await expect(disc).toHaveAttribute('data-playing', 'true');
@@ -314,5 +332,24 @@ test.describe('个人大屏模块（假数据源）', () => {
 
     await page.getByRole('button', { name: '收起播放器', exact: true }).click();
     await expect(page.getByRole('button', { name: '展开播放器', exact: true })).toBeVisible();
+
+    // 刷新只恢复歌曲和播放模式，不恢复播放状态，避免页面打开突然出声。
+    await page.reload();
+    // 测试账号未设城市，刷新会自动拉起设置抽屉；关掉后再检查播放器恢复结果。
+    await page
+      .getByRole('dialog')
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .catch(() => undefined);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: '展开 起风了 播放详情' })).toBeVisible();
+    await expect
+      .poll(() =>
+        page
+          .locator('[data-testid="vinyl-player"] audio')
+          .evaluate((audio) => (audio as HTMLAudioElement).paused),
+      )
+      .toBe(true);
+    await page.getByRole('button', { name: '展开播放器', exact: true }).click();
+    await expect(page.getByRole('button', { name: '播放模式：随机播放，点击切换' })).toBeVisible();
   });
 });

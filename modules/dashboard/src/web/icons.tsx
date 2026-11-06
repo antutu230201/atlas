@@ -29,7 +29,11 @@ export type ScreenIconName =
   | 'chevron'
   | 'lyrics'
   | 'grip'
-  | 'pip';
+  | 'pip'
+  | 'search'
+  | 'close'
+  | 'repeat'
+  | 'shuffle';
 
 interface IconProps {
   className?: string;
@@ -252,6 +256,31 @@ export function ScreenIcon({ name, className }: IconProps & { name: ScreenIconNa
         <svg {...common}>
           <rect x="3" y="5" width="18" height="14" rx="2" />
           <rect x="12" y="11" width="6" height="5" rx="1" />
+        </svg>
+      );
+    case 'search':
+      return (
+        <svg {...common}>
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m16 16 4 4" />
+        </svg>
+      );
+    case 'close':
+      return (
+        <svg {...common}>
+          <path d="m6 6 12 12M18 6 6 18" />
+        </svg>
+      );
+    case 'repeat':
+      return (
+        <svg {...common}>
+          <path d="m17 2 4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3" />
+        </svg>
+      );
+    case 'shuffle':
+      return (
+        <svg {...common}>
+          <path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
         </svg>
       );
   }
