@@ -23,7 +23,14 @@ import {
   type Wallpaper,
 } from './providers/misc';
 import { isFakeMode } from './providers/http';
-import { fakeLocation, fakeQuote, fakeWallpaper, fakeWeather } from './providers/fixtures';
+import { fetchNeteaseLyrics } from './providers/lyrics';
+import {
+  fakeLocation,
+  fakeLyrics,
+  fakeQuote,
+  fakeWallpaper,
+  fakeWeather,
+} from './providers/fixtures';
 
 /**
  * 个人大屏（dashboard）：时钟/农历、天气、多源热榜、滚动头条、一言、倒计时、氛围壁纸。
@@ -87,6 +94,7 @@ const updateCountdownSchema = z.object({
 
 const refreshSchema = z.object({ sources: z.array(z.string().max(40)).max(10).optional() });
 const searchCitySchema = z.object({ q: z.string().min(1, '请输入城市名').max(60) });
+const lyricsSchema = z.object({ id: z.number().int().positive() });
 
 function bad(message: string): never {
   throw new ModuleActionError(`输入不合法：${message}`);
@@ -408,6 +416,17 @@ export const definition: ModuleDefinition = {
       },
     },
 
+    /** 歌词：按歌曲 ID 取 LRC 并解析，前端按播放进度同步；不落库，客户端按歌曲缓存 */
+    lyrics: {
+      permission: 'dashboard:read',
+      handler: async (_ctx, input) => {
+        const parsed = lyricsSchema.safeParse(input ?? {});
+        if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
+        if (isFakeMode()) return fakeLyrics;
+        return fetchNeteaseLyrics(parsed.data.id);
+      },
+    },
+
     /** 手动强刷：跳过 TTL 重新拉取指定源（缺省为全部），失败抛 400 并说明 */
     refresh: {
       permission: 'dashboard:write',
@@ -682,3 +701,4 @@ export {
   normalizeWeibo,
 } from './providers/hotlists';
 export { describeWeatherCode } from './providers/weather';
+export { parseLrc } from './providers/lyrics';

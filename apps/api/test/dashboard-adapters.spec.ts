@@ -6,6 +6,7 @@ import {
   normalizeDouyin,
   normalizeToutiao,
   normalizeWeibo,
+  parseLrc,
 } from '@atlas/module-dashboard';
 
 /** 大屏适配器归一化：各源真实响应形状的子集 → HotItem[]（缺字段跳过、不抛错） */
@@ -95,5 +96,31 @@ describe('dashboard 适配器归一化', () => {
     expect(describeWeatherCode(61).text).toBe('小雨');
     expect(describeWeatherCode(95).icon).toBe('thunder');
     expect(describeWeatherCode(999).text).toBe('未知');
+  });
+});
+
+describe('LRC 歌词解析', () => {
+  it('解析多时间标签、百分秒与毫秒，过滤制作人员并保持时间升序', () => {
+    const lines = parseLrc(
+      [
+        '[00:00.000] 作词 : 某人',
+        '[00:01.50]第一句',
+        '[00:02.123][00:05.000]重复副歌',
+        '[00:03.000]',
+        '[ar:测试歌手]',
+        '[00:04.9]最后一句',
+      ].join('\n'),
+    );
+    expect(lines).toEqual([
+      { time: 1.5, text: '第一句' },
+      { time: 2.123, text: '重复副歌' },
+      { time: 4.9, text: '最后一句' },
+      { time: 5, text: '重复副歌' },
+    ]);
+  });
+
+  it('无有效歌词或纯元数据返回空数组', () => {
+    expect(parseLrc('')).toEqual([]);
+    expect(parseLrc('[ti:标题]\n[ar:歌手]')).toEqual([]);
   });
 });

@@ -163,9 +163,35 @@ test.describe('个人大屏模块（假数据源）', () => {
 
   test('黑胶播放器：播放/暂停 → 切歌 → 歌单选曲', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.route('https://music.163.com/song/media/outer/url**', (route) =>
-      route.fulfill({ status: 200, contentType: 'audio/wav', body: createTestAudio() }),
-    );
+    // 必须支持 Range：完整 200 响应下浏览器 seekable.end=0，歌词跳播会被媒体层拒绝。
+    await page.route('https://music.163.com/song/media/outer/url**', (route) => {
+      const body = createTestAudio();
+      const range = route.request().headers()['range'];
+      const match = range ? /bytes=(\d+)-(\d*)/.exec(range) : null;
+      if (match) {
+        const start = Number(match[1]);
+        const end = Math.min(Number(match[2] || body.length - 1), body.length - 1);
+        return route.fulfill({
+          status: 206,
+          headers: {
+            'content-type': 'audio/wav',
+            'accept-ranges': 'bytes',
+            'content-range': `bytes ${start}-${end}/${body.length}`,
+            'content-length': String(end - start + 1),
+          },
+          body: body.subarray(start, end + 1),
+        });
+      }
+      return route.fulfill({
+        status: 200,
+        headers: {
+          'content-type': 'audio/wav',
+          'accept-ranges': 'bytes',
+          'content-length': String(body.length),
+        },
+        body,
+      });
+    });
 
     const email = `dash-e2e-music-${Date.now()}@example.com`;
     await page.goto('/register');
@@ -194,7 +220,19 @@ test.describe('个人大屏模块（假数据源）', () => {
     const player = page.getByTestId('vinyl-player');
     const disc = page.getByTestId('vinyl-disc');
     await expect(player).toBeVisible();
+    await expect(player).toBeInViewport();
     await expect(disc).toHaveAttribute('data-playing', 'false');
+
+    // 悬浮舱不随页面滚动移动：首屏直接可播，滚到底仍停在右下角。
+    const dockBefore = await player.boundingBox();
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(250);
+    const dockAfter = await player.boundingBox();
+    expect(dockBefore).not.toBeNull();
+    expect(dockAfter).not.toBeNull();
+    expect(Math.abs((dockAfter?.y ?? 0) - (dockBefore?.y ?? 0))).toBeLessThan(1);
+    await expect(player).toBeInViewport();
+    await page.evaluate(() => window.scrollTo(0, 0));
 
     await page.getByRole('button', { name: '播放 消愁', exact: true }).click();
     await expect(disc).toHaveAttribute('data-playing', 'true');
@@ -204,6 +242,53 @@ test.describe('个人大屏模块（假数据源）', () => {
 
     await page.getByRole('button', { name: '暂停 消愁', exact: true }).click();
     await expect(disc).toHaveAttribute('data-playing', 'false');
+
+    await page.getByRole('button', { name: '展开播放器', exact: true }).click();
+    await expect(player.getByRole('heading', { name: '消愁' })).toBeVisible();
+
+    // 桌面歌词：两行 → 点下一句跳播 → 换色 → 拖动 → 关闭。
+    await page.getByRole('button', { name: '歌词', exact: true }).click();
+    const lyrics = page.getByRole('region', { name: '桌面歌词' });
+    await expect(lyrics).toBeVisible();
+    await expect(lyrics.getByText(/假数据歌词/).first()).toBeVisible();
+    const lyricLines = lyrics.getByRole('button', { name: /跳到|回到/ });
+    await expect(lyricLines).toHaveCount(2);
+
+    await lyricLines.nth(1).click();
+    await expect
+      .poll(() =>
+        player.locator('audio').evaluate((audio) => (audio as HTMLAudioElement).currentTime),
+      )
+      .toBeGreaterThan(0.5);
+
+    await lyrics.getByRole('button', { name: '歌词设置', exact: true }).click();
+    await lyrics.getByRole('button', { name: '歌词颜色：粉色' }).click();
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('atlas.dashboard.lyrics-color')))
+      .toBe('var(--screen-pink)');
+    await lyrics.getByRole('button', { name: '单行', exact: true }).click();
+    await expect(lyricLines).toHaveCount(1);
+    await lyrics.getByRole('button', { name: '双行', exact: true }).click();
+    await expect(lyricLines).toHaveCount(2);
+    await lyrics.getByRole('button', { name: '歌词设置', exact: true }).click();
+
+    const handle = page.getByTestId('lyrics-drag-handle');
+    const lyricsBefore = await lyrics.boundingBox();
+    const handleBox = await handle.boundingBox();
+    expect(lyricsBefore).not.toBeNull();
+    expect(handleBox).not.toBeNull();
+    if (handleBox) {
+      await page.mouse.move(handleBox.x + 60, handleBox.y + 12);
+      await page.mouse.down();
+      await page.mouse.move(handleBox.x - 80, handleBox.y + 70, { steps: 6 });
+      await page.mouse.up();
+    }
+    const lyricsAfter = await lyrics.boundingBox();
+    expect(lyricsAfter).not.toBeNull();
+    expect(Math.abs((lyricsAfter?.x ?? 0) - (lyricsBefore?.x ?? 0))).toBeGreaterThan(10);
+
+    await page.getByRole('button', { name: '关闭桌面歌词', exact: true }).click();
+    await expect(lyrics).not.toBeVisible();
 
     // 暂停状态切歌只换曲，不擅自出声。
     await page.getByRole('button', { name: '下一首', exact: true }).click();
@@ -215,5 +300,19 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByRole('button', { name: /^播放 起风了 - / }).click();
     await expect(player.getByRole('heading', { name: '起风了' })).toBeVisible();
     await expect(disc).toHaveAttribute('data-playing', 'true');
+
+    // 手机宽度：展开面板不横向溢出，可收起为贴底迷你舱。
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(250);
+    const mobile = await player.evaluate((element) => ({
+      width: element.getBoundingClientRect().width,
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    }));
+    expect(mobile.width).toBeLessThanOrEqual(390);
+    expect(mobile.scrollWidth).toBeLessThanOrEqual(mobile.clientWidth + 1);
+
+    await page.getByRole('button', { name: '收起播放器', exact: true }).click();
+    await expect(page.getByRole('button', { name: '展开播放器', exact: true })).toBeVisible();
   });
 });

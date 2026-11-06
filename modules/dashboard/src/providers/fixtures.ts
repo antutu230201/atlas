@@ -77,3 +77,11 @@ export const fakeLocation = {
   lon: 120.16,
   source: 'fake',
 };
+
+export const fakeLyrics = {
+  source: 'netease' as const,
+  lines: Array.from({ length: 12 }, (_, index) => ({
+    time: index,
+    text: `假数据歌词 · 第 ${index + 1} 句`,
+  })),
+};

@@ -17,7 +17,7 @@ import { SummaryCard } from './summary-card';
 import { Ticker } from './ticker';
 import { WeatherCard } from './weather-card';
 import { WeatherAtmosphere } from './weather-atmosphere';
-import { VinylPlayerCard } from './vinyl-player-card';
+import { FloatingMusicPlayer } from './floating-music-player';
 import { HOT_SOURCE_LABELS, type DashboardSnapshot, type CountdownItem } from './types';
 
 /** 每台设备独立记住挂墙模式：同一账号在墙面屏和笔记本上可有不同取舍。 */
@@ -329,7 +329,7 @@ export function DashboardScreenPage({
       ) : null}
 
       <div
-        className={`relative z-10 mx-auto w-full space-y-4 p-4 md:p-5 xl:p-6 ${immersive ? 'max-w-[1920px]' : 'max-w-[1728px]'}`}
+        className={`relative z-10 mx-auto w-full space-y-4 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:p-5 md:pb-[calc(6rem+env(safe-area-inset-bottom))] xl:p-6 xl:pb-[calc(6rem+env(safe-area-inset-bottom))] ${immersive ? 'max-w-[1920px]' : 'max-w-[1728px]'}`}
       >
         <header className="screen-card screen-reveal flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-5">
           <div className="flex min-w-0 items-center gap-3">
@@ -564,9 +564,6 @@ export function DashboardScreenPage({
               </section>
             ) : null}
 
-            {/* 黑胶音乐：独立音频状态，与大屏数据刷新互不影响 */}
-            <VinylPlayerCard />
-
             {/* AI 摘要 / 一言 + 成长热力图 */}
             <div className="grid items-stretch gap-4 xl:grid-cols-12">
               <div className="flex flex-col gap-4 xl:col-span-7">
@@ -601,6 +598,8 @@ export function DashboardScreenPage({
           </>
         ) : null}
       </div>
+
+      <FloatingMusicPlayer base={base} />
 
       {canWrite ? (
         <SettingsDrawer

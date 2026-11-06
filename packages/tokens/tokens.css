@@ -130,6 +130,7 @@
   --screen-vinyl-shadow: 0 14px 32px rgba(24, 28, 44, 0.24);
   --screen-vinyl-duration: 18s;
   --screen-equalizer-duration: 760ms;
+  --screen-lyric-halo: rgba(255, 255, 255, 0.94);
 
   /* 天气场景色：只用于渐变与低透明度纹理，不做实时模糊 */
   --weather-rain: rgba(44, 91, 125, 0.18);
@@ -215,6 +216,7 @@
   --screen-vinyl-body: #06070c;
   --screen-vinyl-groove: rgba(255, 255, 255, 0.08);
   --screen-vinyl-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
+  --screen-lyric-halo: rgba(5, 6, 10, 0.92);
 
   --weather-rain: rgba(155, 220, 255, 0.2);
   --weather-snow: rgba(220, 238, 255, 0.44);

@@ -163,6 +163,40 @@
   animation-delay: calc(var(--screen-index, 0) * var(--screen-stagger));
 }
 
+/* 悬浮音乐舱：比普通卡片更实一层，避免滚动时透出下方热榜文字。 */
+@utility screen-dock {
+  position: relative;
+  border: 1px solid var(--screen-border-bright);
+  border-radius: var(--screen-radius);
+  background: var(--screen-panel);
+  box-shadow: var(--screen-card-shadow-hover);
+  backdrop-filter: blur(18px) saturate(115%);
+}
+
+/* 展开面板会压住整块内容，必须用实色底；半透明会让下层标题穿透。 */
+@utility screen-music-panel {
+  position: relative;
+  border: 1px solid var(--screen-border-bright);
+  border-radius: var(--screen-radius);
+  background: var(--screen-panel-solid);
+  box-shadow: var(--screen-card-shadow-hover);
+}
+
+/* 无底板歌词：用背景色光晕保证亮暗主题下压在壁纸/卡片上仍可读 */
+@utility screen-lyric-text {
+  text-shadow:
+    0 1px 2px var(--screen-lyric-halo),
+    0 0 10px var(--screen-lyric-halo),
+    0 0 24px var(--screen-lyric-halo);
+}
+
+/* 无边框柔光衬底：只在文字周围形成逐渐消失的暗角，不是实心卡片 */
+@utility screen-lyrics-scrim {
+  background: radial-gradient(ellipse at 50% 50%, var(--screen-lyric-halo) 0%, transparent 72%);
+  opacity: 0.38;
+  filter: blur(9px);
+}
+
 @utility screen-label {
   color: var(--screen-muted);
   font-size: 10px;
