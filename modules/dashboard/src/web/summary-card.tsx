@@ -24,10 +24,10 @@ export function SummaryCard({ envelope }: { envelope: SourceEnvelope<DailySummar
           </span>
           <div>
             <h2 className="text-sm font-semibold">每日小结</h2>
-            <p className="screen-label mt-0.5 !text-[9px]">Atlas intelligence</p>
+            <p className="screen-label mt-0.5 !text-[10px]">Atlas intelligence</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-border bg-primary-soft px-2.5 py-1 text-[9px] text-primary">
+        <div className="flex items-center gap-2 rounded-full border border-border bg-primary-soft px-2.5 py-1 text-[11px] text-primary">
           <span className="size-1 animate-pulse rounded-full bg-primary" />
           {isMock ? 'PREVIEW · 待接入' : 'AI BRIEFING'}
         </div>
@@ -41,7 +41,7 @@ export function SummaryCard({ envelope }: { envelope: SourceEnvelope<DailySummar
                 <p className="text-[13px] leading-6 font-medium text-text/90">
                   今天也辛苦了。先把手边最要紧的一件事做好，剩下的按自己的节奏来。
                 </p>
-                <p className="mt-1 text-[10px] leading-5 text-muted">
+                <p className="mt-1 text-[11px] leading-5 text-muted">
                   当前为本地预览文案；配置真实 AI 供应商后，会自动结合天气、待办与打卡生成每日小结。
                 </p>
               </div>
@@ -53,7 +53,7 @@ export function SummaryCard({ envelope }: { envelope: SourceEnvelope<DailySummar
                 {isMock ? '预览模式 · 不消耗 AI 配额' : '从今天的天气、进度与节奏里，提炼给你。'}
               </p>
               {envelope.fetchedAt ? (
-                <span className="shrink-0 font-mono text-[9px] text-muted">
+                <span className="shrink-0 font-mono text-[10px] text-muted">
                   {new Date(envelope.fetchedAt).toLocaleTimeString('zh-CN', {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -63,7 +63,7 @@ export function SummaryCard({ envelope }: { envelope: SourceEnvelope<DailySummar
               ) : null}
             </div>
             {envelope.status === 'stale' ? (
-              <p className="mt-2 text-[10px] text-warn" role="status">
+              <p className="mt-2 text-[11px] text-warn" role="status">
                 展示的是上次缓存的小结（本次生成失败）
               </p>
             ) : null}

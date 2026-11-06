@@ -21,15 +21,15 @@ export function QuoteCard({ envelope }: { envelope: SourceEnvelope<Quote> }) {
         <blockquote className="text-[13px] leading-6 text-text/90 md:text-sm md:leading-7">
           {quote.text}」
         </blockquote>
-        <figcaption className="mt-2 flex items-center gap-2 text-[10px] text-muted">
+        <figcaption className="mt-2 flex items-center gap-2 text-[11px] text-muted">
           <span className="h-px w-5 bg-border" />
           {quote.author ? <span>{quote.author}</span> : null}
           {quote.from ? <span>《{quote.from}》</span> : null}
         </figcaption>
       </div>
       <div className="hidden shrink-0 flex-col items-end justify-between border-l border-border pl-4 sm:flex">
-        <span className="screen-label !text-[9px]">Daily quote</span>
-        <span className="font-mono text-[9px] tracking-wider text-muted">HITOKOTO</span>
+        <span className="screen-label !text-[10px]">Daily quote</span>
+        <span className="font-mono text-[10px] tracking-wider text-muted">HITOKOTO</span>
       </div>
     </figure>
   );

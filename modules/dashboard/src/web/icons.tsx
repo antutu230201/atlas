@@ -402,7 +402,7 @@ export function TagChip({ tag }: { tag: string }) {
         : 'bg-info-soft text-info ring-info/25';
   return (
     <span
-      className={`shrink-0 rounded-xs px-1 py-0.5 text-[9px] font-semibold leading-none ring-1 ring-inset ${tone}`}
+      className={`shrink-0 rounded-xs px-1 py-0.5 text-[10px] font-semibold leading-none ring-1 ring-inset ${tone}`}
     >
       {tag}
     </span>

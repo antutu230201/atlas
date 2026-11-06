@@ -43,10 +43,10 @@ export function Ticker({ sources }: { sources: Record<string, SourceEnvelope<Hot
                 key={`${copy}-${index}`}
                 className="mr-8 flex shrink-0 items-center gap-2 text-[11px]"
               >
-                <span className="font-mono text-[9px] text-muted/50">
+                <span className="font-mono text-[10px] text-muted/50">
                   {String(entry.item.rank).padStart(2, '0')}
                 </span>
-                <span className="rounded-xs border border-border bg-primary-soft px-1.5 py-0.5 font-semibold text-[9px] text-primary">
+                <span className="rounded-xs border border-border bg-primary-soft px-1.5 py-0.5 font-semibold text-[11px] text-primary">
                   {entry.sourceLabel}
                 </span>
                 {entry.item.url ? (

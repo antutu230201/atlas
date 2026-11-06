@@ -77,9 +77,9 @@ export function HotlistCard({
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold tracking-tight">{label}</h3>
-          <p className="screen-label mt-0.5 !text-[9px]">Trending now</p>
+          <p className="screen-label mt-0.5 !text-[10px]">Trending now</p>
         </div>
-        <div className="flex items-center gap-1.5 text-[9px] text-muted">
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
           <HealthDot status={envelope.status} />
           {envelope.status === 'stale' || envelope.status === 'error' ? (
             <span className="text-warn" role="status">
@@ -106,9 +106,9 @@ export function HotlistCard({
               const change = changes.get(item.title);
               const changeMark =
                 change === undefined || change === 0 ? null : change > 0 ? (
-                  <span className="text-[9px] leading-none text-err">↑{change}</span>
+                  <span className="text-[10px] leading-none text-err">↑{change}</span>
                 ) : (
-                  <span className="text-[9px] leading-none text-ok">↓{-change}</span>
+                  <span className="text-[10px] leading-none text-ok">↓{-change}</span>
                 );
               const rankTone =
                 rank === 1

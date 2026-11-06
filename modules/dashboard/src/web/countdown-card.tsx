@@ -61,10 +61,10 @@ export function CountdownSection({
           <ScreenIcon name="calendar" className="size-4 text-primary" />
           <div>
             <h2 className="text-sm font-semibold">倒计时与纪念日</h2>
-            <p className="screen-label mt-0.5 !text-[9px]">Moments worth waiting for</p>
+            <p className="screen-label mt-0.5 !text-[10px]">Moments worth waiting for</p>
           </div>
         </div>
-        <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[9px] text-muted">
+        <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted">
           {String(items.length).padStart(2, '0')}
         </span>
       </div>
@@ -103,13 +103,13 @@ export function CountdownSection({
                 <span className="text-[11px] text-muted">{daysText(days)}</span>
               </p>
               <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                <span className="font-mono text-[9px] text-muted">{item.targetDate}</span>
+                <span className="font-mono text-[10px] text-muted">{item.targetDate}</span>
                 {canWrite ? (
                   <button
                     type="button"
                     aria-label={`删除 ${item.title}`}
                     onClick={() => remove(item.id)}
-                    className="flex items-center gap-1 text-[10px] text-muted transition-colors hover:text-err"
+                    className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-err"
                   >
                     <ScreenIcon name="trash" className="size-3" /> 删除
                   </button>

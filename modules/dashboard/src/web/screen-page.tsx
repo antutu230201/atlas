@@ -55,7 +55,7 @@ function ScreenBackground({
             onError={() => setImageFailed(true)}
           />
           {copyright ? (
-            <span className="absolute right-3 bottom-2 z-10 text-[9px] text-muted/60">
+            <span className="absolute right-3 bottom-2 z-10 text-[11px] text-muted/60">
               {copyright}
             </span>
           ) : null}
@@ -337,11 +337,11 @@ export function DashboardScreenPage({
             <div className="min-w-0">
               <div className="flex items-center gap-2.5">
                 <h1 className="text-base font-semibold tracking-[0.12em]">个人大屏</h1>
-                <span className="hidden rounded-xs border border-border px-1.5 py-0.5 font-mono text-[9px] tracking-widest text-muted sm:inline">
+                <span className="hidden rounded-xs border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-widest text-muted sm:inline">
                   PERSONAL OS
                 </span>
               </div>
-              <p className="screen-label mt-0.5 truncate !text-[9px]">
+              <p className="screen-label mt-0.5 truncate !text-[11px]">
                 Atlas command center · {workspace?.name ?? workspaceSlug}
               </p>
             </div>
@@ -368,7 +368,7 @@ export function DashboardScreenPage({
           </nav>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="mr-1 hidden items-center gap-2 px-2 text-[10px] tracking-wider text-muted md:flex">
+            <div className="mr-1 hidden items-center gap-2 px-2 text-[11px] tracking-wider text-muted md:flex">
               <HealthDot status={snapshot.isError ? 'error' : 'fresh'} />
               {snapshot.isFetching
                 ? '正在同步'
@@ -494,7 +494,7 @@ export function DashboardScreenPage({
               >
                 <div className="hidden shrink-0 items-center gap-2 border-r border-border pr-4 text-info md:flex">
                   <ScreenIcon name="signal" className="size-3.5" />
-                  <span className="screen-label !text-[9px] !text-info">Signal feed</span>
+                  <span className="screen-label !text-[10px] !text-info">Signal feed</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <Ticker sources={data.hot} />
@@ -580,11 +580,11 @@ export function DashboardScreenPage({
                       <ScreenIcon name="layers" className="size-4 text-primary" />
                       <h2 className="text-sm font-semibold">实时热榜</h2>
                     </div>
-                    <p className="screen-label mt-1 !text-[9px]">
+                    <p className="screen-label mt-1 !text-[11px]">
                       Real-time pulse · Across the internet
                     </p>
                   </div>
-                  <span className="font-mono text-[9px] tracking-wider text-muted">
+                  <span className="font-mono text-[10px] tracking-wider text-muted">
                     {String(enabledSources.length).padStart(2, '0')} SOURCES
                   </span>
                 </div>
@@ -617,7 +617,7 @@ export function DashboardScreenPage({
               />
             </div>
 
-            <footer className="flex flex-wrap items-center justify-between gap-2 px-1 pt-3 text-[9px] tracking-wider text-muted/60">
+            <footer className="flex flex-wrap items-center justify-between gap-2 px-1 pt-3 text-[11px] tracking-wider text-muted/60">
               <span>ATLAS PERSONAL OS · DESIGNED FOR YOUR EVERYDAY</span>
               <span className="flex items-center gap-1.5">
                 <span className="size-1 rounded-full bg-ok" /> DATA ENCRYPTED · WORKSPACE ISOLATED

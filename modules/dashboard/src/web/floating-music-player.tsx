@@ -486,247 +486,253 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
       {expanded ? (
         <section
           id="music-player-panel"
-          className="screen-music-panel max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 md:p-5"
+          className="screen-music-panel flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden p-4 md:p-5"
           aria-label="音乐播放器"
         >
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <ScreenIcon name="music" className="size-3.5 shrink-0 text-primary" />
-              <span className="screen-label !text-[9px]">Atlas music deck</span>
-              <span className="hidden h-3 w-px bg-border sm:block" aria-hidden />
-              <span className="hidden font-mono text-[8px] tracking-widest text-muted sm:inline">
-                NETEASE
-              </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-widest text-muted">
-                <span
-                  className={`size-1.5 rounded-full ${isPlaying ? 'bg-ok' : 'bg-border'}`}
-                  aria-hidden
-                />
-                {statusLabel} · {String(trackIndex + 1).padStart(2, '0')}/
-                {String(tracks.length).padStart(2, '0')}
-              </span>
-              <button
-                type="button"
-                className="screen-icon-button !size-8 !min-h-8 !rounded-full !p-0"
-                onClick={() => setExpanded(false)}
-                aria-label="收起播放器"
-                title="收起播放器"
-              >
-                <ScreenIcon name="collapse" className="size-3.5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid items-center gap-5 md:grid-cols-[140px_minmax(0,1fr)]">
-            <div className="relative mx-auto w-32 max-md:mt-2 md:w-36">
-              <div
-                className="screen-vinyl-rotation screen-vinyl"
-                data-playing={isPlaying}
-                data-testid="vinyl-disc"
-                aria-hidden
-              >
-                {coverFailed ? (
-                  <span className="absolute inset-[19%] flex items-center justify-center rounded-full bg-primary-soft text-primary">
-                    <ScreenIcon name="music" className="size-8" />
-                  </span>
-                ) : (
-                  <img
-                    key={track.id}
-                    src={`${track.cover}?param=400y400`}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="absolute inset-[19%] h-[62%] w-[62%] rounded-full border border-border object-cover"
-                    onError={() => setCoverFailed(true)}
+          {/* 唱片与控制区固定，歌单区独立滚动（对齐网易云桌面端布局） */}
+          <div className="shrink-0">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <ScreenIcon name="music" className="size-3.5 shrink-0 text-primary" />
+                <span className="screen-label !text-[11px]">Atlas music deck</span>
+                <span className="hidden h-3 w-px bg-border sm:block" aria-hidden />
+                <span className="hidden font-mono text-[10px] tracking-widest text-muted sm:inline">
+                  NETEASE
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="flex items-center gap-1.5 font-mono text-[10px] tracking-widest text-muted">
+                  <span
+                    className={`size-1.5 rounded-full ${isPlaying ? 'bg-ok' : 'bg-border'}`}
+                    aria-hidden
                   />
-                )}
-                <span className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-surface" />
-              </div>
-              <span className="screen-tonearm" data-playing={isPlaying} aria-hidden />
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="screen-label !text-[9px] !text-primary">Now playing</span>
-                <span className="screen-label !text-[8px] !tracking-[0.12em]">网易云音乐</span>
-              </div>
-              <h2 className="mt-2 truncate text-xl font-semibold tracking-tight md:text-2xl">
-                {track.title}
-              </h2>
-              <p className="mt-1 truncate text-xs text-muted">
-                {track.artist} <span className="mx-1 text-border">/</span> {track.album}
-              </p>
-
-              <div className="mt-4 flex items-center gap-3">
-                <span className="w-9 shrink-0 font-mono text-[10px] tabular-nums text-muted">
-                  {formatTime(currentTime)}
+                  {statusLabel} · {String(trackIndex + 1).padStart(2, '0')}/
+                  {String(tracks.length).padStart(2, '0')}
                 </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 0}
-                  step={0.1}
-                  value={Math.min(currentTime, duration || 0)}
-                  onChange={(event) => seek(Number(event.target.value))}
-                  className="screen-player-range flex-1"
-                  style={{ '--range-progress': `${progress}%` } as React.CSSProperties}
-                  aria-label="播放进度"
-                  aria-valuetext={`${formatTime(currentTime)} / ${formatTime(duration)}`}
-                />
-                <span className="w-9 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted">
-                  {formatTime(duration)}
-                </span>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
-                    onClick={() => stepTrack(-1)}
-                    aria-label="上一首"
-                    title="上一首"
-                  >
-                    <ScreenIcon name="previous" className="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="flex size-11 items-center justify-center rounded-full bg-primary text-on-primary shadow-glow transition-transform duration-fast hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-95"
-                    onClick={togglePlay}
-                    aria-label={isPlaying ? `暂停 ${track.title}` : `播放 ${track.title}`}
-                    title={isPlaying ? '暂停' : '播放'}
-                  >
-                    <ScreenIcon
-                      name={isPlaying ? 'pause' : 'play'}
-                      className={isPlaying ? 'size-4' : 'size-4 translate-x-0.5'}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
-                    onClick={() => stepTrack(1)}
-                    aria-label="下一首"
-                    title="下一首"
-                  >
-                    <ScreenIcon name="next" className="size-4" />
-                  </button>
-                </div>
-
-                <span className="mx-1 hidden h-5 w-px bg-border sm:block" aria-hidden />
-
                 <button
                   type="button"
-                  className={`screen-icon-button !min-h-9 !px-3 ${playbackMode !== 'sequence' ? '!border-primary/40 !text-primary' : ''}`}
-                  onClick={() =>
-                    setPlaybackMode(
-                      PLAYBACK_MODES[
-                        (PLAYBACK_MODES.indexOf(playbackMode) + 1) % PLAYBACK_MODES.length
-                      ]!,
-                    )
-                  }
-                  aria-label={`播放模式：${PLAYBACK_MODE_LABELS[playbackMode]}，点击切换`}
-                  title={`${PLAYBACK_MODE_LABELS[playbackMode]} · 点击切换`}
+                  className="screen-icon-button !size-8 !min-h-8 !rounded-full !p-0"
+                  onClick={() => setExpanded(false)}
+                  aria-label="收起播放器"
+                  title="收起播放器"
                 >
-                  <ScreenIcon
-                    name={playbackMode === 'shuffle' ? 'shuffle' : 'repeat'}
-                    className="size-3.5"
-                  />
-                  <span className="hidden lg:inline">{PLAYBACK_MODE_LABELS[playbackMode]}</span>
-                  {playbackMode === 'repeat' ? (
-                    <span className="font-mono text-[9px]">1</span>
-                  ) : null}
+                  <ScreenIcon name="collapse" className="size-3.5" />
                 </button>
+              </div>
+            </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
-                    onClick={() => setIsMuted((muted) => !muted)}
-                    aria-label={isMuted ? '取消静音' : '静音'}
-                    title={isMuted ? '取消静音' : '静音'}
-                  >
-                    <ScreenIcon
-                      name={isMuted || volume === 0 ? 'mute' : 'volume'}
-                      className="size-4"
+            <div className="grid items-center gap-5 md:grid-cols-[140px_minmax(0,1fr)]">
+              <div className="relative mx-auto w-32 max-md:mt-2 md:w-36">
+                <div
+                  className="screen-vinyl-rotation screen-vinyl"
+                  data-playing={isPlaying}
+                  data-testid="vinyl-disc"
+                  aria-hidden
+                >
+                  {coverFailed ? (
+                    <span className="absolute inset-[19%] flex items-center justify-center rounded-full bg-primary-soft text-primary">
+                      <ScreenIcon name="music" className="size-8" />
+                    </span>
+                  ) : (
+                    <img
+                      key={track.id}
+                      src={`${track.cover}?param=400y400`}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="absolute inset-[19%] h-[62%] w-[62%] rounded-full border border-border object-cover"
+                      onError={() => setCoverFailed(true)}
                     />
-                  </button>
+                  )}
+                  <span className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-surface" />
+                </div>
+                <span className="screen-tonearm" data-playing={isPlaying} aria-hidden />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="screen-label !text-[10px] !text-primary">Now playing</span>
+                  <span className="screen-label !tracking-[0.12em]">网易云音乐</span>
+                </div>
+                <h2 className="mt-2 truncate text-xl font-semibold tracking-tight md:text-2xl">
+                  {track.title}
+                </h2>
+                <p className="mt-1 truncate text-xs text-muted">
+                  {track.artist} <span className="mx-1 text-border">/</span> {track.album}
+                </p>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <span className="w-9 shrink-0 font-mono text-[10px] tabular-nums text-muted">
+                    {formatTime(currentTime)}
+                  </span>
                   <input
                     type="range"
                     min={0}
-                    max={1}
-                    step={0.05}
-                    value={isMuted ? 0 : volume}
-                    onChange={(event) => {
-                      setVolume(Number(event.target.value));
-                      setIsMuted(false);
-                    }}
-                    className="screen-player-range w-20"
-                    style={
-                      {
-                        '--range-progress': `${(isMuted ? 0 : volume) * 100}%`,
-                      } as React.CSSProperties
-                    }
-                    aria-label="音量"
+                    max={duration || 0}
+                    step={0.1}
+                    value={Math.min(currentTime, duration || 0)}
+                    onChange={(event) => seek(Number(event.target.value))}
+                    className="screen-player-range flex-1"
+                    style={{ '--range-progress': `${progress}%` } as React.CSSProperties}
+                    aria-label="播放进度"
+                    aria-valuetext={`${formatTime(currentTime)} / ${formatTime(duration)}`}
                   />
+                  <span className="w-9 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted">
+                    {formatTime(duration)}
+                  </span>
                 </div>
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
+                      onClick={() => stepTrack(-1)}
+                      aria-label="上一首"
+                      title="上一首"
+                    >
+                      <ScreenIcon name="previous" className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      className="flex size-11 items-center justify-center rounded-full bg-primary text-on-primary shadow-glow transition-transform duration-fast hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-95"
+                      onClick={togglePlay}
+                      aria-label={isPlaying ? `暂停 ${track.title}` : `播放 ${track.title}`}
+                      title={isPlaying ? '暂停' : '播放'}
+                    >
+                      <ScreenIcon
+                        name={isPlaying ? 'pause' : 'play'}
+                        className={isPlaying ? 'size-4' : 'size-4 translate-x-0.5'}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
+                      onClick={() => stepTrack(1)}
+                      aria-label="下一首"
+                      title="下一首"
+                    >
+                      <ScreenIcon name="next" className="size-4" />
+                    </button>
+                  </div>
+
+                  <span className="mx-1 hidden h-5 w-px bg-border sm:block" aria-hidden />
+
                   <button
                     type="button"
-                    className={`screen-icon-button !min-h-9 !px-3 ${lyricsOpen ? '!border-primary/40 !text-primary' : ''}`}
-                    onClick={() => setLyricsOpen((open) => !open)}
-                    aria-pressed={lyricsOpen}
+                    className={`screen-icon-button !min-h-9 !px-3 ${playbackMode !== 'sequence' ? '!border-primary/40 !text-primary' : ''}`}
+                    onClick={() =>
+                      setPlaybackMode(
+                        PLAYBACK_MODES[
+                          (PLAYBACK_MODES.indexOf(playbackMode) + 1) % PLAYBACK_MODES.length
+                        ]!,
+                      )
+                    }
+                    aria-label={`播放模式：${PLAYBACK_MODE_LABELS[playbackMode]}，点击切换`}
+                    title={`${PLAYBACK_MODE_LABELS[playbackMode]} · 点击切换`}
                   >
-                    <ScreenIcon name="lyrics" className="size-3.5" />
-                    歌词
+                    <ScreenIcon
+                      name={playbackMode === 'shuffle' ? 'shuffle' : 'repeat'}
+                      className="size-3.5"
+                    />
+                    <span className="hidden lg:inline">{PLAYBACK_MODE_LABELS[playbackMode]}</span>
+                    {playbackMode === 'repeat' ? (
+                      <span className="font-mono text-[10px]">1</span>
+                    ) : null}
                   </button>
-                  <button
-                    type="button"
-                    className="screen-icon-button !min-h-9 !px-3"
-                    onClick={() => setPlaylistOpen((open) => !open)}
-                    aria-expanded={playlistOpen}
-                    aria-controls="vinyl-playlist"
-                  >
-                    <ScreenIcon name="playlist" className="size-3.5" />
-                    歌单
-                  </button>
-                  <a
-                    href={sourceUrl(track.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
-                    aria-label={`在网易云收听 ${track.title}`}
-                    title="在网易云收听"
-                  >
-                    <ScreenIcon name="external" className="size-3.5" />
-                  </a>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
+                      onClick={() => setIsMuted((muted) => !muted)}
+                      aria-label={isMuted ? '取消静音' : '静音'}
+                      title={isMuted ? '取消静音' : '静音'}
+                    >
+                      <ScreenIcon
+                        name={isMuted || volume === 0 ? 'mute' : 'volume'}
+                        className="size-4"
+                      />
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={isMuted ? 0 : volume}
+                      onChange={(event) => {
+                        setVolume(Number(event.target.value));
+                        setIsMuted(false);
+                      }}
+                      className="screen-player-range w-20"
+                      style={
+                        {
+                          '--range-progress': `${(isMuted ? 0 : volume) * 100}%`,
+                        } as React.CSSProperties
+                      }
+                      aria-label="音量"
+                    />
+                  </div>
+
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      type="button"
+                      className={`screen-icon-button !min-h-9 !px-3 ${lyricsOpen ? '!border-primary/40 !text-primary' : ''}`}
+                      onClick={() => setLyricsOpen((open) => !open)}
+                      aria-pressed={lyricsOpen}
+                    >
+                      <ScreenIcon name="lyrics" className="size-3.5" />
+                      歌词
+                    </button>
+                    <button
+                      type="button"
+                      className="screen-icon-button !min-h-9 !px-3"
+                      onClick={() => setPlaylistOpen((open) => !open)}
+                      aria-expanded={playlistOpen}
+                      aria-controls="vinyl-playlist"
+                    >
+                      <ScreenIcon name="playlist" className="size-3.5" />
+                      歌单
+                    </button>
+                    <a
+                      href={sourceUrl(track.id)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="screen-icon-button !size-9 !min-h-9 !rounded-full !p-0"
+                      aria-label={`在网易云收听 ${track.title}`}
+                      title="在网易云收听"
+                    >
+                      <ScreenIcon name="external" className="size-3.5" />
+                    </a>
+                  </div>
                 </div>
+
+                {error ? (
+                  <p className="mt-3 text-[11px] leading-5 text-warn" role="status">
+                    {error}
+                  </p>
+                ) : null}
+                {urlUnavailable && !error ? (
+                  <p className="mt-3 text-[11px] leading-5 text-warn" role="status">
+                    这首歌需要 VIP 或受版权限制，暂无可播地址。可切歌或前往网易云收听。
+                  </p>
+                ) : null}
+                {usingNetease && neteaseUrlQuery.isFetching && !isPlaying ? (
+                  <p className="mt-3 text-[11px] leading-5 text-muted" role="status">
+                    正在获取播放地址…
+                  </p>
+                ) : null}
               </div>
-
-              {error ? (
-                <p className="mt-3 text-[11px] leading-5 text-warn" role="status">
-                  {error}
-                </p>
-              ) : null}
-              {urlUnavailable && !error ? (
-                <p className="mt-3 text-[11px] leading-5 text-warn" role="status">
-                  这首歌需要 VIP 或受版权限制，暂无可播地址。可切歌或前往网易云收听。
-                </p>
-              ) : null}
-              {usingNetease && neteaseUrlQuery.isFetching && !isPlaying ? (
-                <p className="mt-3 text-[11px] leading-5 text-muted" role="status">
-                  正在获取播放地址…
-                </p>
-              ) : null}
             </div>
           </div>
 
           {playlistOpen ? (
-            <div id="vinyl-playlist" className="mt-4 border-t border-border pt-4">
+            <div
+              id="vinyl-playlist"
+              className="mt-4 flex min-h-0 flex-1 flex-col border-t border-border pt-4"
+            >
               <div className="mb-3 flex items-center justify-between gap-3">
-                <span className="screen-label !text-[10px]">
+                <span className="screen-label !text-[11px]">
                   {usingNetease
                     ? `网易云 · ${neteaseNickname ?? '我的喜欢'}`
                     : 'Atlas 精选 · 未绑定网易云'}
@@ -735,7 +741,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                   {usingNetease ? (
                     <button
                       type="button"
-                      className="screen-icon-button !min-h-7 !px-2.5 !text-[10px]"
+                      className="screen-icon-button !min-h-7 !px-2.5 !text-[11px]"
                       onClick={() => void handleUnbind()}
                     >
                       退出登录
@@ -743,7 +749,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                   ) : (
                     <button
                       type="button"
-                      className="screen-icon-button !min-h-7 !border-primary/40 !px-2.5 !text-[10px] !text-primary"
+                      className="screen-icon-button !min-h-7 !border-primary/40 !px-2.5 !text-[11px] !text-primary"
                       onClick={() => setLoginOpen(true)}
                     >
                       登录网易云
@@ -755,7 +761,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                   </span>
                 </span>
               </div>
-              <div className="relative mb-3">
+              <div className="relative mb-3 shrink-0">
                 <ScreenIcon
                   name="search"
                   className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted"
@@ -779,7 +785,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                 ) : null}
               </div>
               {filteredTracks.length > 0 ? (
-                <ol className="grid gap-1.5 sm:grid-cols-2">
+                <ol className="grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
                   {filteredTracks.map(({ item, index }, resultIndex) => (
                     <li key={item.id}>
                       <button
@@ -875,7 +881,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
               aria-label={`展开 ${track.title} 播放详情`}
             >
               <span className="block truncate text-xs font-medium">{track.title}</span>
-              <span className="mt-0.5 block truncate text-[10px] text-muted">
+              <span className="mt-0.5 block truncate text-[11px] text-muted">
                 {isBuffering
                   ? '正在载入音频…'
                   : error

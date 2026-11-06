@@ -79,10 +79,10 @@ export function ActivityCard({ stats }: { stats: ActivityStats }) {
           </span>
           <div>
             <h2 className="text-sm font-semibold">成长打卡</h2>
-            <p className="screen-label mt-0.5 !text-[9px]">Momentum · 26 weeks</p>
+            <p className="screen-label mt-0.5 !text-[10px]">Momentum · 26 weeks</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-[9px] text-muted" aria-hidden>
+        <div className="flex items-center gap-1.5 text-[10px] text-muted" aria-hidden>
           <span>少</span>
           {[0, 1, 2, 3].map((level) => (
             <span
@@ -105,17 +105,17 @@ export function ActivityCard({ stats }: { stats: ActivityStats }) {
           <p className="font-mono text-3xl font-medium tracking-tight text-ok tabular-nums">
             {String(stats.streak).padStart(2, '0')}
           </p>
-          <p className="mt-1 text-[10px] text-muted">天连续 · {streakText}</p>
+          <p className="mt-1 text-[11px] text-muted">天连续 · {streakText}</p>
         </div>
         <div className="rounded-sm border border-border p-3">
           <p className="font-mono text-3xl font-medium tracking-tight tabular-nums">
             {String(stats.todayCount).padStart(2, '0')}
           </p>
-          <p className="mt-1 text-[10px] text-muted">今日已完成</p>
+          <p className="mt-1 text-[11px] text-muted">今日已完成</p>
         </div>
         <div className="rounded-sm border border-border p-3">
           <p className="font-mono text-3xl font-medium tracking-tight tabular-nums">{totalCount}</p>
-          <p className="mt-1 text-[10px] text-muted">半年累计</p>
+          <p className="mt-1 text-[11px] text-muted">半年累计</p>
         </div>
       </div>
 
@@ -127,7 +127,7 @@ export function ActivityCard({ stats }: { stats: ActivityStats }) {
         >
           <div className="mr-1 flex flex-col gap-[3px] pt-0.5" aria-hidden>
             {WEEK_LABELS.map((label, index) => (
-              <span key={label} className="h-3 text-[8px] leading-3 text-muted">
+              <span key={label} className="h-4 text-[10px] leading-4 text-muted">
                 {index % 2 === 0 ? label : ''}
               </span>
             ))}

@@ -229,7 +229,7 @@ export function SettingsDrawer({
                   <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
                     <span className="min-w-0 flex-1 truncate">
                       {item.title}
-                      <span className="ml-1 text-[10px] text-muted">{item.targetDate}</span>
+                      <span className="ml-1 text-[11px] text-muted">{item.targetDate}</span>
                     </span>
                     <Button
                       size="sm"

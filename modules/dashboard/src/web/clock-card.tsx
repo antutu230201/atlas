@@ -77,12 +77,12 @@ export function ClockCard({ displayName }: { displayName?: string }) {
           <span className="ml-2 text-muted">今天也保持自己的节奏。</span>
         </p>
         {lunarInfo.jieqi ? (
-          <span className="rounded-xs bg-primary-soft px-2 py-1 text-[10px] font-semibold text-primary">
+          <span className="rounded-xs bg-primary-soft px-2 py-1 text-[11px] font-semibold text-primary">
             {lunarInfo.jieqi}
           </span>
         ) : null}
         {lunarInfo.festival ? (
-          <span className="rounded-xs bg-info-soft px-2 py-1 text-[10px] font-semibold text-info">
+          <span className="rounded-xs bg-info-soft px-2 py-1 text-[11px] font-semibold text-info">
             {lunarInfo.festival}
           </span>
         ) : null}
