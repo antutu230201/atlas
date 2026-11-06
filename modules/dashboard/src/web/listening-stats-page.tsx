@@ -220,9 +220,9 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
               className="rounded-md border border-border bg-surface p-4"
               aria-label="工作空间排名"
             >
-              <h2 className="text-sm font-semibold">本空间排名</h2>
+              <h2 className="text-sm font-semibold">全站排名</h2>
               {ranking!.list.length === 0 ? (
-                <p className="mt-4 text-sm text-muted">还没有人听过歌。</p>
+                <p className="mt-4 text-sm text-muted">还没有人听过歌，去大屏放一首吧。</p>
               ) : (
                 <ol className="mt-3 space-y-2.5">
                   {ranking!.list.map((item) => (

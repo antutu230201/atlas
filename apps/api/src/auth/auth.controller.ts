@@ -20,6 +20,9 @@ import {
   SESSION_SERVICE_TOKEN,
 } from '../tokens';
 import type { ApiEnv } from '../env';
+import { MODULE_SERVICE_TOKEN, WORKSPACE_SERVICE_TOKEN } from '../tokens';
+import type { ModuleService } from '../modules/kernel/module.service';
+import type { WorkspaceService } from '../workspace/workspace.service';
 import type { AuthService } from './auth.service';
 import { readCookie, readIp, sessionCookieOptions } from './cookies';
 import { AuthGuard, type RequestUser } from './guards';
@@ -61,6 +64,8 @@ export class AuthController {
     @Inject(SESSION_SERVICE_TOKEN) private readonly sessionService: SessionService,
     @Inject(RATE_LIMIT_SERVICE_TOKEN) private readonly rateLimit: RateLimitService,
     @Inject(ENV_TOKEN) private readonly env: ApiEnv,
+    @Inject(WORKSPACE_SERVICE_TOKEN) private readonly workspaceService: WorkspaceService,
+    @Inject(MODULE_SERVICE_TOKEN) private readonly moduleService: ModuleService,
   ) {}
 
   @Post('register')
@@ -76,6 +81,19 @@ export class AuthController {
       { ip: readIp(request), device: userAgent(request) },
       this.env.SESSION_TTL_DAYS,
     );
+
+    // 产品定位（ADR-0008）：一人一号一大屏 —— 注册即自动开通个人工作空间
+    // 并启用大屏模块，用户全程不感知"工作空间"概念。底层多租户管道保留
+    // （宪法 §5 隔离不变、未来售卖可恢复）。开通失败不阻断注册。
+    try {
+      const personal = await this.workspaceService.create(result.user.id, {
+        name: `${result.user.displayName}的大屏`,
+      });
+      await this.moduleService.enable(personal.id, result.user.id, 'dashboard');
+    } catch (cause) {
+      console.error('[auth] 个人空间自动开通失败（注册已完成）:', cause);
+    }
+
     this.applySessionCookie(response, result.session.token);
     return { data: { user: result.user } };
   }

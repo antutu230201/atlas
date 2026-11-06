@@ -754,33 +754,24 @@ export const definition: ModuleDefinition = {
       },
     },
 
-    /** 本工作空间听歌排名（成员间可见；名称取行内快照） */
+    /**
+     * 全站听歌排名（ADR-0008：一人一号一大屏，排名面向系统全部注册用户）。
+     * 经 SECURITY DEFINER 函数跨工作空间聚合（仅暴露聚合结果，不泄露行级数据）。
+     */
     listeningRanking: {
       permission: 'dashboard:read',
       handler: async (ctx, input) => {
         const parsed = listeningRangeSchema.safeParse(input ?? {});
         if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
         const { startDay, endDay } = rangeWindow(parsed.data.range);
-        const rows = await ctx.db
-          .select({
-            userId: listeningDaily.userId,
-            userName: sql<string>`max(${listeningDaily.userName})`,
-            seconds: sql<number>`sum(${listeningDaily.seconds})::int`,
-          })
-          .from(listeningDaily)
-          .where(
-            and(
-              eq(listeningDaily.workspaceId, ctx.workspaceId),
-              gte(listeningDaily.day, startDay),
-              lte(listeningDaily.day, endDay),
-            ),
-          )
-          .groupBy(listeningDaily.userId)
-          .orderBy(desc(sql`sum(${listeningDaily.seconds})`))
-          .limit(50);
-        const list = rows.map((row, index) => ({
-          userId: row.userId,
-          userName: row.userName,
+        const result = await ctx.db.execute(
+          sql`select * from platform.listening_ranking_global(${startDay}::date, ${endDay}::date, 50)`,
+        );
+        const list = (
+          result.rows as Array<{ user_id: string; user_name: string; seconds: string | number }>
+        ).map((row, index) => ({
+          userId: row.user_id,
+          userName: row.user_name,
           seconds: Number(row.seconds ?? 0),
           rank: index + 1,
         }));
