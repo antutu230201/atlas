@@ -15,3 +15,4 @@ export type {
 } from './types';
 export { DashboardScreenPage } from './screen-page';
 export { FloatingMusicPlayer } from './floating-music-player';
+export { ListeningStatsPage } from './listening-stats-page';

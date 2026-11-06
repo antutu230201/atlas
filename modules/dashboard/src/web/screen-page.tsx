@@ -2,15 +2,29 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Skeleton, ThemeToggle, useToast } from '@atlas/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Skeleton,
+  ThemeToggle,
+  useToast,
+} from '@atlas/ui';
 import { api } from '@/lib/api';
+import Link from 'next/link';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
+import { useEnabledModules } from '@/lib/queries';
 import { useUiStore } from '@/lib/store';
 import { ActivityCard } from './activity-card';
 import { ClockCard, TimeOrbit } from './clock-card';
 import { CountdownSection } from './countdown-card';
 import { AtlasMark, HealthDot, ScreenIcon, WeatherIcon } from './icons';
 import { HotlistCard } from './hotlist-card';
+import { ListeningMiniCard } from './listening-mini-card';
 import { QuoteCard } from './quote-card';
 import { SettingsDrawer } from './settings-drawer';
 import { SummaryCard } from './summary-card';
@@ -147,6 +161,52 @@ function HeroClockCard({
         {metrics}
       </div>
     </section>
+  );
+}
+
+/**
+ * 延伸功能入口（产品定位：大屏主导，小功能从大屏延出）：
+ * 列出本工作空间其他已启用模块的页面 + 听歌统计 + 通知/设置。
+ */
+function ModuleLauncher({
+  workspaceSlug,
+  currentModule,
+}: {
+  workspaceSlug: string;
+  currentModule: string;
+}) {
+  const modules = useEnabledModules(workspaceSlug);
+  const others = (modules.data ?? []).filter((mod) => mod.name !== currentModule);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="screen-icon-button" aria-label="延伸功能" title="延伸功能">
+          <ScreenIcon name="grid" className="size-3.5" />
+          <span className="hidden sm:inline">功能</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-44">
+        <DropdownMenuLabel>延伸功能</DropdownMenuLabel>
+        <DropdownMenuItem asChild>
+          <Link href={`/m/${currentModule}/listening`}>🎵 听歌统计</Link>
+        </DropdownMenuItem>
+        {others.map((mod) =>
+          mod.routes.map((route) => (
+            <DropdownMenuItem key={`${mod.name}/${route.path}`} asChild>
+              <Link href={`/m/${mod.name}/${route.path}`}>{route.title}</Link>
+            </DropdownMenuItem>
+          )),
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/notifications">通知</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/settings">设置</Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -375,6 +435,7 @@ export function DashboardScreenPage({
                   ? `同步 ${new Date(snapshot.dataUpdatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
                   : '数据在线'}
             </div>
+            <ModuleLauncher workspaceSlug={workspaceSlug} currentModule={moduleName} />
             <ThemeToggle />
             <button
               type="button"
@@ -558,8 +619,9 @@ export function DashboardScreenPage({
                 <SummaryCard envelope={data.summary} />
                 {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
               </div>
-              <div id="activity-section" className="scroll-mt-6 xl:col-span-5">
+              <div id="activity-section" className="flex scroll-mt-6 flex-col gap-4 xl:col-span-5">
                 <ActivityCard stats={data.activity} />
+                <ListeningMiniCard base={base} />
               </div>
             </section>
 
