@@ -198,13 +198,16 @@ function ShellBody({ children }: { children: React.ReactNode }) {
   const collapsed = useUiStore((state) => state.sidebarCollapsed);
   const toggle = useUiStore((state) => state.toggleSidebar);
   const chromeHidden = useUiStore((state) => state.chromeHidden);
-  const isDashboardScreen = /^\/m\/dashboard\/screen\/?$/.test(pathname);
   const session = useSession();
   const router = useRouter();
   const logout = useLogout();
   const queryClient = useQueryClient();
   const { workspace } = useActiveWorkspace();
   const modules = useEnabledModules(workspace?.slug ?? null);
+  // 大屏主导（产品定位）：根路径渲染 dashboard 大屏时按大屏页处理（隐藏 Shell 顶栏、去内边距）
+  const dashboardIsHome = (modules.data ?? []).some((mod) => mod.name === 'dashboard');
+  const isDashboardScreen =
+    /^\/m\/dashboard\/screen\/?$/.test(pathname) || (pathname === '/' && dashboardIsHome);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 

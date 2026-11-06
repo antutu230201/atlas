@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@atlas/ui';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
 import { useEnabledModules } from '@/lib/queries';
+import { DashboardScreenPage } from '@atlas/module-dashboard/web';
 import { getModuleWidget } from '@/lib/module-registry';
 
 function greeting(): string {
@@ -24,6 +25,17 @@ export default function TodayPage() {
   const enabled = modules.data ?? [];
   const now = new Date();
   const dateStr = `${now.getMonth() + 1} 月 ${now.getDate()} 日 · 周${WEEKDAYS[now.getDay()]}`;
+
+  // 大屏是产品主屏（产品定位，见 roadmap 2026-11-07）：启用 dashboard 模块的工作空间，
+  // 根路径直接渲染个人大屏，注册/登录落地即大屏；旧"今天"页保留为未启用模块时的引导页。
+  if (
+    workspace &&
+    !modules.isPending &&
+    !modules.isError &&
+    enabled.some((m) => m.name === 'dashboard')
+  ) {
+    return <DashboardScreenPage workspaceSlug={workspace.slug} moduleName="dashboard" />;
+  }
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8">

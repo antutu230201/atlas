@@ -567,4 +567,71 @@ test.describe('个人大屏模块（假数据源）', () => {
       )
       .toBeGreaterThan(beforeReload);
   });
+
+  test('大屏主导与听歌统计：根路径即大屏，播放时长计入汇总与排名', async ({ page }) => {
+    test.setTimeout(120_000);
+    await routeNeteaseAudio(page);
+
+    const email = `dash-e2e-listen-${Date.now()}@example.com`;
+    await page.goto('/register');
+    await page.getByLabel('昵称').fill('听歌统计验收');
+    await page.getByLabel('邮箱').fill(email);
+    await page.getByLabel('密码').fill(password);
+    await page.getByRole('button', { name: '创建账号' }).click();
+    await page.waitForURL('/');
+
+    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
+    await page.getByLabel('工作空间名称').fill('听歌统计空间');
+    await page.getByRole('button', { name: '创建', exact: true }).click();
+    await expect(page.getByText('听歌统计空间').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.goto('/settings');
+    await page.getByRole('button', { name: '模块', exact: true }).click();
+    await page
+      .getByTestId('module-card-dashboard')
+      .getByRole('button', { name: '启用' })
+      .click({ timeout: 10_000 });
+
+    // 大屏主导：注册后的根路径直接渲染个人大屏（不再需要进 /m/dashboard/screen）
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: '个人大屏' })).toBeVisible({ timeout: 15_000 });
+    // 未设城市 → 首启引导抽屉会以模态弹出并遮蔽其余交互，先关掉
+    await page
+      .getByRole('dialog')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => undefined);
+    await page.keyboard.press('Escape');
+
+    // 延伸功能入口：从大屏顶栏进入听歌统计
+    await page.getByRole('button', { name: '延伸功能' }).click();
+    await page.getByRole('menuitem', { name: /听歌统计/ }).click();
+    await expect(page.getByTestId('listening-stats')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('总时长')).toBeVisible();
+    await expect(page.getByText('还没有人听过歌。')).toBeVisible();
+
+    // 播放一段时间 → 暂停触发冲账 → 时长计入周汇总；今日听歌卡出现并可跳转
+    await page.goto('/m/dashboard/screen');
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press('Escape');
+    const player = page.getByTestId('vinyl-player');
+    await player.getByRole('button', { name: '播放 消愁', exact: true }).click();
+    await expect(page.getByTestId('vinyl-disc')).toHaveAttribute('data-playing', 'true');
+    await expect
+      .poll(
+        () => player.locator('audio').evaluate((audio) => (audio as HTMLAudioElement).currentTime),
+        { timeout: 15_000 },
+      )
+      .toBeGreaterThan(6);
+    await player.getByRole('button', { name: /暂停 消愁/ }).click();
+    // 等暂停触发的听歌心跳冲账完成再离开页面
+    await page.waitForTimeout(500);
+
+    await page.goto('/m/dashboard/listening');
+    await expect(page.getByTestId('listening-stats')).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('tab', { name: '周', exact: true }).click();
+    await expect(page.getByText(/分钟|小时|秒/).first()).toBeVisible({ timeout: 15_000 });
+
+    await page.goto('/m/dashboard/screen');
+    await expect(page.getByTestId('listening-mini-card')).toBeVisible({ timeout: 15_000 });
+  });
 });
