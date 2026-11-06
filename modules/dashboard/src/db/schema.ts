@@ -101,3 +101,29 @@ export const neteaseBinding = moduleSchema.table(
     index('netease_binding_ws_idx').on(t.workspaceId),
   ],
 );
+
+/**
+ * 听歌时长（按 天 × 用户 × 歌曲 聚合）：播放器心跳上报累加（telemetry，非审计对象）。
+ * userName 为快照（免跨 schema 联用户表，排名展示用）；date 无时区歧义。
+ */
+export const listeningDaily = moduleSchema.table(
+  'listening_daily',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    userName: text('user_name').notNull(),
+    day: date('day').notNull(),
+    songId: bigint('song_id', { mode: 'number' }).notNull(),
+    songTitle: text('song_title').notNull(),
+    songArtist: text('song_artist').notNull(),
+    seconds: integer('seconds').notNull().default(0),
+    plays: integer('plays').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('listening_daily_uq').on(t.workspaceId, t.userId, t.day, t.songId),
+    index('listening_daily_ws_day_idx').on(t.workspaceId, t.day),
+    index('listening_daily_ws_user_idx').on(t.workspaceId, t.userId, t.day),
+  ],
+);

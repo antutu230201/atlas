@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   ModuleActionError,
@@ -6,7 +6,7 @@ import {
   type ModuleContext,
   type ModuleDefinition,
 } from '@atlas/sdk';
-import { activity, countdown, sourceCache } from './db/schema';
+import { activity, countdown, listeningDaily, sourceCache } from './db/schema';
 import { HOT_SOURCES, getHotSource, type HotItem } from './providers/hotlists';
 import {
   fetchWeather,
@@ -55,7 +55,10 @@ const manifest = moduleManifestSchema.parse({
   description: '时钟农历、天气、多源热榜、滚动头条、一言、倒计时与氛围壁纸的每日入口。',
   permissions: ['dashboard:read', 'dashboard:write'],
   dependsOn: [],
-  routes: [{ path: 'screen', title: '大屏', nav: { order: 0, icon: '🖥️' } }],
+  routes: [
+    { path: 'screen', title: '大屏', nav: { order: 0, icon: '🖥️' } },
+    { path: 'listening', title: '听歌统计', nav: { order: 1, icon: '🎵' } },
+  ],
   settings: [],
   events: {
     publishes: [
@@ -108,6 +111,15 @@ const refreshSchema = z.object({ sources: z.array(z.string().max(40)).max(10).op
 const searchCitySchema = z.object({ q: z.string().min(1, '请输入城市名').max(60) });
 const lyricsSchema = z.object({ id: z.number().int().positive() });
 const neteaseSongUrlSchema = z.object({ id: z.number().int().positive() });
+const listeningHeartbeatSchema = z.object({
+  songId: z.number().int().positive(),
+  title: z.string().min(1).max(200),
+  artist: z.string().max(200),
+  seconds: z.number().int().min(1).max(120),
+  first: z.boolean().optional(),
+});
+type ListeningRange = 'day' | 'week' | 'month' | 'year';
+const listeningRangeSchema = z.object({ range: z.enum(['day', 'week', 'month', 'year']) });
 /** unikey 为网易云签发的 uuid；只用于轮询，不落库 */
 const neteaseQrPollSchema = z.object({ unikey: z.string().min(10).max(64) });
 
@@ -272,6 +284,58 @@ function localDay(date = new Date()): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+/** 听歌统计窗口：day=今天 / week=近7天 / month=近30天 / year=近12个月（按月桶） */
+function rangeWindow(range: ListeningRange): {
+  startDay: string;
+  endDay: string;
+  bucket: 'day' | 'month';
+} {
+  const today = new Date();
+  const endDay = localDay(today);
+  if (range === 'day') return { startDay: endDay, endDay, bucket: 'day' };
+  if (range === 'week') {
+    const start = new Date(today);
+    start.setDate(start.getDate() - 6);
+    return { startDay: localDay(start), endDay, bucket: 'day' };
+  }
+  if (range === 'month') {
+    const start = new Date(today);
+    start.setDate(start.getDate() - 29);
+    return { startDay: localDay(start), endDay, bucket: 'day' };
+  }
+  return {
+    startDay: localDay(new Date(today.getFullYear(), today.getMonth() - 11, 1)),
+    endDay,
+    bucket: 'month',
+  };
+}
+
+/** 把稀疏聚合补成连续桶（前端直接画柱状图） */
+function fillBuckets(
+  range: ListeningRange,
+  map: Map<string, number>,
+  bucket: 'day' | 'month',
+): Array<{ label: string; seconds: number }> {
+  const out: Array<{ label: string; seconds: number }> = [];
+  const today = new Date();
+  if (bucket === 'month') {
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      out.push({ label, seconds: map.get(label) ?? 0 });
+    }
+    return out;
+  }
+  const days = range === 'week' ? 7 : range === 'day' ? 1 : 30;
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const label = localDay(d);
+    out.push({ label, seconds: map.get(label) ?? 0 });
+  }
+  return out;
 }
 
 interface ActivityDay {
@@ -579,6 +643,149 @@ export const definition: ModuleDefinition = {
           .returning({ uid: neteaseBinding.neteaseUid });
         if (rows[0]) await ctx.events.publish('dashboard.netease.unbound', { uid: rows[0].uid });
         return { unbound: rows.length > 0 };
+      },
+    },
+
+    /* ---------------- 听歌时长（天 × 用户 × 歌曲聚合；心跳为遥测写入，不进审计） ---------------- */
+
+    /**
+     * 心跳上报：播放器每 30s 冲一次实际播放秒数；切歌/暂停/关页前也冲。
+     * upsert 累加到 (workspace, user, day, song)；first 标记一次"播放发生"（+1 次数）。
+     */
+    listeningHeartbeat: {
+      permission: 'dashboard:write',
+      handler: async (ctx, input) => {
+        const parsed = listeningHeartbeatSchema.safeParse(input ?? {});
+        if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
+        const { songId, title, artist, seconds, first } = parsed.data;
+        await ctx.db
+          .insert(listeningDaily)
+          .values({
+            workspaceId: ctx.workspaceId,
+            userId: ctx.userId,
+            userName: ctx.displayName || '用户',
+            day: localDay(),
+            songId,
+            songTitle: title,
+            songArtist: artist,
+            seconds,
+            plays: first ? 1 : 0,
+          })
+          .onConflictDoUpdate({
+            target: [
+              listeningDaily.workspaceId,
+              listeningDaily.userId,
+              listeningDaily.day,
+              listeningDaily.songId,
+            ],
+            set: {
+              seconds: sql`${listeningDaily.seconds} + excluded.seconds`,
+              plays: sql`${listeningDaily.plays} + excluded.plays`,
+              songTitle: title,
+              songArtist: artist,
+              updatedAt: new Date(),
+            },
+          });
+        return { ok: true };
+      },
+    },
+
+    /** 我的听歌汇总：day=今天 / week=近7天 / month=近30天 / year=近12个月 */
+    listeningSummary: {
+      permission: 'dashboard:read',
+      handler: async (ctx, input) => {
+        const parsed = listeningRangeSchema.safeParse(input ?? {});
+        if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
+        const { startDay, endDay, bucket } = rangeWindow(parsed.data.range);
+        const rows = await ctx.db
+          .select({
+            day: listeningDaily.day,
+            songId: listeningDaily.songId,
+            songTitle: listeningDaily.songTitle,
+            songArtist: listeningDaily.songArtist,
+            seconds: sql<number>`sum(${listeningDaily.seconds})::int`,
+            plays: sql<number>`sum(${listeningDaily.plays})::int`,
+          })
+          .from(listeningDaily)
+          .where(
+            and(
+              eq(listeningDaily.workspaceId, ctx.workspaceId),
+              eq(listeningDaily.userId, ctx.userId),
+              gte(listeningDaily.day, startDay),
+              lte(listeningDaily.day, endDay),
+            ),
+          )
+          .groupBy(
+            listeningDaily.day,
+            listeningDaily.songId,
+            listeningDaily.songTitle,
+            listeningDaily.songArtist,
+          );
+
+        let totalSeconds = 0;
+        let totalPlays = 0;
+        const bucketSeconds = new Map<string, number>();
+        const songSeconds = new Map<
+          number,
+          { songId: number; title: string; artist: string; seconds: number; plays: number }
+        >();
+        for (const row of rows) {
+          const seconds = Number(row.seconds ?? 0);
+          totalSeconds += seconds;
+          totalPlays += Number(row.plays ?? 0);
+          const label = bucket === 'month' ? String(row.day).slice(0, 7) : String(row.day);
+          bucketSeconds.set(label, (bucketSeconds.get(label) ?? 0) + seconds);
+          const song = songSeconds.get(row.songId);
+          if (song) song.seconds += seconds;
+          else
+            songSeconds.set(row.songId, {
+              songId: row.songId,
+              title: row.songTitle,
+              artist: row.songArtist,
+              seconds,
+              plays: Number(row.plays ?? 0),
+            });
+        }
+        const buckets = fillBuckets(parsed.data.range, bucketSeconds, bucket);
+        const topSongs = [...songSeconds.values()]
+          .sort((a, b) => b.seconds - a.seconds)
+          .slice(0, 10);
+        return { range: parsed.data.range, totalSeconds, totalPlays, buckets, topSongs };
+      },
+    },
+
+    /** 本工作空间听歌排名（成员间可见；名称取行内快照） */
+    listeningRanking: {
+      permission: 'dashboard:read',
+      handler: async (ctx, input) => {
+        const parsed = listeningRangeSchema.safeParse(input ?? {});
+        if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
+        const { startDay, endDay } = rangeWindow(parsed.data.range);
+        const rows = await ctx.db
+          .select({
+            userId: listeningDaily.userId,
+            userName: sql<string>`max(${listeningDaily.userName})`,
+            seconds: sql<number>`sum(${listeningDaily.seconds})::int`,
+          })
+          .from(listeningDaily)
+          .where(
+            and(
+              eq(listeningDaily.workspaceId, ctx.workspaceId),
+              gte(listeningDaily.day, startDay),
+              lte(listeningDaily.day, endDay),
+            ),
+          )
+          .groupBy(listeningDaily.userId)
+          .orderBy(desc(sql`sum(${listeningDaily.seconds})`))
+          .limit(50);
+        const list = rows.map((row, index) => ({
+          userId: row.userId,
+          userName: row.userName,
+          seconds: Number(row.seconds ?? 0),
+          rank: index + 1,
+        }));
+        const mine = list.find((item) => item.userId === ctx.userId) ?? null;
+        return { range: parsed.data.range, list, me: mine };
       },
     },
 

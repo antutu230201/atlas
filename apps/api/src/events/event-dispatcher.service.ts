@@ -185,6 +185,7 @@ export class EventDispatcherService implements OnApplicationBootstrap, OnApplica
       const context = this.moduleService.buildContext(mod, {
         tx,
         userId: userId ?? row.actor_user_id ?? '',
+        displayName: '',
         workspaceId: row.workspace_id ?? '',
         role: 'admin',
       });

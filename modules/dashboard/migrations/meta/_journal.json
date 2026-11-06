@@ -43,6 +43,20 @@
       "when": 1794052801000,
       "tag": "0005_netease_binding_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794139200000,
+      "tag": "0006_listening_daily",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794139201000,
+      "tag": "0007_listening_rls",
+      "breakpoints": true
     }
   ]
 }

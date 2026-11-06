@@ -114,6 +114,7 @@ export class ModuleController {
         const context = this.moduleService.buildContext(mod, {
           tx,
           userId: user.id,
+          displayName: user.displayName,
           workspaceId: request.workspace!.id,
           role,
         });

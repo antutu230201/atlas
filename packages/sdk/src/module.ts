@@ -86,6 +86,8 @@ export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
 export interface ModuleContext {
   readonly moduleName: string;
   readonly userId: string;
+  /** 当前调用者显示名（网关从会话透传；用于快照类展示字段，免跨 schema 联表） */
+  readonly displayName: string;
   readonly workspaceId: string;
   readonly role: Role;
   /** 租户事务内的 Drizzle 执行器：RLS 已按当前用户绑定；同一调用内所有读写同事务 */

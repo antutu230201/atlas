@@ -34,6 +34,7 @@ export interface ModuleStatusView {
 export interface ModuleCallContextParams {
   tx: Db;
   userId: string;
+  displayName: string;
   workspaceId: string;
   role: Role;
 }
@@ -228,11 +229,12 @@ export class ModuleService {
 
   /** 组装模块上下文（调用网关在每个租户事务内构造） */
   buildContext(mod: LoadedModule, params: ModuleCallContextParams): ModuleContext {
-    const { tx, userId, workspaceId, role } = params;
+    const { tx, userId, displayName, workspaceId, role } = params;
     const moduleName = mod.definition.manifest.name;
     return {
       moduleName,
       userId,
+      displayName,
       workspaceId,
       role,
       db: tx as unknown as ModuleExecutor,
