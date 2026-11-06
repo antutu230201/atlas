@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { DesktopLyrics, type LyricLine } from './desktop-lyrics';
+import { NeteaseLoginDialog } from './netease-login-dialog';
 import { ScreenIcon } from './icons';
 
 interface MusicTrack {
@@ -16,7 +17,7 @@ interface MusicTrack {
   durationMs: number;
 }
 
-/** 网易云允许网页外链的默认歌单；版权状态变化时由 audio error 明确降级，不伪造播放成功。 */
+/** 网易云允许网页外链的默认歌单；未绑定网易云账号或喜欢列表不可用时回退使用，版权变化由 audio error 明确降级，不伪造播放成功。 */
 const TRACKS: MusicTrack[] = [
   {
     id: 569200213,
@@ -204,14 +205,56 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [coverFailed, setCoverFailed] = useState(false);
   const [error, setError] = useState('');
-  const track = TRACKS[trackIndex] ?? FIRST_TRACK;
+  const [loginOpen, setLoginOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  // 网易云绑定状态与喜欢列表：绑定了就用自己的歌单，否则回退内置精选。
+  // liked 查询失败（接口风控/网络）同样回退内置，不阻塞播放器。
+  const likedQuery = useQuery({
+    queryKey: ['dashboard', 'netease-liked'],
+    queryFn: () =>
+      api<{ bound: boolean; nickname?: string; tracks: MusicTrack[] }>(`${base}/neteaseLiked`, {
+        method: 'POST',
+        json: {},
+      }),
+    staleTime: 5 * 60_000,
+    retry: 1,
+  });
+  const usingNetease = likedQuery.data?.bound === true && (likedQuery.data.tracks?.length ?? 0) > 0;
+  const tracks = useMemo<MusicTrack[]>(
+    () => (usingNetease ? likedQuery.data!.tracks : TRACKS),
+    [likedQuery.data, usingNetease],
+  );
+  const neteaseNickname = usingNetease ? likedQuery.data!.nickname : undefined;
+
+  const track = tracks[trackIndex] ?? tracks[0] ?? FIRST_TRACK;
   const filteredTracks = useMemo(() => {
     const keyword = playlistQuery.trim().toLocaleLowerCase('zh-CN');
-    if (!keyword) return TRACKS.map((item, index) => ({ item, index }));
-    return TRACKS.map((item, index) => ({ item, index })).filter(({ item }) =>
+    const all = tracks.map((item, index) => ({ item, index }));
+    if (!keyword) return all;
+    return all.filter(({ item }) =>
       `${item.title} ${item.artist} ${item.album}`.toLocaleLowerCase('zh-CN').includes(keyword),
     );
-  }, [playlistQuery]);
+  }, [playlistQuery, tracks]);
+
+  // 网易云曲目按需取有时效的 CDN 地址；取不到（VIP/版权）回落外链，由 audio error 明确报错
+  const neteaseUrlQuery = useQuery({
+    queryKey: ['dashboard', 'netease-url', track.id],
+    queryFn: () =>
+      api<{ url: string | null; type: string | null }>(`${base}/neteaseSongUrl`, {
+        method: 'POST',
+        json: { id: track.id },
+      }),
+    enabled: usingNetease,
+    staleTime: 4 * 60_000,
+    retry: false,
+  });
+  const audioSrc = usingNetease ? (neteaseUrlQuery.data?.url ?? '') : audioUrl(track.id);
+
+  // 歌单来源切换（绑定/解绑/喜欢列表变化）时回到列表头部，避免悬空索引
+  useEffect(() => {
+    setTrackIndex(0);
+  }, [usingNetease]);
 
   const lyricsQuery = useQuery({
     queryKey: ['dashboard', 'lyrics', track.id],
@@ -261,12 +304,13 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
     }
   }, []);
 
-  // 切歌后只恢复“此前正在播放”或用户主动选歌的意图，页面初次打开绝不自动播放。
+  // 播放地址就绪（新歌选中或网易云 CDN 地址到达）才 load：地址未就绪时静默等待，
+  // “此前正在播放”或用户主动选歌的意图由 resumeAfterChangeRef 延续；页面初次打开绝不自动播放。
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !audioSrc) return;
     setCurrentTime(0);
-    setDuration((TRACKS[trackIndex] ?? FIRST_TRACK).durationMs / 1000);
+    setDuration(track.durationMs > 0 ? track.durationMs / 1000 : FIRST_TRACK.durationMs / 1000);
     setCoverFailed(false);
     setError('');
     audio.load();
@@ -274,7 +318,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
       resumeAfterChangeRef.current = false;
       void playAudio();
     }
-  }, [trackIndex, playAudio]);
+  }, [audioSrc, track.id, track.durationMs, playAudio]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -338,14 +382,14 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
 
   const stepTrack = useCallback(
     (direction: 1 | -1, shouldPlay = isPlaying) => {
-      let nextIndex = (trackIndex + direction + TRACKS.length) % TRACKS.length;
-      if (playbackMode === 'shuffle' && TRACKS.length > 1) {
-        nextIndex = Math.floor(Math.random() * (TRACKS.length - 1));
+      let nextIndex = (trackIndex + direction + tracks.length) % tracks.length;
+      if (playbackMode === 'shuffle' && tracks.length > 1) {
+        nextIndex = Math.floor(Math.random() * (tracks.length - 1));
         if (nextIndex >= trackIndex) nextIndex += 1;
       }
       selectTrack(nextIndex, shouldPlay);
     },
-    [isPlaying, playbackMode, selectTrack, trackIndex],
+    [isPlaying, playbackMode, selectTrack, trackIndex, tracks.length],
   );
 
   const togglePlay = () => {
@@ -381,6 +425,21 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
 
   const progress = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0;
   const statusLabel = isBuffering ? 'LOADING' : isPlaying ? 'PLAYING' : 'READY';
+  const urlUnavailable = usingNetease && neteaseUrlQuery.isSuccess && !neteaseUrlQuery.data?.url;
+
+  const handleBound = useCallback(() => {
+    // 状态反馈由歌单面板的来源标签（网易云 · 昵称）承担，error 仅用于真正的失败
+    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'netease-liked'] });
+  }, [queryClient]);
+
+  const handleUnbind = useCallback(async () => {
+    try {
+      await api(`${base}/neteaseUnbind`, { method: 'POST', json: {} });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard', 'netease-liked'] });
+    } catch {
+      setError('退出登录失败，请稍后重试');
+    }
+  }, [base, queryClient]);
 
   return (
     <div
@@ -393,7 +452,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
     >
       <audio
         ref={audioRef}
-        src={audioUrl(track.id)}
+        src={audioSrc || undefined}
         preload="none"
         onLoadStart={() => setIsBuffering(true)}
         onCanPlay={() => setIsBuffering(false)}
@@ -446,7 +505,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                   aria-hidden
                 />
                 {statusLabel} · {String(trackIndex + 1).padStart(2, '0')}/
-                {String(TRACKS.length).padStart(2, '0')}
+                {String(tracks.length).padStart(2, '0')}
               </span>
               <button
                 type="button"
@@ -651,16 +710,49 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                   {error}
                 </p>
               ) : null}
+              {urlUnavailable && !error ? (
+                <p className="mt-3 text-[11px] leading-5 text-warn" role="status">
+                  这首歌需要 VIP 或受版权限制，暂无可播地址。可切歌或前往网易云收听。
+                </p>
+              ) : null}
+              {usingNetease && neteaseUrlQuery.isFetching && !isPlaying ? (
+                <p className="mt-3 text-[11px] leading-5 text-muted" role="status">
+                  正在获取播放地址…
+                </p>
+              ) : null}
             </div>
           </div>
 
           {playlistOpen ? (
             <div id="vinyl-playlist" className="mt-4 border-t border-border pt-4">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <span className="screen-label !text-[10px]">Atlas 精选 · 已验证网页音源</span>
-                <span className="shrink-0 font-mono text-[10px] font-medium tracking-wider text-muted">
-                  {playlistQuery ? `${filteredTracks.length} / ` : ''}
-                  {TRACKS.length} 首
+                <span className="screen-label !text-[10px]">
+                  {usingNetease
+                    ? `网易云 · ${neteaseNickname ?? '我的喜欢'}`
+                    : 'Atlas 精选 · 未绑定网易云'}
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {usingNetease ? (
+                    <button
+                      type="button"
+                      className="screen-icon-button !min-h-7 !px-2.5 !text-[10px]"
+                      onClick={() => void handleUnbind()}
+                    >
+                      退出登录
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="screen-icon-button !min-h-7 !border-primary/40 !px-2.5 !text-[10px] !text-primary"
+                      onClick={() => setLoginOpen(true)}
+                    >
+                      登录网易云
+                    </button>
+                  )}
+                  <span className="font-mono text-[10px] font-medium tracking-wider text-muted">
+                    {playlistQuery ? `${filteredTracks.length} / ` : ''}
+                    {tracks.length} 首
+                  </span>
                 </span>
               </div>
               <div className="relative mb-3">
@@ -672,7 +764,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                   value={playlistQuery}
                   onChange={(event) => setPlaylistQuery(event.target.value)}
                   placeholder="搜索歌名、歌手或专辑"
-                  aria-label="搜索内置歌单"
+                  aria-label="搜索歌单"
                   className="bg-surface/60 pl-9 pr-9 text-xs"
                 />
                 {playlistQuery ? (
@@ -736,7 +828,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
                     className="mt-2 text-xs text-primary hover:underline"
                     onClick={() => setPlaylistQuery('')}
                   >
-                    查看全部 {TRACKS.length} 首
+                    查看全部 {tracks.length} 首
                   </button>
                 </div>
               )}
@@ -807,7 +899,7 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
             <button
               type="button"
               className="screen-icon-button !size-8 !min-h-8 !shrink-0 !rounded-full !p-0"
-              onClick={() => selectTrack((trackIndex + 1) % TRACKS.length)}
+              onClick={() => selectTrack((trackIndex + 1) % tracks.length)}
               aria-label="下一首"
               title="下一首"
             >
@@ -846,6 +938,13 @@ export function FloatingMusicPlayer({ base }: { base: string }) {
           onClose={() => setLyricsOpen(false)}
         />
       ) : null}
+
+      <NeteaseLoginDialog
+        base={base}
+        open={loginOpen}
+        onOpenChange={setLoginOpen}
+        onBound={handleBound}
+      />
     </div>
   );
 }
