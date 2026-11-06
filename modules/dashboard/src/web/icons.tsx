@@ -15,7 +15,16 @@ export type ScreenIconName =
   | 'trash'
   | 'signal'
   | 'check'
-  | 'layers';
+  | 'layers'
+  | 'music'
+  | 'play'
+  | 'pause'
+  | 'previous'
+  | 'next'
+  | 'volume'
+  | 'mute'
+  | 'playlist'
+  | 'external';
 
 interface IconProps {
   className?: string;
@@ -142,6 +151,63 @@ export function ScreenIcon({ name, className }: IconProps & { name: ScreenIconNa
         <svg {...common}>
           <path d="m12 3 9 5-9 5-9-5 9-5Z" />
           <path d="m3 12 9 5 9-5M3 16l9 5 9-5" />
+        </svg>
+      );
+    case 'music':
+      return (
+        <svg {...common}>
+          <path d="M9 18V5l11-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="17" cy="16" r="3" />
+        </svg>
+      );
+    case 'play':
+      return (
+        <svg {...common} fill="currentColor" stroke="none">
+          <path d="m8 5 11 7-11 7V5Z" />
+        </svg>
+      );
+    case 'pause':
+      return (
+        <svg {...common} fill="currentColor" stroke="none">
+          <path d="M7 5h4v14H7zM14 5h4v14h-4z" />
+        </svg>
+      );
+    case 'previous':
+      return (
+        <svg {...common} fill="currentColor" stroke="none">
+          <path d="M6 5h2v14H6zM19 5v14L8 12l11-7Z" />
+        </svg>
+      );
+    case 'next':
+      return (
+        <svg {...common} fill="currentColor" stroke="none">
+          <path d="M16 5h2v14h-2zM5 5v14l11-7L5 5Z" />
+        </svg>
+      );
+    case 'volume':
+      return (
+        <svg {...common}>
+          <path d="M11 5 6 9H3v6h3l5 4V5ZM15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12" />
+        </svg>
+      );
+    case 'mute':
+      return (
+        <svg {...common}>
+          <path d="M11 5 6 9H3v6h3l5 4V5ZM16 10l5 5M21 10l-5 5" />
+        </svg>
+      );
+    case 'playlist':
+      return (
+        <svg {...common}>
+          <path d="M4 6h10M4 11h10M4 16h7M17 6v10" />
+          <circle cx="15" cy="17" r="3" />
+        </svg>
+      );
+    case 'external':
+      return (
+        <svg {...common}>
+          <path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6" />
         </svg>
       );
   }

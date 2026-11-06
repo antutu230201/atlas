@@ -2,6 +2,26 @@ import { expect, test } from '@playwright/test';
 
 const password = 'password123';
 
+/** 20 秒静音 WAV：只替换音乐平台的网络音频，仍由真实 HTMLAudioElement 驱动全部交互。 */
+function createTestAudio() {
+  const sampleRate = 8_000;
+  const dataSize = sampleRate * 20 * 2;
+  const buffer = Buffer.alloc(44 + dataSize);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write('WAVEfmt ', 8);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(dataSize, 40);
+  return buffer;
+}
+
 test.describe('个人大屏模块（假数据源）', () => {
   test('启用 → 首启引导选城市 → 时钟/天气/热榜/滚动头条可见', async ({ page }) => {
     test.setTimeout(60_000);
@@ -123,5 +143,61 @@ test.describe('个人大屏模块（假数据源）', () => {
     await expect(drawer).not.toBeVisible();
     await expect(page.getByText('抖音热搜')).toHaveCount(0, { timeout: 10_000 });
     await expect(page.getByText('微博热搜').first()).toBeVisible();
+  });
+
+  test('黑胶播放器：播放/暂停 → 切歌 → 歌单选曲', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.route('https://music.163.com/song/media/outer/url**', (route) =>
+      route.fulfill({ status: 200, contentType: 'audio/wav', body: createTestAudio() }),
+    );
+
+    const email = `dash-e2e-music-${Date.now()}@example.com`;
+    await page.goto('/register');
+    await page.getByLabel('昵称').fill('大屏音乐验收');
+    await page.getByLabel('邮箱').fill(email);
+    await page.getByLabel('密码').fill(password);
+    await page.getByRole('button', { name: '创建账号' }).click();
+    await page.waitForURL('/');
+
+    await page.getByRole('button', { name: '+ 新建工作空间' }).click();
+    await page.getByLabel('工作空间名称').fill('大屏音乐空间');
+    await page.getByRole('button', { name: '创建', exact: true }).click();
+    await expect(page.getByText('大屏音乐空间').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.goto('/settings');
+    await page.getByRole('button', { name: '模块', exact: true }).click();
+    await page
+      .getByTestId('module-card-dashboard')
+      .getByRole('button', { name: '启用' })
+      .click({ timeout: 10_000 });
+    await page.goto('/m/dashboard/screen');
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+
+    const player = page.getByTestId('vinyl-player');
+    const disc = page.getByTestId('vinyl-disc');
+    await expect(player).toBeVisible();
+    await expect(disc).toHaveAttribute('data-playing', 'false');
+
+    await page.getByRole('button', { name: '播放 消愁', exact: true }).click();
+    await expect(disc).toHaveAttribute('data-playing', 'true');
+    await expect
+      .poll(() => player.locator('audio').evaluate((audio) => !(audio as HTMLAudioElement).paused))
+      .toBe(true);
+
+    await page.getByRole('button', { name: '暂停 消愁', exact: true }).click();
+    await expect(disc).toHaveAttribute('data-playing', 'false');
+
+    // 暂停状态切歌只换曲，不擅自出声。
+    await page.getByRole('button', { name: '下一首', exact: true }).click();
+    await expect(player.getByRole('heading', { name: '理想三旬' })).toBeVisible();
+    await expect(disc).toHaveAttribute('data-playing', 'false');
+
+    await page.getByRole('button', { name: '歌单', exact: true }).click();
+    await expect(page.getByText('Atlas 精选 · 可网页播放')).toBeVisible();
+    await page.getByRole('button', { name: /^播放 起风了 - / }).click();
+    await expect(player.getByRole('heading', { name: '起风了' })).toBeVisible();
+    await expect(disc).toHaveAttribute('data-playing', 'true');
   });
 });

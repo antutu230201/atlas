@@ -84,6 +84,15 @@
   }
 }
 
+@keyframes screen-equalizer {
+  from {
+    transform: scaleY(0.3);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
 @keyframes screen-core-breathe {
   0%,
   100% {
@@ -462,6 +471,141 @@
   transform-origin: center;
 }
 
+@utility screen-vinyl {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  border: 1px solid var(--screen-border-bright);
+  border-radius: 9999px;
+  background: repeating-radial-gradient(
+    circle at center,
+    var(--screen-vinyl-body) 0,
+    var(--screen-vinyl-body) 2px,
+    var(--screen-vinyl-groove) 3px,
+    var(--screen-vinyl-body) 4px
+  );
+  box-shadow: var(--screen-vinyl-shadow);
+}
+
+@utility screen-vinyl-rotation {
+  animation: screen-orbit-spin var(--screen-vinyl-duration) linear infinite;
+  animation-play-state: paused;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.screen-vinyl-rotation[data-playing='true'] {
+  animation-play-state: running;
+}
+
+.screen-tonearm {
+  position: absolute;
+  top: -6%;
+  right: 7%;
+  z-index: 2;
+  width: 2px;
+  height: 51%;
+  border-radius: 9999px;
+  background: var(--screen-muted);
+  box-shadow: 0 0 0 1px var(--screen-border);
+  transform: rotate(-22deg);
+  transform-origin: 50% 10%;
+  transition: transform var(--duration-slow) var(--ease-out-soft);
+  pointer-events: none;
+}
+
+.screen-tonearm::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--screen-muted);
+  border-radius: 9999px;
+  background: var(--screen-panel-solid);
+  transform: translateX(-50%);
+}
+
+.screen-tonearm::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  bottom: 0;
+  width: 8px;
+  height: 12px;
+  border-radius: var(--radius-xs);
+  background: var(--screen-muted);
+}
+
+.screen-tonearm[data-playing='true'] {
+  transform: rotate(7deg);
+}
+
+@utility screen-player-range {
+  height: 4px;
+  margin: 0;
+  appearance: none;
+  border-radius: 9999px;
+  outline: none;
+  background: linear-gradient(
+    to right,
+    var(--screen-accent) 0,
+    var(--screen-accent) var(--range-progress, 0%),
+    var(--screen-cell) var(--range-progress, 0%),
+    var(--screen-cell) 100%
+  );
+  cursor: pointer;
+  &::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+    appearance: none;
+    border: 2px solid var(--screen-panel-solid);
+    border-radius: 9999px;
+    background: var(--screen-accent);
+    box-shadow: 0 0 0 1px var(--screen-border-bright);
+  }
+  &::-moz-range-thumb {
+    width: 8px;
+    height: 8px;
+    border: 2px solid var(--screen-panel-solid);
+    border-radius: 9999px;
+    background: var(--screen-accent);
+    box-shadow: 0 0 0 1px var(--screen-border-bright);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--screen-accent);
+    outline-offset: 5px;
+  }
+}
+
+.screen-equalizer {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: 14px;
+  height: 14px;
+}
+
+.screen-equalizer i {
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: 9999px;
+  background: currentColor;
+  transform-origin: bottom;
+  animation: screen-equalizer var(--screen-equalizer-duration) var(--ease-out-soft) infinite
+    alternate;
+}
+
+.screen-equalizer i:nth-child(2) {
+  animation-delay: calc(var(--screen-equalizer-duration) / -3);
+}
+
+.screen-equalizer i:nth-child(3) {
+  animation-delay: calc(var(--screen-equalizer-duration) / -1.5);
+}
+
 @utility screen-core {
   animation: screen-core-breathe calc(var(--screen-ambient-duration) / 3) var(--ease-out-soft)
     infinite;
@@ -493,6 +637,8 @@
 .dashboard-screen[data-scrolling] .screen-orbit,
 .dashboard-screen[data-scrolling] .screen-core,
 .dashboard-screen[data-scrolling] .screen-pulse-ring,
+.dashboard-screen[data-scrolling] .screen-vinyl-rotation,
+.dashboard-screen[data-scrolling] .screen-equalizer i,
 .dashboard-screen[data-scrolling] .screen-weather,
 .dashboard-screen[data-scrolling] .screen-weather * {
   animation: none !important;

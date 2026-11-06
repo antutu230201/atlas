@@ -17,6 +17,7 @@ import { SummaryCard } from './summary-card';
 import { Ticker } from './ticker';
 import { WeatherCard } from './weather-card';
 import { WeatherAtmosphere } from './weather-atmosphere';
+import { VinylPlayerCard } from './vinyl-player-card';
 import { HOT_SOURCE_LABELS, type DashboardSnapshot, type CountdownItem } from './types';
 
 /** 氛围背景：必应壁纸（可关，onError 自动降级）→ 极光渐变兜底；视觉值全部来自 tokens */
@@ -516,6 +517,9 @@ export function DashboardScreenPage({
                 </div>
               </section>
             ) : null}
+
+            {/* 黑胶音乐：独立音频状态，与大屏数据刷新互不影响 */}
+            <VinylPlayerCard />
 
             {/* AI 摘要 / 一言 + 成长热力图 */}
             <div className="grid items-stretch gap-4 xl:grid-cols-12">

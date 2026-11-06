@@ -125,6 +125,11 @@
   --screen-stagger: 32ms;
   --screen-ambient-duration: 18s;
   --screen-orbit-duration: 28s;
+  --screen-vinyl-body: #1b1e29;
+  --screen-vinyl-groove: rgba(255, 255, 255, 0.07);
+  --screen-vinyl-shadow: 0 14px 32px rgba(24, 28, 44, 0.24);
+  --screen-vinyl-duration: 18s;
+  --screen-equalizer-duration: 760ms;
 
   /* 天气场景色：只用于渐变与低透明度纹理，不做实时模糊 */
   --weather-rain: rgba(44, 91, 125, 0.18);
@@ -207,6 +212,9 @@
   --screen-card-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
   --screen-card-shadow-hover: 0 18px 44px rgba(0, 0, 0, 0.38);
   --screen-glow: 0 0 30px rgba(var(--screen-accent-rgb), 0.14);
+  --screen-vinyl-body: #06070c;
+  --screen-vinyl-groove: rgba(255, 255, 255, 0.08);
+  --screen-vinyl-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
 
   --weather-rain: rgba(155, 220, 255, 0.2);
   --weather-snow: rgba(220, 238, 255, 0.44);
