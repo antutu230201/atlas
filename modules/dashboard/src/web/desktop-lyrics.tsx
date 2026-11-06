@@ -138,7 +138,14 @@ export function DesktopLyrics({
   const cardRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
-  const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
   const pipRef = useRef<PipLyricsController | null>(null);
   const seekRef = useRef(onSeek);
   const [position, setPosition] = useState<Position | null>(null);
@@ -352,13 +359,22 @@ export function DesktopLyrics({
       pointerId: event.pointerId,
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // 不立即捕获指针：未拖动时让点击事件正常落到歌词按钮（点歌词跳播）。
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.moved) {
+      // 位移超过阈值才算拖动，避免误伤"点歌词跳播"。
+      if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 4) return;
+      drag.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
     setPosition(clamp(event.clientX - drag.offsetX, event.clientY - drag.offsetY));
   };
 
@@ -366,6 +382,7 @@ export function DesktopLyrics({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
+    if (!drag.moved) return;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -398,183 +415,183 @@ export function DesktopLyrics({
         {trackTitle} · {artist}
       </span>
 
-      <div className="pointer-events-none absolute inset-x-0 -top-9 z-20 flex justify-center">
-        <div
-          className={`pointer-events-auto relative flex items-center gap-1 rounded-full border border-border/50 bg-surface/45 px-2.5 py-1 text-[9px] text-muted opacity-80 backdrop-blur-md transition-opacity duration-200 hover:bg-surface/80 hover:opacity-100 md:opacity-70 md:group-hover/lyrics:opacity-100 md:focus-within:opacity-100 ${
-            settings.locked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
-          }`}
-          data-testid="lyrics-drag-handle"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-        >
-          <ScreenIcon name="grip" className="size-3.5" />
-          <span>{settings.locked ? '已锁定' : '拖动歌词'}</span>
-          <span className="mx-0.5 h-3 w-px bg-border" aria-hidden />
-          {pipSupported ? (
+      {/* 歌词区整体可拖（参考网易云桌面歌词）：悬停浮现工具条，平时只显示歌词文字 */}
+      <div
+        className={`pointer-events-auto relative flex flex-col items-center gap-1 px-2 py-3 text-center transition-colors ${
+          settings.locked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+        }`}
+        style={{ opacity: activeOpacity }}
+        data-testid="lyrics-drag-handle"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
+        <div className="pointer-events-none absolute inset-x-0 -top-9 z-20 flex justify-center">
+          <div
+            className={`pointer-events-auto flex items-center gap-1 rounded-full border border-border/50 bg-surface/70 px-2 py-1 shadow-soft backdrop-blur-md transition-opacity duration-200 ${
+              settingsOpen
+                ? 'opacity-100'
+                : 'opacity-0 max-md:opacity-90 md:group-hover/lyrics:opacity-100 md:focus-within:opacity-100'
+            }`}
+          >
+            {pipSupported ? (
+              <button
+                type="button"
+                className="flex size-6 items-center justify-center rounded-full transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-2 focus-visible:outline-primary"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => void togglePip()}
+                aria-label="桌面歌词小窗"
+                aria-pressed={pipOpen}
+                title={pipOpen ? '关闭置顶歌词小窗' : '弹出置顶歌词小窗'}
+              >
+                <ScreenIcon name="pip" className="size-3.5" />
+              </button>
+            ) : null}
+            <button
+              ref={settingsButtonRef}
+              type="button"
+              className="flex size-6 items-center justify-center rounded-full transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-2 focus-visible:outline-primary"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => setSettingsOpen((open) => !open)}
+              aria-label="歌词设置"
+              aria-expanded={settingsOpen}
+              title="歌词设置"
+            >
+              <ScreenIcon name="settings" className="size-3.5" />
+            </button>
             <button
               type="button"
-              className={`flex size-5 items-center justify-center rounded-full transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-2 focus-visible:outline-primary ${
-                pipOpen ? 'text-primary' : ''
-              }`}
+              className="flex size-6 items-center justify-center rounded-full transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-2 focus-visible:outline-primary"
               onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => void togglePip()}
-              aria-label="桌面歌词小窗"
-              aria-pressed={pipOpen}
-              title={pipOpen ? '关闭置顶歌词小窗' : '弹出置顶歌词小窗'}
+              onClick={onClose}
+              aria-label="关闭桌面歌词"
+              title="关闭桌面歌词"
             >
-              <ScreenIcon name="pip" className="size-3" />
+              <ScreenIcon name="collapse" className="size-3.5" />
             </button>
-          ) : null}
-          <button
-            ref={settingsButtonRef}
-            type="button"
-            className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-2 focus-visible:outline-primary"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={() => setSettingsOpen((open) => !open)}
-            aria-label="歌词设置"
-            aria-expanded={settingsOpen}
-            title="歌词设置"
-          >
-            <ScreenIcon name="settings" className="size-3" />
-          </button>
-          <button
-            type="button"
-            className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-2 focus-visible:outline-primary"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={onClose}
-            aria-label="关闭桌面歌词"
-            title="关闭桌面歌词"
-          >
-            <ScreenIcon name="collapse" className="size-3" />
-          </button>
 
-          {settingsOpen ? (
-            <div
-              ref={settingsRef}
-              className="pointer-events-auto absolute top-full right-0 z-30 mt-2 w-[272px] space-y-2.5 rounded-md border border-border bg-[var(--screen-panel-solid)] p-3 text-left shadow-soft"
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              <OptionGroup
-                label="显示行数"
-                value={String(settings.lineCount)}
-                options={[
-                  { value: '1', label: '单行' },
-                  { value: '2', label: '双行' },
-                ]}
-                onChange={(value) => updateSettings({ lineCount: value === '1' ? 1 : 2 })}
-              />
-              <OptionGroup
-                label="字号"
-                value={settings.fontSize}
-                options={[
-                  { value: 'sm', label: '小' },
-                  { value: 'md', label: '中' },
-                  { value: 'lg', label: '大' },
-                ]}
-                onChange={(value) => updateSettings({ fontSize: value as FontSize })}
-              />
-              <OptionGroup
-                label="透明度"
-                value={settings.opacity}
-                options={[
-                  { value: 'soft', label: '柔和' },
-                  { value: 'normal', label: '标准' },
-                  { value: 'strong', label: '清晰' },
-                ]}
-                onChange={(value) => updateSettings({ opacity: value as LyricOpacity })}
-              />
+            {settingsOpen ? (
+              <div
+                ref={settingsRef}
+                className="pointer-events-auto absolute top-full right-0 z-30 mt-2 w-[272px] space-y-2.5 rounded-md border border-border bg-[var(--screen-panel-solid)] p-3 text-left shadow-soft"
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <OptionGroup
+                  label="显示行数"
+                  value={String(settings.lineCount)}
+                  options={[
+                    { value: '1', label: '单行' },
+                    { value: '2', label: '双行' },
+                  ]}
+                  onChange={(value) => updateSettings({ lineCount: value === '1' ? 1 : 2 })}
+                />
+                <OptionGroup
+                  label="字号"
+                  value={settings.fontSize}
+                  options={[
+                    { value: 'sm', label: '小' },
+                    { value: 'md', label: '中' },
+                    { value: 'lg', label: '大' },
+                  ]}
+                  onChange={(value) => updateSettings({ fontSize: value as FontSize })}
+                />
+                <OptionGroup
+                  label="透明度"
+                  value={settings.opacity}
+                  options={[
+                    { value: 'soft', label: '柔和' },
+                    { value: 'normal', label: '标准' },
+                    { value: 'strong', label: '清晰' },
+                  ]}
+                  onChange={(value) => updateSettings({ opacity: value as LyricOpacity })}
+                />
 
-              <div className="flex items-center justify-between gap-3">
-                <span className="shrink-0 text-[12px] text-muted">颜色</span>
-                <div className="flex items-center gap-1">
-                  {COLOR_PRESETS.map((preset) => (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      className={`flex size-5 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-primary ${
-                        color === preset.value ? 'ring-2 ring-primary/60' : ''
-                      }`}
-                      onClick={() => applyColor(preset.value)}
-                      aria-label={`歌词颜色：${preset.name}`}
-                      aria-pressed={color === preset.value}
-                      title={preset.name}
+                <div className="flex items-center justify-between gap-3">
+                  <span className="shrink-0 text-[12px] text-muted">颜色</span>
+                  <div className="flex items-center gap-1">
+                    {COLOR_PRESETS.map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        className={`flex size-5 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-primary ${
+                          color === preset.value ? 'ring-2 ring-primary/60' : ''
+                        }`}
+                        onClick={() => applyColor(preset.value)}
+                        aria-label={`歌词颜色：${preset.name}`}
+                        aria-pressed={color === preset.value}
+                        title={preset.name}
+                      >
+                        <span
+                          className="size-3.5 rounded-full border border-border/70"
+                          style={{ background: preset.value ?? 'var(--screen-accent)' }}
+                        />
+                      </button>
+                    ))}
+                    <label
+                      className="relative flex size-5 cursor-pointer items-center justify-center rounded-full hover:bg-surface-hover"
+                      title="自定义颜色"
                     >
                       <span
                         className="size-3.5 rounded-full border border-border/70"
-                        style={{ background: preset.value ?? 'var(--screen-accent)' }}
+                        style={{
+                          background: `conic-gradient(#ff6b6b, #ffd166, #72e2e7, #aa9bff, #ff6b6b)`,
+                        }}
+                        aria-hidden
                       />
-                    </button>
-                  ))}
-                  <label
-                    className="relative flex size-5 cursor-pointer items-center justify-center rounded-full hover:bg-surface-hover"
-                    title="自定义颜色"
+                      <input
+                        type="color"
+                        value={customColor}
+                        onChange={(event) => applyColor(event.target.value)}
+                        className="absolute inset-0 size-full cursor-pointer opacity-0"
+                        aria-label="自定义歌词颜色"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 border-t border-border pt-2.5">
+                  <span className="text-[12px] text-muted">锁定页面位置</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.locked}
+                    aria-label="锁定页面位置"
+                    className={`relative h-5 w-9 rounded-full transition-colors ${
+                      settings.locked ? 'bg-primary' : 'bg-border'
+                    }`}
+                    onClick={() => updateSettings({ locked: !settings.locked })}
                   >
                     <span
-                      className="size-3.5 rounded-full border border-border/70"
-                      style={{
-                        background: `conic-gradient(#ff6b6b, #ffd166, #72e2e7, #aa9bff, #ff6b6b)`,
-                      }}
-                      aria-hidden
+                      className={`absolute top-0.5 size-4 rounded-full bg-surface transition-transform ${
+                        settings.locked ? 'translate-x-[18px]' : 'translate-x-0.5'
+                      }`}
                     />
-                    <input
-                      type="color"
-                      value={customColor}
-                      onChange={(event) => applyColor(event.target.value)}
-                      className="absolute inset-0 size-full cursor-pointer opacity-0"
-                      aria-label="自定义歌词颜色"
-                    />
-                  </label>
+                  </button>
+                </div>
+
+                <div className="border-t border-border pt-2.5">
+                  <button
+                    type="button"
+                    className="screen-icon-button w-full !justify-center !min-h-8 !text-[12px] disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => void togglePip()}
+                    disabled={!pipSupported}
+                  >
+                    <ScreenIcon name="pip" className="size-3.5" />
+                    {pipOpen ? '关闭置顶歌词' : '弹出置顶歌词'}
+                  </button>
+                  <p className="mt-1.5 text-[11px] leading-4 text-muted/80">
+                    {pipSupported
+                      ? '置顶小窗可覆盖其他应用；浏览器标题栏无法隐藏。'
+                      : '当前浏览器不支持置顶小窗，请使用 Chrome / Edge 桌面版。'}
+                  </p>
+                  {pipNotice ? <p className="mt-1 text-[11px] text-warn">{pipNotice}</p> : null}
                 </div>
               </div>
-
-              <div className="flex items-center justify-between gap-3 border-t border-border pt-2.5">
-                <span className="text-[12px] text-muted">锁定页面位置</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={settings.locked}
-                  aria-label="锁定页面位置"
-                  className={`relative h-5 w-9 rounded-full transition-colors ${
-                    settings.locked ? 'bg-primary' : 'bg-border'
-                  }`}
-                  onClick={() => updateSettings({ locked: !settings.locked })}
-                >
-                  <span
-                    className={`absolute top-0.5 size-4 rounded-full bg-surface transition-transform ${
-                      settings.locked ? 'translate-x-[18px]' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="border-t border-border pt-2.5">
-                <button
-                  type="button"
-                  className="screen-icon-button w-full !justify-center !min-h-8 !text-[12px] disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => void togglePip()}
-                  disabled={!pipSupported}
-                >
-                  <ScreenIcon name="pip" className="size-3.5" />
-                  {pipOpen ? '关闭置顶歌词' : '弹出置顶歌词'}
-                </button>
-                <p className="mt-1.5 text-[10px] leading-4 text-muted/70">
-                  {pipSupported
-                    ? '置顶小窗可覆盖其他应用；浏览器标题栏无法隐藏。'
-                    : '当前浏览器不支持置顶小窗，请使用 Chrome / Edge 桌面版。'}
-                </p>
-                {pipNotice ? <p className="mt-1 text-[9px] text-warn">{pipNotice}</p> : null}
-              </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
-      </div>
 
-      <div
-        className="pointer-events-auto flex flex-col items-center gap-1 px-2 py-3 text-center"
-        style={{ opacity: activeOpacity }}
-      >
         {loading ? (
           <p className="screen-lyric-text py-2 text-sm text-muted">歌词加载中…</p>
         ) : error ? (
