@@ -20,16 +20,23 @@ import { WeatherAtmosphere } from './weather-atmosphere';
 import { VinylPlayerCard } from './vinyl-player-card';
 import { HOT_SOURCE_LABELS, type DashboardSnapshot, type CountdownItem } from './types';
 
+/** 每台设备独立记住挂墙模式：同一账号在墙面屏和笔记本上可有不同取舍。 */
+const LOW_POWER_KEY = 'atlas.dashboard.low-power';
+
 /** 氛围背景：必应壁纸（可关，onError 自动降级）→ 极光渐变兜底；视觉值全部来自 tokens */
 function ScreenBackground({
   wallpaperUrl,
   copyright,
+  enabled = true,
 }: {
   wallpaperUrl?: string;
   copyright?: string;
+  enabled?: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = wallpaperUrl !== undefined && wallpaperUrl.length > 0 && !imageFailed;
+  // 低功耗模式不挂载壁纸与极光层，既省 GPU 合成也避免继续下载每日壁纸。
+  if (!enabled) return <div aria-hidden className="pointer-events-none absolute inset-0 bg-bg" />;
   return (
     /* absolute（而非 fixed）：限制在大屏区域内，避免盖住 app 外壳的左侧导航 */
     <div
@@ -158,6 +165,7 @@ export function DashboardScreenPage({
   const { toast } = useToast();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [lowPowerMode, setLowPowerMode] = useState(false);
   const scrolling = useScrollActive();
   const chromeHidden = useUiStore((state) => state.chromeHidden);
   const setChromeHidden = useUiStore((state) => state.setChromeHidden);
@@ -173,6 +181,15 @@ export function DashboardScreenPage({
     document.addEventListener('fullscreenchange', syncFullscreen);
     return () => document.removeEventListener('fullscreenchange', syncFullscreen);
   }, [setChromeHidden]);
+
+  // 读本地偏好放在挂载后：SSR 默认高画质，避免服务端与客户端首帧 hydration 不一致。
+  useEffect(() => {
+    try {
+      setLowPowerMode(window.localStorage.getItem(LOW_POWER_KEY) === '1');
+    } catch {
+      // 隐私模式下 localStorage 可能不可用，保持默认高画质即可。
+    }
+  }, []);
 
   // 离开大屏时同时复位外壳与浏览器全屏，避免其他页面仍处于沉浸状态
   useEffect(
@@ -272,6 +289,18 @@ export function DashboardScreenPage({
     }
   };
 
+  const toggleLowPowerMode = () => {
+    setLowPowerMode((enabled) => {
+      const next = !enabled;
+      try {
+        window.localStorage.setItem(LOW_POWER_KEY, next ? '1' : '0');
+      } catch {
+        // 偏好写不进去只影响下次打开，当前切换仍然生效。
+      }
+      return next;
+    });
+  };
+
   const scrollToSection = (id: string) => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.getElementById(id)?.scrollIntoView({
@@ -284,8 +313,10 @@ export function DashboardScreenPage({
     <div
       className="dashboard-screen relative min-h-screen overflow-hidden bg-bg text-text"
       data-scrolling={scrolling || undefined}
+      data-low-power={lowPowerMode || undefined}
     >
       <ScreenBackground
+        enabled={!lowPowerMode}
         wallpaperUrl={
           data && data.options.wallpaper && data.wallpaper.payload?.url
             ? data.wallpaper.payload.url
@@ -293,7 +324,7 @@ export function DashboardScreenPage({
         }
         copyright={data?.wallpaper.payload?.copyright}
       />
-      {weather?.payload ? (
+      {!lowPowerMode && weather?.payload ? (
         <WeatherAtmosphere icon={weather.payload.now.icon} isDay={weather.payload.now.isDay} />
       ) : null}
 
@@ -322,6 +353,21 @@ export function DashboardScreenPage({
               {snapshot.isFetching ? '正在同步' : '数据在线'}
             </div>
             <ThemeToggle />
+            <button
+              type="button"
+              className={`screen-icon-button ${lowPowerMode ? '!border-primary/40 !text-primary' : ''}`}
+              onClick={toggleLowPowerMode}
+              aria-pressed={lowPowerMode}
+              aria-label="低功耗模式"
+              title={
+                lowPowerMode
+                  ? '低功耗模式已开启：已关闭壁纸和氛围动画'
+                  : '低功耗模式：关闭壁纸和氛围动画，保留音乐与时钟'
+              }
+            >
+              <ScreenIcon name="power" className="size-3.5" />
+              <span className="hidden sm:inline">{lowPowerMode ? '省电中' : '低功耗'}</span>
+            </button>
             {canWrite ? (
               <>
                 <button

@@ -92,6 +92,22 @@ test.describe('个人大屏模块（假数据源）', () => {
 
     // 一言
     await expect(page.getByText(/「.+」/).first()).toBeVisible();
+
+    // 挂墙低功耗：关闭壁纸/天气氛围且持续动画停止，偏好刷新后保留
+    const lowPower = page.getByRole('button', { name: '低功耗模式', exact: true });
+    await expect(lowPower).toHaveAttribute('aria-pressed', 'false');
+    await lowPower.click();
+    await expect(lowPower).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.dashboard-screen')).toHaveAttribute('data-low-power', 'true');
+    await expect(page.locator('.screen-backdrop')).toHaveCount(0);
+    await expect(page.locator('.screen-weather')).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: '低功耗模式', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.locator('.dashboard-screen')).toHaveAttribute('data-low-power', 'true');
   });
 
   test('倒计时增删 + 数据源开关立即生效', async ({ page }) => {

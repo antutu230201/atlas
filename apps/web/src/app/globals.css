@@ -643,3 +643,12 @@
 .dashboard-screen[data-scrolling] .screen-weather * {
   animation: none !important;
 }
+
+/* 挂墙低功耗：壁纸/天气层不挂载，其余持续动画与入场动画全部停掉；音乐与时钟数据仍正常。 */
+.dashboard-screen[data-low-power] .screen-reveal,
+.dashboard-screen[data-low-power] .screen-marquee,
+.dashboard-screen[data-low-power] .screen-orbit,
+.dashboard-screen[data-low-power] .screen-core,
+.dashboard-screen[data-low-power] .screen-pulse-ring {
+  animation: none !important;
+}

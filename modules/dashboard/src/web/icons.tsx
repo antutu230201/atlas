@@ -24,7 +24,8 @@ export type ScreenIconName =
   | 'volume'
   | 'mute'
   | 'playlist'
-  | 'external';
+  | 'external'
+  | 'power';
 
 interface IconProps {
   className?: string;
@@ -208,6 +209,13 @@ export function ScreenIcon({ name, className }: IconProps & { name: ScreenIconNa
       return (
         <svg {...common}>
           <path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6" />
+        </svg>
+      );
+    case 'power':
+      return (
+        <svg {...common}>
+          <path d="M12 3v9" />
+          <path d="M7.1 6.6a7 7 0 1 0 9.8 0" />
         </svg>
       );
   }
