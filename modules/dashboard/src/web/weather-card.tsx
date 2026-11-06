@@ -75,7 +75,7 @@ function HourlyChart({ data }: { data: WeatherData['hourly'] }) {
           />
         ))}
       </svg>
-      <div className="flex justify-between text-[9px] text-muted">
+      <div className="flex justify-between text-[11px] text-muted">
         {hours.map((hour, index) => (
           <span
             key={hour.time}
@@ -124,7 +124,7 @@ export function WeatherCard({
             <p className="screen-label">Atmosphere · Live</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="hidden items-center gap-1 text-[9px] text-info sm:inline-flex">
+            <span className="hidden items-center gap-1 text-[11px] text-info sm:inline-flex">
               <span className="size-1 rounded-full bg-info" />
               {WEATHER_SCENE_LABELS[scene]}
             </span>
@@ -204,7 +204,7 @@ export function WeatherCard({
                 {Math.round(day.min)}° <span className="text-muted">/ {Math.round(day.max)}°</span>
               </span>
               {day.precipProb !== undefined && day.precipProb >= 30 ? (
-                <span className="text-[10px] text-info">降水 {day.precipProb}%</span>
+                <span className="text-[11px] text-info">降水 {day.precipProb}%</span>
               ) : null}
             </button>
           ))}

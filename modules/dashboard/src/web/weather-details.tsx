@@ -155,19 +155,19 @@ export function WeatherDetailsDialog({
                   >
                     <div>
                       <p className="font-semibold">{dayLabel(day.date, index)}</p>
-                      <p className="mt-0.5 text-[10px] text-muted">{day.date.slice(5)}</p>
+                      <p className="mt-0.5 text-[11px] text-muted">{day.date.slice(5)}</p>
                     </div>
                     <WeatherIcon icon={day.icon} className="size-5 text-info" />
                     <div className="min-w-0">
                       <p>{day.text}</p>
-                      <p className="mt-0.5 text-[10px] text-muted">
+                      <p className="mt-0.5 text-[11px] text-muted">
                         {day.precipProb === undefined ? '降水概率暂无' : `降水 ${day.precipProb}%`}
                       </p>
                     </div>
                     <p className="font-mono font-semibold tabular-nums">
                       {Math.round(day.min)}° / {Math.round(day.max)}°
                     </p>
-                    <p className="hidden text-right text-[10px] leading-relaxed text-muted sm:block">
+                    <p className="hidden text-right text-[11px] leading-relaxed text-muted sm:block">
                       {day.sunrise ? `日出 ${day.sunrise.slice(11, 16)}` : ''}
                       {day.sunset ? (
                         <>
