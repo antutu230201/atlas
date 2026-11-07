@@ -16,6 +16,9 @@ export interface StageBucket {
   seconds: number;
 }
 
+/** 声浪柱最高高度（世界单位）：再高就会被卡片顶边裁掉，旧值 3.2 在 400px 卡里顶穿 */
+const BAR_MAX_HEIGHT = 2.45;
+
 interface StageColors {
   accent: string;
   accentAlt: string;
@@ -93,12 +96,15 @@ export function ListeningStage({
   topTitle,
   topArtist,
   className,
+  empty = false,
 }: {
   buckets: StageBucket[];
   totalSeconds: number;
   topTitle?: string;
   topArtist?: string;
   className?: string;
+  /** 选中窗口内没有任何播放记录时，舞台给一句引导而不是空转的网格 */
+  empty?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneHandle | null>(null);
@@ -140,8 +146,13 @@ export function ListeningStage({
         0.1,
         100,
       );
-      camera.position.set(0, 3.1, 7.6);
-      camera.lookAt(0, 0.7, 0);
+      // 视口越窄离得越远：手机竖屏下不把黑胶和声浪柱挤出画面
+      const fitCamera = (aspect: number) => {
+        const distance = 7.6 * Math.max(1, 1.95 / aspect);
+        camera.position.set(0, 3.1 * (distance / 7.6), distance);
+        camera.lookAt(0, 0.7, 0);
+      };
+      fitCamera(mount.clientWidth / mount.clientHeight);
 
       const stage = new THREElib.Group();
       scene.add(stage);
@@ -159,19 +170,19 @@ export function ListeningStage({
       scene.add(altLight);
 
       // 地面：极坐标网格舞台（比实心圆盘更"舞台"，避免远看像灰色小山）
-      const floor = new THREElib.PolarGridHelper(7.2, 8, 5, 64, 0x8888aa, 0x555577);
+      const floor = new THREElib.PolarGridHelper(6.4, 8, 5, 64, 0x8888aa, 0x555577);
       (floor.material as THREE.LineBasicMaterial).transparent = true;
-      (floor.material as THREE.LineBasicMaterial).opacity = 0.16;
+      (floor.material as THREE.LineBasicMaterial).opacity = 0.14;
       floor.position.y = 0;
       stage.add(floor);
 
       /* ---- 黑胶唱片（左侧，持续旋转） ---- */
       const vinyl = new THREElib.Group();
-      vinyl.position.set(-2.9, 1.05, 0);
+      vinyl.position.set(-3.05, 1.0, 0);
       vinyl.rotation.y = 0.42;
       stage.add(vinyl);
       const disc = new THREElib.Mesh(
-        new THREElib.CylinderGeometry(1.5, 1.5, 0.09, 96),
+        new THREElib.CylinderGeometry(1.38, 1.38, 0.09, 96),
         new THREElib.MeshStandardMaterial({ color: 0x101018, roughness: 0.32, metalness: 0.55 }),
       );
       disc.rotation.x = Math.PI / 2;
@@ -184,14 +195,14 @@ export function ListeningStage({
       const grooves: THREE.Mesh[] = [];
       for (let i = 0; i < 5; i += 1) {
         const groove = new THREElib.Mesh(
-          new THREElib.TorusGeometry(0.86 + i * 0.13, 0.006, 8, 96),
+          new THREElib.TorusGeometry(0.8 + i * 0.115, 0.006, 8, 96),
           grooveMaterial,
         );
         vinyl.add(groove);
         grooves.push(groove);
       }
       const edgeRing = new THREElib.Mesh(
-        new THREElib.TorusGeometry(1.5, 0.022, 10, 96),
+        new THREElib.TorusGeometry(1.38, 0.022, 10, 96),
         new THREElib.MeshStandardMaterial({
           color: new THREElib.Color(colors.accent),
           emissive: new THREElib.Color(colors.accent),
@@ -202,7 +213,7 @@ export function ListeningStage({
       vinyl.add(edgeRing);
       const labelTexture = new THREElib.CanvasTexture(makeLabelTexture('', '', colors.accent));
       const labelMesh = new THREElib.Mesh(
-        new THREElib.CircleGeometry(0.62, 64),
+        new THREElib.CircleGeometry(0.57, 64),
         new THREElib.MeshBasicMaterial({ map: labelTexture, transparent: true }),
       );
       labelMesh.position.z = 0.052;
@@ -216,7 +227,7 @@ export function ListeningStage({
 
       /* ---- 声浪柱（数据分桶） ---- */
       const barsGroup = new THREElib.Group();
-      barsGroup.position.set(1.15, 0, 0);
+      barsGroup.position.set(1.3, 0, 0);
       stage.add(barsGroup);
       interface BarItem {
         mesh: THREE.Mesh;
@@ -237,7 +248,7 @@ export function ListeningStage({
         bars = [];
         if (list.length === 0) return;
         const count = list.length;
-        const slot = Math.min(0.5, 5.6 / count);
+        const slot = Math.min(0.62, 5.8 / count);
         const width = slot * 0.72;
         let geometry = barGeometryCache.get(count);
         if (!geometry) {
@@ -258,7 +269,7 @@ export function ListeningStage({
           const mesh = new THREElib.Mesh(geometry!, material);
           mesh.position.x = startX + index * slot;
           const maxSeconds = Math.max(...list.map((item) => item.seconds), 60);
-          const target = Math.max(0.12, (bucket.seconds / maxSeconds) * 3.2);
+          const target = Math.max(0.12, (bucket.seconds / maxSeconds) * BAR_MAX_HEIGHT);
           mesh.scale.y = 0.02;
           mesh.position.y = 0;
           barsGroup.add(mesh);
@@ -422,7 +433,7 @@ export function ListeningStage({
         const maxSeconds = Math.max(...bars.map((bar) => bar.seconds), 60);
         const beat = pulse ? Math.sin(now / 260) * 0.1 : 0;
         for (const bar of bars) {
-          bar.target = Math.max(0.12, (bar.seconds / maxSeconds) * 3.2) * (1 + beat);
+          bar.target = Math.max(0.12, (bar.seconds / maxSeconds) * BAR_MAX_HEIGHT) * (1 + beat);
           bar.current += (bar.target - bar.current) * Math.min(1, dt * 6);
           bar.mesh.scale.y = Math.max(0.02, bar.current);
           bar.mesh.position.y = bar.mesh.scale.y / 2;
@@ -462,6 +473,7 @@ export function ListeningStage({
         renderer.setSize(width, height);
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
+        fitCamera(camera.aspect);
         if (reducedMotion) renderer.render(scene, camera);
       });
       resizeObserver.observe(mount);
@@ -551,8 +563,14 @@ export function ListeningStage({
           </span>
         </div>
       ) : null}
+      {ready && empty ? (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 text-center">
+          <p className="text-sm font-medium text-text">这个窗口还没有播放记录</p>
+          <p className="text-[11px] text-muted">去大屏放一首歌，声浪会在这里长出来</p>
+        </div>
+      ) : null}
       {ready ? (
-        <p className="pointer-events-none absolute bottom-2.5 left-1/2 -translate-x-1/2 text-[10px] tracking-wider text-muted/60">
+        <p className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-border/70 bg-surface/70 px-3 py-1 text-[10px] tracking-wider text-muted backdrop-blur-sm">
           拖拽旋转视角 · 悬停声浪柱查看时长
         </p>
       ) : null}

@@ -354,6 +354,14 @@
 - [x] 播放脉冲：播放器 isPlaying 变化经页内事件 atlas:listening-pulse 广播；3D 舞台挂载时从 localStorage 快照取初始值并实时监听 —— 播放中黑胶加速旋转（0.85→2.55 rad/s）、声浪柱随节拍呼吸（±10%）、音符粒子提速 1.9 倍，暂停回落
 - [x] e2e 13 条全绿（app-shell/todo/habit 仍走设置页模块流程，覆盖收敛后页面）
 
+### 全站视觉统一到大屏体系（2026-11-07 续）
+
+- [x] UI 库 Card 换 screen 令牌（面板底/描边/阴影/悬停）——待办/习惯/笔记/通知/设置/AI 等所有用到 Card 的页面一次玻璃化
+- [x] 登录/注册页大屏化：共享 AuthFrame（天空渐变+网格+scrim），screen-card 玻璃卡 + screen-label 品牌副标（PERSONAL OS · SIGN IN / CREATE ACCOUNT）
+- [x] Shell 全局氛围增强（sky 0.8 / grid 0.45）；通知页标题加 screen-label 副标
+- [x] 听歌统计页迭代（周几标签、Top1 歌曲上卡、Top10 两列、榜外钉"我的位置"等）+ 两处 noUncheckedIndexedAccess 类型修复；e2e 断言随改版更新
+- [x] 本地一次性脚本（atlas-seed/atlas-shot/atlas-visual）加入 eslint ignores；e2e 13 条全绿
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。
