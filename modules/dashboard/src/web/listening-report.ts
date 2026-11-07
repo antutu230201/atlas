@@ -1,4 +1,4 @@
-type Range = 'day' | 'week' | 'month' | 'year';
+export type Range = 'day' | 'lastWeek' | 'week' | 'month' | 'year';
 
 /**
  * 听歌报告模板：把统计页数据渲染成一张自包含的大屏风格 HTML 报告单页。
@@ -14,11 +14,13 @@ export interface ReportSong {
   songId: number;
   title: string;
   artist: string;
+  cover: string;
   seconds: number;
   plays: number;
 }
 
 export interface ReportRank {
+  userId: string;
   rank: number;
   userName: string;
   seconds: number;
@@ -37,7 +39,7 @@ export interface ListeningReportInput {
   } | null;
   ranking: {
     list: ReportRank[];
-    me: { rank: number; userName: string; seconds: number } | null;
+    me: { userId: string; rank: number; userName: string; seconds: number } | null;
   } | null;
 }
 
@@ -61,6 +63,8 @@ function shortLabel(label: string): string {
   return label.slice(5); // 2026-11-07 → 11-07；2026-11 → 11
 }
 
+export { formatDuration as formatDurationReport };
+
 export function buildListeningReportHtml(input: ListeningReportInput): string {
   const { rangeHint, generatedAt } = input;
   const summary = input.summary;
@@ -76,12 +80,17 @@ export function buildListeningReportHtml(input: ListeningReportInput): string {
 
   const bucketBars = buckets
     .map((bucket, index) => {
-      const height = Math.max(bucket.seconds > 0 ? 8 : 3, (bucket.seconds / maxBucket) * 100);
+      // 0 秒的桶不画柱体：3% 的最小高度会变成一条误导性的短线
+      const height = Math.max(8, (bucket.seconds / maxBucket) * 100);
       const isPeak = bucket.seconds === maxBucket && bucket.seconds > 0;
       return `
       <div class="bar-col">
         <div class="bar-value">${bucket.seconds > 0 ? formatDuration(bucket.seconds) : ''}</div>
-        <div class="bar-track"><div class="bar-fill${isPeak ? ' peak' : ''}" style="height:${height}%"></div></div>
+        <div class="bar-track">${
+          bucket.seconds > 0
+            ? `<div class="bar-fill${isPeak ? ' peak' : ''}" style="height:${height}%"></div>`
+            : ''
+        }</div>
         <div class="bar-label${index % labelEvery === 0 || index === buckets.length - 1 ? '' : ' dim'}">${escapeHtml(shortLabel(bucket.label))}</div>
       </div>`;
     })
@@ -93,7 +102,13 @@ export function buildListeningReportHtml(input: ListeningReportInput): string {
           const share = total > 0 ? Math.max(6, (song.seconds / total) * 100) : 0;
           return `
       <li class="song-row${index === 0 ? ' top1' : ''}">
-        <span class="rank${index === 0 ? ' first' : ''}">${index + 1}</span>
+        <span class="rank${index === 0 ? ' first' : ''}">${index + 1}</span>${
+          song.cover
+            ? `
+        <img class="cover" src="${escapeHtml(song.cover)}?param=120y120" alt="" onerror="this.style.display='none'">`
+            : `
+        <span class="cover cover-fallback">${escapeHtml(song.title.slice(0, 1))}</span>`
+        }
         <span class="song-meta">
           <span class="song-title">${escapeHtml(song.title)}</span>
           <span class="song-artist">${escapeHtml(song.artist)} · ${song.plays} 次播放</span>
@@ -112,7 +127,8 @@ export function buildListeningReportHtml(input: ListeningReportInput): string {
             4,
             (entry.seconds / Math.max(1, ...ranks.map((r) => r.seconds))) * 100,
           );
-          const isMe = me?.userName === entry.userName;
+          // 按 userId 判定"我"：昵称可重复，用名字会把同名用户一起点亮
+          const isMe = me?.userId === entry.userId;
           return `
       <li class="rank-row${isMe ? ' me' : ''}">
         <span class="rank${entry.rank === 1 ? ' first' : ''}">${entry.rank}</span>
@@ -221,6 +237,13 @@ export function buildListeningReportHtml(input: ListeningReportInput): string {
     font-size: 11px; font-weight: 700; background: rgba(255, 255, 255, 0.08); color: var(--muted);
   }
   .rank.first { background: linear-gradient(135deg, var(--accent), rgba(170, 155, 255, 0.55)); color: #14141f; }
+  .cover {
+    flex: none; width: 44px; height: 44px; border-radius: 8px;
+    object-fit: cover; background: rgba(170, 155, 255, 0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: var(--accent);
+  }
+  .cover-fallback { border: 1px solid var(--border); }
   .song-meta, .rank-name { flex: 1; min-width: 0; }
   .song-title { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .song-artist { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -290,5 +313,6 @@ export function downloadFile(filename: string, content: string, mime: string): v
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  URL.revokeObjectURL(url);
+  // 立即 revoke 会让部分浏览器取消下载，交给下一轮事件循环回收
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }

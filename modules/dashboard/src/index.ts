@@ -115,11 +115,14 @@ const listeningHeartbeatSchema = z.object({
   songId: z.number().int().positive(),
   title: z.string().min(1).max(200),
   artist: z.string().max(200),
+  cover: z.string().max(500).optional(),
   seconds: z.number().int().min(1).max(120),
   first: z.boolean().optional(),
 });
-type ListeningRange = 'day' | 'week' | 'month' | 'year';
-const listeningRangeSchema = z.object({ range: z.enum(['day', 'week', 'month', 'year']) });
+type ListeningRange = 'day' | 'lastWeek' | 'week' | 'month' | 'year';
+const listeningRangeSchema = z.object({
+  range: z.enum(['day', 'lastWeek', 'week', 'month', 'year']),
+});
 /** unikey 为网易云签发的 uuid；只用于轮询，不落库 */
 const neteaseQrPollSchema = z.object({ unikey: z.string().min(10).max(64) });
 
@@ -295,6 +298,17 @@ function rangeWindow(range: ListeningRange): {
   const today = new Date();
   const endDay = localDay(today);
   if (range === 'day') return { startDay: endDay, endDay, bucket: 'day' };
+  if (range === 'lastWeek') {
+    // 上一个自然周（周一~周日）：本周一往前推 7 天为起点、往前推 1 天为终点
+    const dayNum = (today.getDay() + 6) % 7;
+    const thisMonday = new Date(today);
+    thisMonday.setDate(today.getDate() - dayNum);
+    const start = new Date(thisMonday);
+    start.setDate(thisMonday.getDate() - 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { startDay: localDay(start), endDay: localDay(end), bucket: 'day' };
+  }
   if (range === 'week') {
     const start = new Date(today);
     start.setDate(start.getDate() - 6);
@@ -328,10 +342,16 @@ function fillBuckets(
     }
     return out;
   }
-  const days = range === 'week' ? 7 : range === 'day' ? 1 : 30;
+  // lastWeek 的窗口终点是上周日（不是今天）
+  const anchor = new Date(today);
+  if (range === 'lastWeek') {
+    const dayNum = (today.getDay() + 6) % 7;
+    anchor.setDate(today.getDate() - dayNum - 1);
+  }
+  const days = range === 'week' || range === 'lastWeek' ? 7 : range === 'day' ? 1 : 30;
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
+    const d = new Date(anchor);
+    d.setDate(anchor.getDate() - i);
     const label = localDay(d);
     out.push({ label, seconds: map.get(label) ?? 0 });
   }
@@ -657,7 +677,7 @@ export const definition: ModuleDefinition = {
       handler: async (ctx, input) => {
         const parsed = listeningHeartbeatSchema.safeParse(input ?? {});
         if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
-        const { songId, title, artist, seconds, first } = parsed.data;
+        const { songId, title, artist, cover, seconds, first } = parsed.data;
         await ctx.db
           .insert(listeningDaily)
           .values({
@@ -668,6 +688,7 @@ export const definition: ModuleDefinition = {
             songId,
             songTitle: title,
             songArtist: artist,
+            songCover: cover ?? '',
             seconds,
             plays: first ? 1 : 0,
           })
@@ -683,6 +704,8 @@ export const definition: ModuleDefinition = {
               plays: sql`${listeningDaily.plays} + excluded.plays`,
               songTitle: title,
               songArtist: artist,
+              // 本次心跳没带封面时保留库里已有的（切歌瞬间拿不到 picUrl 不能把封面抹掉）
+              songCover: cover ? cover : sql`${listeningDaily.songCover}`,
               updatedAt: new Date(),
             },
           });
@@ -703,6 +726,7 @@ export const definition: ModuleDefinition = {
             songId: listeningDaily.songId,
             songTitle: listeningDaily.songTitle,
             songArtist: listeningDaily.songArtist,
+            songCover: sql<string>`max(${listeningDaily.songCover})`,
             seconds: sql<number>`sum(${listeningDaily.seconds})::int`,
             plays: sql<number>`sum(${listeningDaily.plays})::int`,
           })
@@ -727,7 +751,14 @@ export const definition: ModuleDefinition = {
         const bucketSeconds = new Map<string, number>();
         const songSeconds = new Map<
           number,
-          { songId: number; title: string; artist: string; seconds: number; plays: number }
+          {
+            songId: number;
+            title: string;
+            artist: string;
+            cover: string;
+            seconds: number;
+            plays: number;
+          }
         >();
         for (const row of rows) {
           const seconds = Number(row.seconds ?? 0);
@@ -742,6 +773,7 @@ export const definition: ModuleDefinition = {
               songId: row.songId,
               title: row.songTitle,
               artist: row.songArtist,
+              cover: row.songCover ?? '',
               seconds,
               plays: Number(row.plays ?? 0),
             });

@@ -64,6 +64,13 @@
       "when": 1794225600000,
       "tag": "0008_listening_global_ranking",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794225700000,
+      "tag": "0009_listening_cover",
+      "breakpoints": true
     }
   ]
 }

@@ -65,10 +65,12 @@ describe('听歌时长统计', () => {
       songId: 569200213,
       title: '消愁',
       artist: '毛不易',
+      cover: 'https://p1.music.126.net/cover-test/109951163350929740.jpg',
       seconds: 30,
       first: true,
     });
     expect(first.status).toBe(200);
+    // 第二次心跳不带封面：应当保留库里已有的封面，而不是被空值覆盖
     const second = await call(ownerCookie, 'listeningHeartbeat', {
       songId: 569200213,
       title: '消愁',
@@ -84,6 +86,7 @@ describe('听歌时长统计', () => {
     expect(summary.body.data.topSongs[0]).toMatchObject({
       songId: 569200213,
       title: '消愁',
+      cover: 'https://p1.music.126.net/cover-test/109951163350929740.jpg',
       seconds: 50,
     });
     // day 桶只有今天一格

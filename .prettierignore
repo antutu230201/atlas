@@ -7,4 +7,9 @@ coverage
 pnpm-lock.yaml
 playwright-report
 test-results
+# 本地一次性脚本（已在 eslint 中忽略）与 Next 自动生成文件
+apps/api/atlas-seed.mjs
+apps/web/atlas-shot.mjs
+apps/web/atlas-visual.mjs
+apps/web/next-env.d.ts
 docs/design/总体设计（原始）.md

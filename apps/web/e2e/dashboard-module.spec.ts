@@ -576,5 +576,23 @@ test.describe('个人大屏模块（假数据源）', () => {
 
     await page.goto('/m/dashboard/screen');
     await expect(page.getByTestId('listening-mini-card')).toBeVisible({ timeout: 15_000 });
+
+    // 分享卡：一键生成 1080×1350 PNG
+    await page.goto('/m/dashboard/listening');
+    await expect(page.getByTestId('listening-stats')).toBeVisible({ timeout: 15_000 });
+    const shareButton = page.getByRole('button', { name: '生成分享卡 PNG' });
+    await expect(shareButton).toBeEnabled({ timeout: 15_000 });
+    const shareDownload = page.waitForEvent('download');
+    await shareButton.click();
+    const shareCard = await shareDownload;
+    expect(shareCard.suggestedFilename()).toMatch(/^atlas_listening_share_\d{4}-\d{2}-\d{2}\.png$/);
+
+    // 周报通知直达：切到上周并自动下载当期报告，URL 参数随即清理（刷新不重复下载）
+    const reportDownload = page.waitForEvent('download');
+    await page.goto('/m/dashboard/listening?range=lastWeek&download=1');
+    const report = await reportDownload;
+    expect(report.suggestedFilename()).toMatch(/^atlas_listening_report_lastWeek_/);
+    await expect(page).toHaveURL(/\/m\/dashboard\/listening$/);
+    await expect(page.getByRole('tab', { name: '上周' })).toHaveAttribute('aria-selected', 'true');
   });
 });

@@ -23,3 +23,6 @@ test-results/
 .DS_Store
 Thumbs.db
 .zcode/
+
+# AI 会话记忆与工作区数据
+.workbuddy/

@@ -54,8 +54,15 @@ export function Button({
       disabled={asChild ? undefined : disabled || loading}
       {...props}
     >
-      {loading ? <Spinner className="size-4" /> : null}
-      {children}
+      {/* asChild 走 Radix Slot，只能有一个子元素：加载图标不能与 children 并列 */}
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {loading ? <Spinner className="size-4" /> : null}
+          {children}
+        </>
+      )}
     </Comp>
   );
 }

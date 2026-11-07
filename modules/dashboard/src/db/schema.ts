@@ -116,6 +116,7 @@ export const listeningDaily = moduleSchema.table(
     day: date('day').notNull(),
     songId: bigint('song_id', { mode: 'number' }).notNull(),
     songTitle: text('song_title').notNull(),
+    songCover: text('song_cover').notNull().default(''),
     songArtist: text('song_artist').notNull(),
     seconds: integer('seconds').notNull().default(0),
     plays: integer('plays').notNull().default(0),

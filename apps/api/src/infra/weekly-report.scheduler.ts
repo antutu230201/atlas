@@ -115,7 +115,7 @@ export class WeeklyReportScheduler implements OnApplicationBootstrap, OnModuleDe
             title: `听歌周报：上周 ${formatMinutes(seconds)}${top}`,
             body: {
               text: `全站第 ${rank} 名（共 ${rows.length} 人参与）· 播放 ${Number(row.out_plays ?? 0)} 次`,
-              link: '/m/dashboard/listening',
+              link: '/m/dashboard/listening?range=lastWeek&download=1',
               weekStart: start,
               weekEnd: end,
             },

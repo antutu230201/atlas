@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { cn } from '@atlas/ui';
+import { cn, useToast } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { dispatchPlaySong } from './listening-pulse';
+import { downloadShareCardPng } from './listening-share-card';
 import { buildListeningReportHtml, downloadFile } from './listening-report';
 import type { ListeningReportInput } from './listening-report';
 import { ListeningStage } from './listening-stage';
@@ -23,7 +24,7 @@ import { ScreenIcon } from './icons';
  *    避免旧版把 50 条全渲染成一条无底长卷。
  */
 
-type Range = 'day' | 'week' | 'month' | 'year';
+type Range = 'day' | 'lastWeek' | 'week' | 'month' | 'year';
 
 interface SummaryPayload {
   range: Range;
@@ -34,6 +35,7 @@ interface SummaryPayload {
     songId: number;
     title: string;
     artist: string;
+    cover: string;
     seconds: number;
     plays: number;
   }>;
@@ -55,12 +57,14 @@ interface RankingPayload {
 const RANGES: Array<{ value: Range; label: string }> = [
   { value: 'day', label: '日' },
   { value: 'week', label: '周' },
+  { value: 'lastWeek', label: '上周' },
   { value: 'month', label: '月' },
   { value: 'year', label: '年' },
 ];
 
 const RANGE_HINTS: Record<Range, string> = {
   day: '今天',
+  lastWeek: '上一个自然周',
   week: '最近 7 天',
   month: '最近 30 天',
   year: '最近 12 个月',
@@ -69,6 +73,7 @@ const RANGE_HINTS: Record<Range, string> = {
 /** 分桶单位：day/week/month 都是按天分桶，year 按月 */
 const RANGE_BUCKET_NOUN: Record<Range, string> = {
   day: '天',
+  lastWeek: '天',
   week: '天',
   month: '天',
   year: '月',
@@ -113,7 +118,20 @@ function bucketFullLabel(label: string): string {
 
 export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string }) {
   const base = `/modules/workspaces/${workspaceSlug}/dashboard/call`;
+  // 周报通知直达：/m/dashboard/listening?range=lastWeek&download=1
+  // query 在挂载后读取（SSR 阶段没有 window；Next 客户端导航也可能先渲染后更新 href）
   const [range, setRange] = useState<Range>('week');
+  const pendingDownloadRef = useRef<Range | null>(null);
+  const { toast } = useToast();
+  const [sharing, setSharing] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('range');
+    const target = RANGES.some((item) => item.value === raw) ? (raw as Range) : null;
+    if (target && target !== 'week') setRange(target);
+    if (params.get('download') === '1') pendingDownloadRef.current = target ?? 'week';
+  }, []);
 
   const summaryQuery = useQuery({
     queryKey: ['dashboard', 'listening-summary', range],
@@ -128,6 +146,7 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
     staleTime: 30_000,
   });
 
+  // 通知直达：数据就绪后自动下载一次当期报告，并清理 URL 参数（防刷新重复下载）
   const summary = summaryQuery.data;
   const ranking = rankingQuery.data;
   const loading = summaryQuery.isPending;
@@ -139,7 +158,7 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
 
   // 数据导出（宪法 §4：所有数据可导出）：漂亮报告（HTML 单页，可打印存 PDF）+ 原始数据（JSON）
   const today = new Date().toISOString().slice(0, 10);
-  const downloadReport = () => {
+  const downloadReport = useCallback(() => {
     if (!summary) return;
     const input: ListeningReportInput = {
       range,
@@ -153,7 +172,7 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
       buildListeningReportHtml(input),
       'text/html;charset=utf-8',
     );
-  };
+  }, [summary, ranking, range, today]);
   const downloadJson = () => {
     if (!summary && !ranking) return;
     const payload = {
@@ -168,6 +187,45 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
       'application/json',
     );
   };
+
+  // 分享卡：先加载专辑封面再绘制（封面失败退回首字占位，不阻断导出）
+  const shareCard = async () => {
+    if (!summary || sharing) return;
+    setSharing(true);
+    try {
+      await downloadShareCardPng({
+        rangeHint: RANGE_HINTS[range],
+        generatedAt: new Date(),
+        totalSeconds,
+        totalPlays,
+        meRank: ranking?.me?.rank ?? null,
+        buckets: summary.buckets,
+        topSongs: summary.topSongs,
+      });
+      toast({
+        title: '分享卡已生成',
+        description: '1080×1350 PNG，可直接发社交平台',
+        variant: 'ok',
+      });
+    } catch (error) {
+      toast({
+        title: '分享卡生成失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'err',
+      });
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  // 通知直达：数据就绪后自动下载一次当期报告，并清理 URL 参数（防刷新重复下载）
+  useEffect(() => {
+    const target = pendingDownloadRef.current;
+    if (!target || !summary || range !== target) return;
+    pendingDownloadRef.current = null;
+    downloadReport();
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [summary, range, downloadReport]);
 
   return (
     <div
@@ -197,6 +255,18 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              className="screen-icon-button !min-h-9"
+              onClick={() => void shareCard()}
+              disabled={!summary || sharing}
+              aria-label="生成分享卡 PNG"
+              aria-busy={sharing}
+              title="生成分享卡 PNG（1080×1350）"
+            >
+              <ScreenIcon name="layers" className="size-3.5" />
+              <span className="hidden sm:inline text-xs">{sharing ? '生成中…' : '分享卡'}</span>
+            </button>
             <button
               type="button"
               className="screen-icon-button !min-h-9"
@@ -661,6 +731,25 @@ function TopSongsCard({
                 )}
               >
                 {index + 1}
+              </span>
+              {/* 专辑封面（无封面回退首字） */}
+              <span
+                className={cn(
+                  'flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-primary-soft text-[11px] font-bold text-primary',
+                )}
+              >
+                {song.cover ? (
+                  <img
+                    src={`${song.cover}?param=90y90`}
+                    alt=""
+                    className="size-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  song.title.slice(0, 1)
+                )}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-medium leading-5">

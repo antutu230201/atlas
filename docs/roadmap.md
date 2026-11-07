@@ -406,6 +406,16 @@
 - [x] 统计页导出入口拆两个："报告"（HTML 单页）/ "数据"（JSON 原始数据，进阶用途）
 - [x] 实测：UI 点击"报告"→ Playwright 捕获下载 → 打开报告全页截图验收；e2e 13 条全绿
 
+### 听歌报告三件套：封面 / 周报直达 / 分享卡（2026-11-07 续 8）
+
+- [x] 封面入库：迁移 0009 给 `listening_daily` 补 `song_cover`；心跳上报 cover（schema 上限 500），upsert 仅在本次带图时覆盖——切歌瞬间拿不到 picUrl 不会把已有封面抹空；`listeningSummary.topSongs[].cover` 返回给统计页与报告
+- [x] 报告嵌封面：歌曲榜每行 44px 封面（源图 120×120），无图/加载失败回退首字渐变色块；报告与统计页共用同一份 cover 字段
+- [x] 周报直达：通知 link 改 `/m/dashboard/listening?range=lastWeek&download=1`；新增 `lastWeek` 窗口（上一个自然周，周一起算，分桶锚点在上周日）；统计页挂载后读 query → 切窗口 → 数据就绪自动下载当期报告 → 清理 URL 参数（刷新不重复）
+- [x] 通知页真正闭环：此前只渲染标题，body.text 与 body.link 完全不可见；现在正文 + 「下载当期报告」按钮，点击顺手标记已读
+- [x] 分享卡 1080×1350 PNG：Top1 260px 大封面 + 榜单 54px 缩略图，crossOrigin 加载（网易云 CDN 有 `ACAO: *`）、4s 超时/失败回退首字；按曲目数收缩卡片高度；按钮加生成态与 Toast
+- [x] 顺手修掉的真 bug：`Button asChild` 同时渲染 Spinner 与 children 导致 Radix Slot 崩溃（通知页一进就白屏）；报告「我」按昵称判定会把同名用户一起点亮（改 userId）；0 秒分桶画最小高度变成误导性短线（改为不画）；`revokeObjectURL` 立即执行会取消部分浏览器下载（延后 1s）
+- 验证：typecheck 16/16、lint、format:check 全绿；api 听歌集成 4/4（新增「不带封面的心跳不清空已有封面」断言）；dashboard e2e 6/6（新增分享卡下载 + `?download=1` 直达下载与 URL 清理断言）；亮暗双主题截图验收分享卡/报告/通知页
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。

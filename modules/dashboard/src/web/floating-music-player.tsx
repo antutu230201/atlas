@@ -379,6 +379,7 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
           songId: current.id,
           title: current.title,
           artist: current.artist,
+          cover: current.cover,
           seconds,
           first: listenFirstRef.current,
         },
