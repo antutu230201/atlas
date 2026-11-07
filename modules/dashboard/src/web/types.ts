@@ -123,6 +123,4 @@ export const HOT_SOURCE_LABELS: Record<string, string> = {
   weibo: '微博热搜',
   douyin: '抖音热搜',
   bilibili: 'B站热搜',
-  baidu: '百度热搜',
-  toutiao: '头条热榜',
 };

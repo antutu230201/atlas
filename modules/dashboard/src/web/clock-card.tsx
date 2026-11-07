@@ -95,7 +95,7 @@ export function ClockCard({ displayName }: { displayName?: string }) {
 export function TimeOrbit() {
   return (
     <div
-      className="pointer-events-none relative hidden aspect-square w-full max-w-48 items-center justify-center md:flex"
+      className="pointer-events-none relative hidden aspect-square w-full max-w-36 items-center justify-center md:flex"
       aria-hidden
     >
       <svg viewBox="0 0 240 240" className="size-full overflow-visible">

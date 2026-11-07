@@ -223,33 +223,8 @@ export const HOT_SOURCES: HotSourceDef[] = [
       return normalizeBilibili(raw);
     },
   },
-  {
-    key: 'baidu',
-    label: '百度热搜',
-    ttlMs: 10 * 60_000,
-    fetchList: async () => {
-      if (isFakeMode()) return fakeHotLists.baidu;
-      const raw = await fetchJson<BaiduResponse>(
-        // PC 榜单才带 hotScore（wise 只给 word/url），热度数字全靠它
-        'https://top.baidu.com/api/board?platform=pc&tab=realtime',
-        { referer: 'https://top.baidu.com/board' },
-      );
-      return normalizeBaidu(raw);
-    },
-  },
-  {
-    key: 'toutiao',
-    label: '头条热榜',
-    ttlMs: 10 * 60_000,
-    fetchList: async () => {
-      if (isFakeMode()) return fakeHotLists.toutiao;
-      const raw = await fetchJson<ToutiaoResponse>(
-        'https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc',
-        { referer: 'https://www.toutiao.com/' },
-      );
-      return normalizeToutiao(raw);
-    },
-  },
+  // 百度热搜 / 头条热榜已停用（2026-11）：大屏只保留微博、抖音、B 站三源，卡片更宽、
+  // 标题不再被截断；normalize 与 fake 数据保留，需要时可原样恢复。
 ];
 
 export function getHotSource(key: string): HotSourceDef | undefined {

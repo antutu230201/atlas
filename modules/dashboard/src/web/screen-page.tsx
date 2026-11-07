@@ -521,8 +521,8 @@ export function DashboardScreenPage({
                 </div>
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-              {[0, 1, 2, 3, 4].map((index) => (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2].map((index) => (
                 <Skeleton key={index} className="h-80 rounded-md" />
               ))}
             </div>
@@ -624,7 +624,7 @@ export function DashboardScreenPage({
                   </span>
                 </div>
                 {/* 宽屏固定五列单行；窄屏自动降列。每条源只取前 4 条，保证一屏可读完 */}
-                <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {enabledSources.map(([key, envelope], index) => (
                     <HotlistCard
                       key={key}
@@ -632,7 +632,7 @@ export function DashboardScreenPage({
                       index={index}
                       label={HOT_SOURCE_LABELS[key] ?? key}
                       envelope={envelope}
-                      limit={4}
+                      limit={5}
                     />
                   ))}
                 </div>

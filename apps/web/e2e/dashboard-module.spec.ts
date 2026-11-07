@@ -105,7 +105,7 @@ test.describe('个人大屏模块（假数据源）', () => {
     // 时钟走时（role=timer）
     await expect(page.getByRole('timer', { name: '当前时间' })).toBeVisible();
 
-    // 热榜卡片（假数据源 ×5）
+    // 热榜卡片（假数据源 ×3）
     await expect(page.getByText('微博热搜').first()).toBeVisible();
     await expect(page.getByText('抖音热搜').first()).toBeVisible();
     await expect(page.getByText('测试热搜第 1 条').first()).toBeVisible();
