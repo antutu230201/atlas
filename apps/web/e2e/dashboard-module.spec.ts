@@ -547,7 +547,7 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByRole('menuitem', { name: /听歌统计/ }).click();
     await expect(page.getByTestId('listening-stats')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('总时长')).toBeVisible();
-    await expect(page.getByText('全站排名')).toBeVisible();
+    await expect(page.getByText('全站排名').first()).toBeVisible();
 
     // 播放一段时间 → 暂停触发冲账 → 时长计入周汇总；今日听歌卡出现并可跳转
     await page.goto('/m/dashboard/screen');
@@ -571,7 +571,8 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.getByRole('tab', { name: '周', exact: true }).click();
     await expect(page.getByText(/分钟|小时|秒/).first()).toBeVisible({ timeout: 15_000 });
     // 全站排名里能看到自己（标记（我））
-    await expect(page.getByText('（我）')).toBeVisible({ timeout: 15_000 });
+    // 改版后排名：前十内标"我 · 第 N 名"，榜外钉"我的位置"行
+    await expect(page.getByText(/我 · 第|我的位置/).first()).toBeVisible({ timeout: 15_000 });
 
     await page.goto('/m/dashboard/screen');
     await expect(page.getByTestId('listening-mini-card')).toBeVisible({ timeout: 15_000 });
