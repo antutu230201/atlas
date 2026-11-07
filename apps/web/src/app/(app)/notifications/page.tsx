@@ -15,6 +15,20 @@ function readBodyLink(body: Record<string, unknown>): string | null {
   return typeof body.link === 'string' && body.link.startsWith('/') ? body.link : null;
 }
 
+/** 相对时间：通知越新越该一眼看出，精确到分钟；跨年才显示年份 */
+function relativeTime(value: string): string {
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return '';
+  const diff = Date.now() - then;
+  const minute = 60_000;
+  if (diff < minute) return '刚刚';
+  if (diff < 60 * minute) return `${Math.floor(diff / minute)} 分钟前`;
+  if (diff < 24 * 60 * minute) return `${Math.floor(diff / (60 * minute))} 小时前`;
+  const date = new Date(then);
+  const md = `${date.getMonth() + 1} 月 ${date.getDate()} 日`;
+  return date.getFullYear() === new Date().getFullYear() ? md : `${date.getFullYear()} 年 ${md}`;
+}
+
 export default function NotificationsPage() {
   const notifications = useNotifications();
   const queryClient = useQueryClient();
@@ -76,8 +90,11 @@ export default function NotificationsPage() {
                       ) : null}
                     </p>
                     {text ? <p className="mt-1.5 text-sm text-muted">{text}</p> : null}
-                    <p className="mt-1.5 text-xs text-muted">
-                      {new Date(n.createdAt).toLocaleString('zh-CN')}
+                    <p
+                      className="mt-1.5 text-xs text-muted"
+                      title={new Date(n.createdAt).toLocaleString('zh-CN')}
+                    >
+                      {relativeTime(n.createdAt)}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">

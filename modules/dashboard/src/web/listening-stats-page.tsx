@@ -39,6 +39,14 @@ interface SummaryPayload {
     seconds: number;
     plays: number;
   }>;
+  /** 歌手聚合榜（报告里用；老接口没有该字段时为空） */
+  topArtists?: Array<{
+    artist: string;
+    seconds: number;
+    plays: number;
+    songCount: number;
+    cover: string;
+  }>;
 }
 
 interface RankingEntry {
@@ -276,7 +284,7 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
               title="导出听歌报告（HTML，可打印存 PDF）"
             >
               <ScreenIcon name="external" className="size-3.5" />
-              <span className="hidden sm:inline">报告</span>
+              <span className="hidden sm:inline text-xs">报告</span>
             </button>
             <button
               type="button"
@@ -286,8 +294,8 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
               aria-label="导出听歌数据（JSON）"
               title="导出听歌数据（JSON）"
             >
+              <ScreenIcon name="grid" className="size-3.5" />
               <span className="hidden sm:inline text-xs">数据</span>
-              <span className="sm:hidden text-xs">JSON</span>
             </button>
             <div
               className="flex shrink-0 rounded-full border border-border bg-surface/70 p-1 shadow-soft backdrop-blur-md"

@@ -749,6 +749,7 @@ export const definition: ModuleDefinition = {
         let totalSeconds = 0;
         let totalPlays = 0;
         const bucketSeconds = new Map<string, number>();
+        const artistSeconds = new Map<string, { artist: string; seconds: number; plays: number }>();
         const songSeconds = new Map<
           number,
           {
@@ -766,6 +767,18 @@ export const definition: ModuleDefinition = {
           totalPlays += Number(row.plays ?? 0);
           const label = bucket === 'month' ? String(row.day).slice(0, 7) : String(row.day);
           bucketSeconds.set(label, (bucketSeconds.get(label) ?? 0) + seconds);
+          const artist = row.songArtist || '未知歌手';
+          const artistRow = artistSeconds.get(artist);
+          if (artistRow) {
+            artistRow.seconds += seconds;
+            artistRow.plays += Number(row.plays ?? 0);
+          } else {
+            artistSeconds.set(artist, {
+              artist,
+              seconds,
+              plays: Number(row.plays ?? 0),
+            });
+          }
           const song = songSeconds.get(row.songId);
           if (song) song.seconds += seconds;
           else
@@ -782,7 +795,31 @@ export const definition: ModuleDefinition = {
         const topSongs = [...songSeconds.values()]
           .sort((a, b) => b.seconds - a.seconds)
           .slice(0, 10);
-        return { range: parsed.data.range, totalSeconds, totalPlays, buckets, topSongs };
+        // 歌手榜：报告里按艺人聚合看口味分布；封面取该歌手播放最多那首的歌封
+        const allSongs = [...songSeconds.values()];
+        const topArtists = [...artistSeconds.values()]
+          .sort((a, b) => b.seconds - a.seconds)
+          .slice(0, 8)
+          .map((entry) => {
+            const own = allSongs
+              .filter((song) => song.artist === entry.artist)
+              .sort((a, b) => b.seconds - a.seconds);
+            return {
+              artist: entry.artist,
+              seconds: entry.seconds,
+              plays: entry.plays,
+              songCount: own.length,
+              cover: own[0]?.cover ?? '',
+            };
+          });
+        return {
+          range: parsed.data.range,
+          totalSeconds,
+          totalPlays,
+          buckets,
+          topSongs,
+          topArtists,
+        };
       },
     },
 
