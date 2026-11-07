@@ -206,6 +206,7 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
   const resumeOnMetadataRef = useRef(false);
   const resumeOnGestureRef = useRef(false);
   const currentTimeRef = useRef(0);
+  const lastTimeUpdateRef = useRef(0);
   const isPlayingRef = useRef(false);
   const preferencesReadyRef = useRef(false);
   const [expanded, setExpanded] = useState(false);
@@ -684,7 +685,15 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
           setResumeHint(false);
         }}
         onPause={() => setIsPlaying(false)}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onTimeUpdate={(event) => {
+          // 原生 timeupdate 约 4Hz；节流到 2Hz，进度条靠 CSS 过渡补齐，
+          // 避免整块播放器（含歌词/歌单）每秒重渲染四次
+          const value = event.currentTarget.currentTime;
+          if (value < lastTimeUpdateRef.current || value - lastTimeUpdateRef.current >= 0.5) {
+            lastTimeUpdateRef.current = value;
+            setCurrentTime(value);
+          }
+        }}
         onLoadedMetadata={(event) => {
           if (Number.isFinite(event.currentTarget.duration)) {
             setDuration(event.currentTarget.duration);

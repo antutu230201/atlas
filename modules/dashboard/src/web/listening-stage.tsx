@@ -194,7 +194,8 @@ export function ListeningStage({
       const mount = mountRef.current;
       const colors = readStageColors();
 
-      const renderer = new THREElib.WebGLRenderer({ antialias: true, alpha: true });
+      // 关掉 MSAA：画布本身按 1.5 倍 DPR 渲染，边缘已够干净，省下的填充率对集显更友好
+      const renderer = new THREElib.WebGLRenderer({ antialias: false, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.setSize(mount.clientWidth, mount.clientHeight);
       // ACES 色调映射：高光更柔、材质更有"摄影感"
@@ -515,6 +516,12 @@ export function ListeningStage({
       let running = false;
 
       const frame = (now: number) => {
+        raf = requestAnimationFrame(frame);
+        // 空闲（未播放、未拖拽、旋转已停）时降到 40fps：持续 60fps 渲染 3D 在集显上
+        // 会让整台机器发热变卡，而静止画面看不出差别；交互/播放时恢复满帧。
+        const idle = !pulse && !dragging && Math.abs(yawVelocity) < 0.001;
+        const minGap = idle ? 1000 / 40 : 0;
+        if (now - last < minGap) return;
         const dt = Math.min(0.05, (now - last) / 1000);
         last = now;
         vinyl.rotation.z += dt * (0.85 + (pulse ? 1.7 : 0));
@@ -545,7 +552,6 @@ export function ListeningStage({
           }
         }
         renderer.render(scene, camera);
-        raf = requestAnimationFrame(frame);
       };
       const start = () => {
         if (running || reducedMotion) return;
