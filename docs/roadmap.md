@@ -391,6 +391,14 @@
 - [x] PWA manifest：可安装为独立应用（standalone、深色底、SVG 图标）——Chrome 对已安装应用放行自动播放，挂墙场景刚需；Service Worker 离线缓存留待后续
 - [x] e2e 13 条全绿
 
+### SW 离线 / 助手持久化 / 听歌周报（2026-11-07 续 6）
+
+- [x] PWA Service Worker：静态 Cache-First、导航 Network-First（离线回退 SPA 壳+内置离线页）、/v1 API 永不缓存；仅生产环境注册（dev 不干扰热更新）；版本化缓存激活时清理
+- [x] 设置页 PWA 安装卡：捕获 beforeinstallprompt 一键安装（standalone 后 Chrome 放行自动播放）
+- [x] AI 助手会话持久化：按用户存本机（60 条上限，损坏容错），刷新不丢；头部新增"清空对话"
+- [x] 听歌周报：迁移 0006（platform.scheduler_state + SECURITY DEFINER 函数 listening_weekly_report 跨空间按用户聚合 Top 歌曲）；新增 WeeklyReportScheduler（每分钟 tick，新 ISO 周首触自愈补发，状态幂等；ATLAS_WEEKLY_REPORT_FORCE=1 测试开关）→ 每用户通知"听歌周报：上周 X 分钟，最常听《…》"
+- [x] 实测：force 模式 4 位用户收到周报通知；集成测试补 SQL 函数断言（跨工作空间聚合+Top 歌曲）；e2e 13 条全绿
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。

@@ -17,12 +17,59 @@ const QUICK_PROMPTS = [
   '引导我做周复盘',
 ];
 
+/** 会话持久化：按用户存本机（刷新不丢；跨设备同步留待后端会话存储） */
+const chatKey = (userId: string) => `atlas.assistant.chat.${userId}`;
+const MAX_MESSAGES = 60;
+
 export default function AssistantPage() {
   const { user } = useActiveWorkspace();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 按用户恢复会话（useEffect 读取，避免 SSR 水合不一致）
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const raw = window.localStorage.getItem(chatKey(user.id));
+      if (raw) {
+        const parsed = JSON.parse(raw) as ChatMessage[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(
+            parsed
+              .filter(
+                (m) => (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string',
+              )
+              .slice(-MAX_MESSAGES),
+          );
+        }
+      }
+    } catch {
+      // 本地会话损坏：从空白开始，不影响使用。
+    }
+  }, [user]);
+
+  // 会话变化即持久化（截断到上限，防止无限膨胀）
+  useEffect(() => {
+    if (!user) return;
+    try {
+      window.localStorage.setItem(chatKey(user.id), JSON.stringify(messages.slice(-MAX_MESSAGES)));
+    } catch {
+      // 存储不可用（隐私模式）：对话仍可用，只是刷新后不保留。
+    }
+  }, [messages, user]);
+
+  const clearChat = () => {
+    setMessages([]);
+    if (user) {
+      try {
+        window.localStorage.removeItem(chatKey(user.id));
+      } catch {
+        // 忽略
+      }
+    }
+  };
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -53,10 +100,17 @@ export default function AssistantPage() {
 
   return (
     <div className="mx-auto flex h-[calc(100vh-8rem)] w-full max-w-2xl flex-col">
-      <header className="mb-4">
-        <h1 className="text-xl font-semibold">AI 成长助手</h1>
-        <p className="screen-label mt-1 !text-[10px]">Assistant · Always here</p>
-        <p className="text-xs text-muted">温暖、直接、有智慧——像一位老朋友。</p>
+      <header className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">AI 成长助手</h1>
+          <p className="screen-label mt-1 !text-[10px]">Assistant · Always here</p>
+          <p className="text-xs text-muted">温暖、直接、有智慧——像一位老朋友。</p>
+        </div>
+        {messages.length > 0 ? (
+          <Button size="sm" variant="ghost" onClick={clearChat}>
+            清空对话
+          </Button>
+        ) : null}
       </header>
 
       <div ref={scrollRef} className="glass flex-1 overflow-y-auto rounded-[var(--radius-lg)] p-4">

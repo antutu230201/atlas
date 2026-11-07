@@ -132,6 +132,22 @@ describe('听歌时长统计', () => {
     expect(year.body.data.totalSeconds).toBe(740);
     expect(year.body.data.buckets).toHaveLength(12);
     expect(year.body.data.buckets.at(-1)?.seconds).toBe(140);
+
+    // 全站周报聚合函数（SECURITY DEFINER）：跨工作空间按用户聚合 + Top 歌曲
+    const adminDb = createManagedDb('postgres://atlas:atlas@localhost:5433/atlas');
+    const weekly = await adminDb.db.execute(
+      sql`select * from platform.listening_weekly_report(${localDay(-7)}::date, ${localDay(0)}::date, 50)`,
+    );
+    const rows = weekly.rows as Array<{
+      out_user_name: string;
+      out_seconds: string;
+      out_top_title: string;
+    }>;
+    const owner = rows.find((r) => r.out_user_name === '听歌甲');
+    expect(owner).toBeTruthy();
+    expect(Number(owner!.out_seconds)).toBe(140);
+    expect(owner!.out_top_title).toBe('理想三旬');
+    await adminDb.end();
   });
 
   it('排名：工作空间成员按秒数排序，me 指向调用者；guest 可读但不可写心跳', async () => {

@@ -43,6 +43,13 @@
       "when": 1793897519668,
       "tag": "0005_great_anthem",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794048274221,
+      "tag": "0006_scheduler_state",
+      "breakpoints": true
     }
   ]
 }

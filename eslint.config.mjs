@@ -9,6 +9,7 @@ export default tseslint.config(
       '**/atlas-seed.mjs',
       '**/atlas-shot.mjs',
       '**/atlas-visual.mjs',
+      '**/public/sw.js',
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',

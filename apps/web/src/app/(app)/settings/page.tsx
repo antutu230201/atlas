@@ -22,6 +22,7 @@ import {
 } from '@atlas/ui';
 import { api, ApiError } from '@/lib/api';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
+import { PwaInstall } from '@/components/pwa-install';
 
 type Tab = 'modules' | 'audit' | 'ai';
 
@@ -72,7 +73,12 @@ export default function SettingsPage() {
         ))}
       </nav>
 
-      {tab === 'modules' ? <ModulesTab slug={workspace.slug} /> : null}
+      {tab === 'modules' ? (
+        <>
+          <ModulesTab slug={workspace.slug} />
+          <PwaInstall />
+        </>
+      ) : null}
       {tab === 'audit' ? <AuditTab slug={workspace.slug} /> : null}
       {tab === 'ai' ? <AiConfigTab /> : null}
     </div>

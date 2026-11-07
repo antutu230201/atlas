@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { THEME_INIT_SCRIPT } from '@atlas/tokens';
+import { PwaRegister } from '@/components/pwa-register';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className="min-h-screen bg-bg font-sans text-text antialiased"
         style={{ background: 'var(--bg-gradient)', backgroundAttachment: 'fixed' }}
       >
+        <PwaRegister />
         <Providers>{children}</Providers>
       </body>
     </html>
