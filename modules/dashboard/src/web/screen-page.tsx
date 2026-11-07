@@ -155,10 +155,10 @@ function HeroClockCard({
 }) {
   return (
     <section
-      className="screen-card screen-reveal p-4 md:p-5 xl:col-span-7"
+      className="screen-card screen-reveal p-4 md:p-5 xl:col-span-4"
       style={{ '--screen-index': 1 } as React.CSSProperties}
     >
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <ClockCard displayName={displayName} />
         </div>
@@ -513,8 +513,16 @@ export function DashboardScreenPage({
                 }
               />
               <div
-                className="screen-reveal min-w-0 xl:col-span-5"
+                className="screen-reveal min-w-0 xl:col-span-4"
                 style={{ '--screen-index': 2 } as React.CSSProperties}
+              >
+                <div className="screen-card flex h-full min-h-64 items-center justify-center p-6">
+                  <Skeleton className="h-full w-full rounded-sm" />
+                </div>
+              </div>
+              <div
+                className="screen-reveal min-w-0 xl:col-span-4"
+                style={{ '--screen-index': 3 } as React.CSSProperties}
               >
                 <div className="screen-card flex h-full min-h-64 items-center justify-center p-6">
                   <Skeleton className="h-full w-full rounded-sm" />
@@ -567,24 +575,24 @@ export function DashboardScreenPage({
                     />
                     <HeroMetric
                       value={data.activity.streak}
-                      label="连续打卡 · 天"
+                      label="连续打卡"
                       onClick={() => scrollToSection('activity-section')}
                     />
                     <HeroMetric
                       value={enabledSources.length}
-                      label="实时热榜源"
+                      label="热榜源"
                       onClick={() => scrollToSection('hotlist-section')}
                     />
                     <HeroMetric
                       value={data.countdowns.length}
-                      label="期待中的日子"
+                      label="期待"
                       onClick={() => scrollToSection('countdown-section')}
                     />
                   </>
                 }
               />
               <div
-                className="screen-reveal min-w-0 xl:col-span-5"
+                className="screen-reveal min-w-0 xl:col-span-4"
                 style={{ '--screen-index': 2 } as React.CSSProperties}
               >
                 {weather && weather.status !== 'empty' ? (
@@ -598,12 +606,13 @@ export function DashboardScreenPage({
                   </div>
                 )}
               </div>
+              <div
+                className="screen-reveal min-w-0 xl:col-span-4"
+                style={{ '--screen-index': 3 } as React.CSSProperties}
+              >
+                <ListeningMiniCard base={base} />
+              </div>
             </div>
-
-            {/* 今日听歌：首屏横向一条（今日 / 本周 / 7 天柱 / 最近在听 四块并排） */}
-            <section aria-label="今日听歌" className="min-w-0">
-              <ListeningMiniCard base={base} />
-            </section>
 
             {/* 实时热榜：紧跟时间/天气，五源横向铺满，放在听歌之后 */}
             {enabledSources.length > 0 ? (
