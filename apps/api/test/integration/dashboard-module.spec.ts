@@ -69,11 +69,11 @@ afterAll(async () => {
 });
 
 describe('个人大屏模块', () => {
-  it('snapshot：假数据源全量返回（热榜×5 + 天气 empty + 一言 + 壁纸 + 倒计时）', async () => {
+  it('snapshot：假数据源全量返回（热榜×3 + 天气 empty + 一言 + 壁纸 + 倒计时）', async () => {
     const res = await call(ownerCookie, 'snapshot');
     expect(res.status).toBe(200);
     const data = res.body.data;
-    expect(Object.keys(data.hot)).toHaveLength(5);
+    expect(Object.keys(data.hot)).toHaveLength(3);
     expect(data.hot.weibo.status).toBe('fresh');
     expect(data.hot.weibo.payload).toHaveLength(12);
     expect(data.hot.weibo.payload[0].title).toContain('微博');
@@ -84,9 +84,9 @@ describe('个人大屏模块', () => {
       weibo: true,
       douyin: true,
       bilibili: true,
-      baidu: true,
-      toutiao: true,
     });
+    // 未配置关注词时返回空数组，前端据此跳过高亮
+    expect(data.options.watchWords).toEqual([]);
     expect(data.countdowns).toEqual([]);
   });
 
@@ -119,6 +119,20 @@ describe('个人大屏模块', () => {
     expect(res.body.data.hot.weibo).toBeDefined();
 
     await call(ownerCookie, 'setOptions', { sources: { douyin: true } });
+  });
+
+  it('关注词：保存时去空白去重，snapshot 原样返回', async () => {
+    const saved = await call(ownerCookie, 'setOptions', {
+      watchWords: ['  AI ', 'AI', '英雄联盟', '', '   '],
+    });
+    expect(saved.status).toBe(200);
+    // 空串与纯空白被丢弃，重复项只保留一个
+    expect(saved.body.data.watchWords).toEqual(['AI', '英雄联盟']);
+
+    const res = await call(ownerCookie, 'snapshot');
+    expect(res.body.data.options.watchWords).toEqual(['AI', '英雄联盟']);
+
+    await call(ownerCookie, 'setOptions', { watchWords: [] });
   });
 
   it('倒计时全流程：创建→置顶→软删→回收站→恢复', async () => {

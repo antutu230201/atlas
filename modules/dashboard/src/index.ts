@@ -87,6 +87,8 @@ const settingsSchema = z.object({
   city: citySchema.nullable().optional(),
   sources: z.record(z.string(), z.boolean()).optional(),
   wallpaper: z.boolean().optional(),
+  /** 关注词：命中标题的热榜条目会高亮，最多 20 个、每个 20 字 */
+  watchWords: z.array(z.string().min(1).max(20)).max(20).optional(),
 });
 
 type WorkspaceSettings = z.infer<typeof settingsSchema>;
@@ -534,6 +536,7 @@ export const definition: ModuleDefinition = {
               return acc;
             }, {}),
             wallpaper: settings.wallpaper !== false,
+            watchWords: settings.watchWords ?? [],
           },
           weather,
           hot,
@@ -832,6 +835,25 @@ export const definition: ModuleDefinition = {
               cover: own[0]?.cover ?? '',
             };
           });
+        // 连续听歌天数：宽容口径——今天还没听不算断，从昨天往前数
+        const activeRows = await ctx.db
+          .selectDistinct({ day: listeningDaily.day })
+          .from(listeningDaily)
+          .where(
+            and(
+              eq(listeningDaily.workspaceId, ctx.workspaceId),
+              eq(listeningDaily.userId, ctx.userId),
+              gte(listeningDaily.day, localDay(new Date(Date.now() - 400 * 86_400_000))),
+            ),
+          );
+        const activeSet = new Set(activeRows.map((row) => String(row.day)));
+        const cursor = new Date();
+        if (!activeSet.has(localDay(cursor))) cursor.setDate(cursor.getDate() - 1);
+        let streakDays = 0;
+        while (activeSet.has(localDay(cursor))) {
+          streakDays += 1;
+          cursor.setDate(cursor.getDate() - 1);
+        }
         return {
           range: parsed.data.range,
           offset: parsed.data.offset ?? 0,
@@ -840,6 +862,7 @@ export const definition: ModuleDefinition = {
           buckets,
           topSongs,
           topArtists,
+          streakDays,
         };
       },
     },
@@ -995,7 +1018,11 @@ export const definition: ModuleDefinition = {
     setOptions: {
       permission: 'dashboard:write',
       handler: async (ctx, input) => {
-        const raw = (input ?? {}) as { sources?: Record<string, boolean>; wallpaper?: boolean };
+        const raw = (input ?? {}) as {
+          sources?: Record<string, boolean>;
+          wallpaper?: boolean;
+          watchWords?: string[];
+        };
         const patch: Record<string, unknown> = {};
         if (raw.sources !== undefined) {
           const known = new Set(HOT_SOURCES.map((s) => s.key));
@@ -1007,6 +1034,18 @@ export const definition: ModuleDefinition = {
         if (raw.wallpaper !== undefined) {
           if (typeof raw.wallpaper !== 'boolean') bad('wallpaper 需为布尔');
           patch.wallpaper = raw.wallpaper;
+        }
+        if (raw.watchWords !== undefined) {
+          if (!Array.isArray(raw.watchWords)) bad('watchWords 需为字符串数组');
+          // 去空白、去重、限长：前端输入框允许逗号分隔，服务端仍按数组收口
+          const words = [
+            ...new Set(
+              (raw.watchWords as string[])
+                .map((word) => word.trim())
+                .filter((word) => word.length > 0 && word.length <= 20),
+            ),
+          ].slice(0, 20);
+          patch.watchWords = words;
         }
         await ctx.settings.set(patch);
         return parseSettings(await ctx.settings.get());

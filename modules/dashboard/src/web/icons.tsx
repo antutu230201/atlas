@@ -34,7 +34,8 @@ export type ScreenIconName =
   | 'close'
   | 'repeat'
   | 'shuffle'
-  | 'grid';
+  | 'grid'
+  | 'bell';
 
 interface IconProps {
   className?: string;
@@ -74,6 +75,13 @@ export function ScreenIcon({ name, className }: IconProps & { name: ScreenIconNa
         <svg {...common}>
           <path d="M20 6v5h-5M4 18v-5h5" />
           <path d="M6.1 8a7 7 0 0 1 11.8-1L20 11M4 13l2.1 4a7 7 0 0 0 11.8-1" />
+        </svg>
+      );
+    case 'bell':
+      return (
+        <svg {...common}>
+          <path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9Z" />
+          <path d="M10 18.5a2 2 0 0 0 4 0" />
         </svg>
       );
     case 'settings':

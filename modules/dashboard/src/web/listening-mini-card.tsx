@@ -17,6 +17,8 @@ interface SummaryPayload {
   totalSeconds: number;
   buckets: Array<{ label: string; seconds: number }>;
   topSongs: Array<{ songId: number; title: string; artist: string; seconds: number }>;
+  /** 连续有听歌的天数（今天还没听不断签） */
+  streakDays?: number;
 }
 
 function shortDuration(seconds: number): string {
@@ -37,12 +39,37 @@ export function ListeningMiniCard({ base }: { base: string }) {
   });
 
   const summary = query.data;
+  // 加载中不占位：避免首屏三列在数据到位时跳动
   if (!summary) return null;
   const buckets = summary.buckets.slice(-7);
-  if (buckets.length === 0) return null;
   const todaySeconds = buckets.at(-1)?.seconds ?? 0;
   const weekSeconds = summary.totalSeconds;
-  if (todaySeconds === 0 && weekSeconds === 0) return null;
+  // 完全没有数据时也保留卡片（给引导），否则上排三列会塌成两列
+  if (buckets.length === 0 || (todaySeconds === 0 && weekSeconds === 0)) {
+    return (
+      <Link
+        href="/m/dashboard/listening"
+        className="screen-card flex h-full flex-col items-start justify-between gap-3 p-4 transition-colors hover:border-primary/40"
+        aria-label="今天还没有听歌，去听一首"
+        data-testid="listening-mini-card"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-7 items-center justify-center rounded-xs border border-primary/20 bg-primary-soft text-primary">
+            <ScreenIcon name="music" className="size-3.5" />
+          </span>
+          <div>
+            <h2 className="text-[13px] font-semibold leading-4">今日听歌</h2>
+            <p className="screen-label !text-[9px] !tracking-[0.16em]">Listening · Today</p>
+          </div>
+        </div>
+        <p className="text-[13px] text-muted">今天还没有播放记录。</p>
+        <p className="flex items-center gap-1.5 text-[11px] text-primary">
+          去放一首歌
+          <ScreenIcon name="arrow" className="size-3" />
+        </p>
+      </Link>
+    );
+  }
 
   const todayMinutes = Math.round(todaySeconds / 60);
   const activeDays = buckets.filter((bucket) => bucket.seconds > 0).length;
@@ -83,6 +110,12 @@ export function ListeningMiniCard({ base }: { base: string }) {
         </p>
         <p className="text-[10px] text-muted/70">
           日均 {shortDuration(Math.round(weekSeconds / Math.max(1, activeDays)))}
+          {summary.streakDays !== undefined && summary.streakDays > 1 ? (
+            <>
+              <span className="mx-1.5 opacity-40">·</span>
+              连续 <span className="font-mono text-text/80">{summary.streakDays}</span> 天
+            </>
+          ) : null}
         </p>
       </div>
 

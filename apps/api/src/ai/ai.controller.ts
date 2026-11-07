@@ -84,7 +84,8 @@ export class AIController {
     try {
       const result = await probe.complete({
         prompt: '连接测试：请只回复"连接成功"四个字。',
-        maxTokens: 16,
+        // 推理型模型会先消耗 token 再出正文，给太小会拿到空内容
+        maxTokens: 64,
         temperature: 0,
       });
       return { data: { ok: true, model: result.model, sample: result.text.slice(0, 80) } };

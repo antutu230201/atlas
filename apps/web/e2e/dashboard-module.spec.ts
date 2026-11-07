@@ -484,7 +484,8 @@ test.describe('个人大屏模块（假数据源）', () => {
       .toBeGreaterThan(1);
 
     // 切到「今天」页：组件不卸载，播放不中断、进度继续走
-    await page.getByRole('link', { name: '今天' }).click();
+    // 侧栏「今天」：用 href 精确定位，避免命中大屏里的「今日听歌」空态卡
+    await page.locator('a[href="/"]').filter({ hasText: '今天' }).first().click();
     await expect(page.getByTestId('vinyl-player')).toBeVisible();
     await expect(disc).toHaveAttribute('data-playing', 'true');
     const beforeNavigate = await player

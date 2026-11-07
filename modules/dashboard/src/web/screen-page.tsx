@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -25,12 +25,16 @@ import { CountdownSection } from './countdown-card';
 import { AtlasMark, HealthDot, ScreenIcon, WeatherIcon } from './icons';
 import { HotlistCard } from './hotlist-card';
 import { ListeningMiniCard } from './listening-mini-card';
+import { NotificationBell } from './notification-bell';
 import { QuoteCard } from './quote-card';
 import { SettingsDrawer } from './settings-drawer';
+import { ScreenHeadline } from './screen-headline';
+import { ShortcutHelp } from './shortcut-help';
 import { SummaryCard } from './summary-card';
 import { Ticker } from './ticker';
 import { WeatherCard } from './weather-card';
 import { WeatherAtmosphere } from './weather-atmosphere';
+import { ANTI_BURN_IN_KEY, NIGHT_MODE_KEY, useAntiBurnIn, useNightMode } from './screen-ambient';
 import { HOT_SOURCE_LABELS, type DashboardSnapshot, type CountdownItem } from './types';
 
 /** 每台设备独立记住挂墙模式：同一账号在墙面屏和笔记本上可有不同取舍。 */
@@ -130,7 +134,7 @@ function HeroMetric({
       className="group/metric rounded-sm border-l border-border py-0.5 pl-4 text-left transition-colors first:border-l-0 first:pl-0 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:border-l-0 max-sm:pl-0"
     >
       <span
-        className={`block font-mono text-[26px] font-medium tracking-tight tabular-nums ${accent ? 'text-primary' : ''}`}
+        className={`block font-mono text-[20px] font-medium tracking-tight tabular-nums sm:text-[26px] ${accent ? 'text-primary' : ''}`}
       >
         {String(value).padStart(2, '0')}
       </span>
@@ -164,9 +168,7 @@ function HeroClockCard({
         </div>
         <TimeOrbit />
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-y-3 border-t border-border pt-2 sm:grid-cols-4">
-        {metrics}
-      </div>
+      <div className="mt-2 grid grid-cols-4 gap-y-3 border-t border-border pt-2">{metrics}</div>
     </section>
   );
 }
@@ -230,8 +232,14 @@ export function DashboardScreenPage({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lowPowerMode, setLowPowerMode] = useState(false);
+  // 护屏偏好默认开启：挂墙场景下用户往往不会主动去找开关，宁可有微小位移也不烧屏
+  const [antiBurnIn, setAntiBurnIn] = useState(true);
+  const [nightAuto, setNightAuto] = useState(true);
+  const night = useNightMode(nightAuto);
+  const shiftRef = useAntiBurnIn(antiBurnIn);
   const scrolling = useScrollActive();
   // 播放器挂在应用外壳层，用 body 标记让全局样式在滚动时把它淡出
   useEffect(() => {
@@ -259,6 +267,8 @@ export function DashboardScreenPage({
   useEffect(() => {
     try {
       setLowPowerMode(window.localStorage.getItem(LOW_POWER_KEY) === '1');
+      setAntiBurnIn(window.localStorage.getItem(ANTI_BURN_IN_KEY) !== '0');
+      setNightAuto(window.localStorage.getItem(NIGHT_MODE_KEY) !== '0');
     } catch {
       // 隐私模式下 localStorage 可能不可用，保持默认高画质即可。
     }
@@ -276,7 +286,8 @@ export function DashboardScreenPage({
   const snapshot = useQuery({
     queryKey: ['module', moduleName, workspaceSlug, 'snapshot'],
     queryFn: () => api<DashboardSnapshot>(`${base}/snapshot`, { method: 'POST', json: {} }),
-    refetchInterval: 10 * 60_000,
+    // 热榜时效性强，5 分钟一轮；AI 小结按天缓存，不受频率影响
+    refetchInterval: 5 * 60_000,
     // 窗口失焦回来不重复闪加载；10 分钟轮询 + 手动刷新仍在
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
@@ -290,7 +301,8 @@ export function DashboardScreenPage({
   };
 
   const refresh = useMutation({
-    mutationFn: () => api(`${base}/refresh`, { method: 'POST', json: {} }),
+    mutationFn: (sources?: string[]) =>
+      api(`${base}/refresh`, { method: 'POST', json: sources ? { sources } : {} }),
     onSuccess: () => {
       invalidate();
       toast({ title: '已刷新全部数据源', variant: 'ok' });
@@ -335,10 +347,43 @@ export function DashboardScreenPage({
 
   const data = snapshot.data;
   const enabledSources = data ? Object.entries(data.hot) : [];
+  const watchWords = data?.options.watchWords ?? [];
+  // 关注词命中数：热榜标题里出现任一关注词的条目数，给"今天有没有我关心的事"一个直接答案
+  const watchHits =
+    watchWords.length === 0
+      ? 0
+      : enabledSources.reduce((sum, [, envelope]) => {
+          const items = envelope.payload ?? [];
+          return (
+            sum +
+            items.filter((item) =>
+              watchWords.some((word) => item.title.toLowerCase().includes(word.toLowerCase())),
+            ).length
+          );
+        }, 0);
   // 无任何热榜数据时不渲染空的热搜条
   const hasTicker = enabledSources.some(([, envelope]) => (envelope.payload?.length ?? 0) > 0);
   const weather = data?.weather;
   const immersive = isFullscreen || chromeHidden;
+
+  // 顶栏副标轮播：AI 小结只在真实供应商下展示，Mock 文案不上大屏
+  const summaryText = data?.summary.payload?.text ?? '';
+  const summaryHeadline =
+    summaryText.length > 0 && !summaryText.startsWith('[MockAI]')
+      ? (summaryText.split(/[。！？\n]/)[0] ?? '').trim()
+      : '';
+  const headlineItems = [
+    `Atlas command center · ${workspace?.name ?? workspaceSlug}`,
+    ...(summaryHeadline ? [`今日小结 · ${summaryHeadline}`] : []),
+    ...(data
+      ? [`连续打卡 ${data.activity.streak} 天 · 今日完成 ${data.activity.todayCount} 件`]
+      : []),
+    ...(weather?.payload
+      ? [
+          `${data?.city?.name ?? '当地'} ${weather.payload.now.text} ${Math.round(weather.payload.now.temperature)}°C`,
+        ]
+      : []),
+  ];
 
   const toggleFullscreen = async () => {
     if (document.fullscreenElement) {
@@ -374,6 +419,31 @@ export function DashboardScreenPage({
     });
   };
 
+  /** 护屏开关只落本机：同一账号在墙面屏与笔记本上应各自决定 */
+  const toggleAntiBurnIn = () => {
+    setAntiBurnIn((enabled) => {
+      const next = !enabled;
+      try {
+        window.localStorage.setItem(ANTI_BURN_IN_KEY, next ? '1' : '0');
+      } catch {
+        // 同上：写不进去不影响本次切换
+      }
+      return next;
+    });
+  };
+
+  const toggleNightAuto = () => {
+    setNightAuto((enabled) => {
+      const next = !enabled;
+      try {
+        window.localStorage.setItem(NIGHT_MODE_KEY, next ? '1' : '0');
+      } catch {
+        // 同上
+      }
+      return next;
+    });
+  };
+
   const scrollToSection = (id: string) => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.getElementById(id)?.scrollIntoView({
@@ -382,11 +452,52 @@ export function DashboardScreenPage({
     });
   };
 
+  /**
+   * 键盘快捷键：handler 存 ref，事件只绑一次——否则每次渲染都会解绑重绑，
+   * 且依赖一堆 useMutation 对象容易漏依赖。
+   */
+  const shortcutRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
+  shortcutRef.current = (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+    ) {
+      return;
+    }
+    const key = event.key.toLowerCase();
+    if (key === 'f') {
+      event.preventDefault();
+      void toggleFullscreen();
+    } else if (key === 'l') {
+      event.preventDefault();
+      toggleLowPowerMode();
+    } else if (key === 'r') {
+      event.preventDefault();
+      if (!refresh.isPending) refresh.mutate();
+    } else if (key === 's') {
+      if (!canWrite) return;
+      event.preventDefault();
+      setSettingsOpen(true);
+    } else if (event.key === '?') {
+      event.preventDefault();
+      setShortcutsOpen((open) => !open);
+    }
+  };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => shortcutRef.current(event);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div
+      ref={shiftRef}
       className="dashboard-screen relative min-h-screen overflow-hidden bg-bg text-text"
       data-scrolling={scrolling || undefined}
       data-low-power={lowPowerMode || undefined}
+      data-night={night || undefined}
     >
       <ScreenBackground
         enabled={!lowPowerMode}
@@ -402,7 +513,7 @@ export function DashboardScreenPage({
       ) : null}
 
       <div
-        className={`relative z-10 mx-auto w-full space-y-4 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:p-5 md:pb-[calc(6rem+env(safe-area-inset-bottom))] xl:p-6 xl:pb-[calc(6rem+env(safe-area-inset-bottom))] ${immersive ? 'max-w-[1920px]' : 'max-w-[1728px]'}`}
+        className={`screen-shift relative z-10 mx-auto w-full space-y-4 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:p-5 md:pb-[calc(6rem+env(safe-area-inset-bottom))] xl:p-6 xl:pb-[calc(6rem+env(safe-area-inset-bottom))] ${immersive ? 'max-w-[1920px]' : 'max-w-[1728px]'}`}
       >
         <header className="screen-card screen-reveal flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-5">
           <div className="flex min-w-0 items-center gap-3">
@@ -414,9 +525,7 @@ export function DashboardScreenPage({
                   PERSONAL OS
                 </span>
               </div>
-              <p className="screen-label mt-0.5 truncate !text-[11px]">
-                Atlas command center · {workspace?.name ?? workspaceSlug}
-              </p>
+              <ScreenHeadline items={headlineItems} />
             </div>
           </div>
 
@@ -441,19 +550,29 @@ export function DashboardScreenPage({
           </nav>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="mr-1 hidden items-center gap-2 px-2 text-[11px] tracking-wider text-muted md:flex">
+            <button
+              type="button"
+              onClick={() => refresh.mutate()}
+              disabled={refresh.isPending || snapshot.isFetching}
+              className="mr-1 hidden items-center gap-2 rounded-full px-2 py-1 text-[11px] tracking-wider text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:cursor-progress md:flex"
+              title="点击刷新全部数据源（R）"
+              aria-label="刷新全部数据源"
+            >
               <HealthDot status={snapshot.isError ? 'error' : 'fresh'} />
-              {snapshot.isFetching
+              {snapshot.isFetching || refresh.isPending
                 ? '正在同步'
                 : snapshot.dataUpdatedAt > 0
                   ? `同步 ${new Date(snapshot.dataUpdatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
                   : '数据在线'}
-            </div>
+            </button>
             <ModuleLauncher workspaceSlug={workspaceSlug} currentModule={moduleName} />
-            <ThemeToggle />
+            <NotificationBell />
+            <div className="hidden sm:block">
+              <ThemeToggle />
+            </div>
             <button
               type="button"
-              className={`screen-icon-button ${lowPowerMode ? '!border-primary/40 !text-primary' : ''}`}
+              className={`screen-icon-button hidden md:inline-flex ${lowPowerMode ? '!border-primary/40 !text-primary' : ''}`}
               onClick={toggleLowPowerMode}
               aria-pressed={lowPowerMode}
               aria-label="低功耗模式"
@@ -492,7 +611,7 @@ export function DashboardScreenPage({
             ) : null}
             <button
               type="button"
-              className="screen-icon-button"
+              className="screen-icon-button hidden sm:inline-flex"
               onClick={() => void toggleFullscreen()}
               title={isFullscreen ? '退出浏览器全屏（Esc）' : '进入浏览器全屏'}
               aria-label={immersive ? (isFullscreen ? '退出全屏' : '退出沉浸') : '全屏'}
@@ -635,9 +754,19 @@ export function DashboardScreenPage({
                     </div>
                     <p className="screen-label !text-[10px]">Real-time pulse</p>
                   </div>
-                  <span className="font-mono text-[10px] tracking-wider text-muted">
-                    {String(enabledSources.length).padStart(2, '0')} SOURCES
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] tracking-wider text-muted">
+                      {String(enabledSources.length).padStart(2, '0')} SOURCES
+                    </span>
+                    {watchHits > 0 ? (
+                      <span
+                        className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-semibold text-primary"
+                        title={`关注词：${watchWords.join('、')}`}
+                      >
+                        关注 {watchHits}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 {/* 宽屏固定五列单行；窄屏自动降列。每条源只取前 4 条，保证一屏可读完 */}
                 <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -649,6 +778,7 @@ export function DashboardScreenPage({
                       label={HOT_SOURCE_LABELS[key] ?? key}
                       envelope={envelope}
                       limit={6}
+                      watchWords={watchWords}
                     />
                   ))}
                 </div>
@@ -662,7 +792,11 @@ export function DashboardScreenPage({
               className="grid items-stretch gap-4 xl:grid-cols-12"
             >
               <div className="flex min-w-0 flex-col gap-4 xl:col-span-7">
-                <SummaryCard envelope={data.summary} />
+                <SummaryCard
+                  envelope={data.summary}
+                  regenerating={refresh.isPending}
+                  onRegenerate={() => refresh.mutate(['summary'])}
+                />
                 {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
               </div>
               <div id="activity-section" className="min-w-0 scroll-mt-6 xl:col-span-5">
@@ -710,6 +844,11 @@ export function DashboardScreenPage({
         ) : null}
       </div>
 
+      {/* 夜间压暗覆盖层：叠在内容之上（不拦截点击），比给整棵树加 filter 便宜 */}
+      {night ? <div className="screen-night" aria-hidden /> : null}
+
+      <ShortcutHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+
       {canWrite ? (
         <SettingsDrawer
           open={settingsOpen}
@@ -719,6 +858,11 @@ export function DashboardScreenPage({
           city={data?.city ?? null}
           sources={data?.options.sources ?? {}}
           wallpaper={data?.options.wallpaper ?? true}
+          watchWords={data?.options.watchWords ?? []}
+          antiBurnIn={antiBurnIn}
+          nightAuto={nightAuto}
+          onToggleAntiBurnIn={toggleAntiBurnIn}
+          onToggleNightAuto={toggleNightAuto}
           onAfterChange={invalidate}
         />
       ) : null}

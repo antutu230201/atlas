@@ -11,8 +11,30 @@ export function formatHeat(heat?: number): string | undefined {
   return String(heat);
 }
 
-/** 与上一次快照对比的排名变化：↑升 ↓降 ＝持平 · 新上榜 */
-function useRankChanges(items: HotItem[]): Map<string, number> {
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** 关注词高亮：只做子串匹配（不区分大小写），命中部分用主色标出 */
+function renderTitle(title: string, watchWords: string[]): React.ReactNode {
+  const hits = watchWords.filter(
+    (word) => word.length > 0 && title.toLowerCase().includes(word.toLowerCase()),
+  );
+  if (hits.length === 0) return title;
+  const lowerHits = new Set(hits.map((word) => word.toLowerCase()));
+  const pattern = new RegExp(`(${hits.map(escapeRegExp).join('|')})`, 'gi');
+  return title.split(pattern).map((part, index) =>
+    lowerHits.has(part.toLowerCase()) ? (
+      <mark key={`${part}-${index}`} className="rounded-[2px] bg-primary-soft px-0.5 text-primary">
+        {part}
+      </mark>
+    ) : (
+      <span key={`${part}-${index}`}>{part}</span>
+    ),
+  );
+}
+
+/** 与上一次快照对比的排名变化：↑升 ↓降 ＝持平 · 新上榜 */ function useRankChanges(
+  items: HotItem[],
+): Map<string, number> {
   const prevRef = useRef<Map<string, number>>(new Map());
   const [changes, setChanges] = useState<Map<string, number>>(new Map());
   useEffect(() => {
@@ -38,12 +60,15 @@ export function HotlistCard({
   limit = 10,
   sourceKey,
   index = 0,
+  watchWords = [],
 }: {
   label: string;
   envelope: SourceEnvelope<HotItem[]>;
   limit?: number;
   sourceKey?: string;
   index?: number;
+  /** 关注词：命中的标题高亮 */
+  watchWords?: string[];
 }) {
   // useMemo 稳定 items 引用：否则 slice 每次渲染产生新数组，useRankChanges 的 effect 会无限重跑
   const items = useMemo(() => (envelope.payload ?? []).slice(0, limit), [envelope.payload, limit]);
@@ -134,7 +159,7 @@ export function HotlistCard({
                       className="truncate text-[13px] leading-normal text-text"
                       title={item.title}
                     >
-                      {item.title}
+                      {renderTitle(item.title, watchWords)}
                     </span>
                     {item.tag ? <TagChip tag={item.tag} /> : null}
                   </span>

@@ -1,3 +1,4 @@
+import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AIAdapter, AICompletionRequest, AICompletionResponse } from '@atlas/core';
@@ -146,7 +147,8 @@ export function mergeAiConfig(
  * 可热切换的 AI 适配器：包装当前实例，配置保存后调用 refresh() 立即生效，无需重启。
  * 无界面配置时回落 env；两者皆无 key 时回落 Mock（零配置可跑）。
  */
-export class ConfigurableAIProvider implements AIAdapter {
+export class ConfigurableAIProvider implements AIAdapter, OnApplicationBootstrap {
+  private readonly logger = new Logger('AIAdapter');
   private current: AIAdapter;
   private currentConfig: AiConfig | null;
 
@@ -157,6 +159,24 @@ export class ConfigurableAIProvider implements AIAdapter {
   ) {
     this.currentConfig = initialConfig;
     this.current = instantiateAdapter(initialConfig, env);
+  }
+
+  /**
+   * 库配置必须在应用启动完成后再读：内嵌 PG 由 infra 在 onModuleInit 阶段拉起，
+   * 工厂函数执行时库还没就绪，读库会直接失败——这正是"库里配了 key 却一直走 Mock"的根因。
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    try {
+      const config = await readAiConfigFromDb(this.db);
+      this.refresh(config);
+      this.logger.log(
+        config ? `AI 配置已从数据库加载（${config.model}）` : '未配置 AI 供应商，使用 Mock',
+      );
+    } catch (error) {
+      this.logger.warn(
+        `读取 AI 配置失败，保持 env/Mock：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   get config(): AiConfig | null {

@@ -696,3 +696,43 @@ body[data-screen-scrolling='1'] [data-testid='vinyl-player'] {
 .dashboard-screen[data-low-power] .screen-pulse-ring {
   animation: none !important;
 }
+
+/* ---------- 挂墙护屏 ----------
+   防烧屏：位移值由 screen-ambient 的定时器直写 CSS 变量（不经过 React 渲染）。
+   用 1.6s 过渡把 1px 的跳变摊平，肉眼几乎察觉不到。 */
+.dashboard-screen .screen-shift {
+  transform: translate3d(var(--screen-shift-x, 0px), var(--screen-shift-y, 0px), 0);
+  transition: transform 1.6s ease-in-out;
+}
+
+/* 夜间压暗：叠在内容之上，只压亮度不改布局，也不拦截点击 */
+.screen-night {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(4, 6, 14, 0.32), rgba(4, 6, 14, 0.46));
+}
+
+/* 顶栏副标轮播的淡入 */
+@keyframes screen-headline-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.screen-headline-fade {
+  animation: screen-headline-in 0.45s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen-headline-fade {
+    animation: none;
+  }
+  .dashboard-screen .screen-shift {
+    transition: none;
+  }
+}

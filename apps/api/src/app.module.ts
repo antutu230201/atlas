@@ -24,7 +24,7 @@ import { HealthController } from './modules/health/health.controller';
 import { HealthService } from './modules/health/health.service';
 import { ConsoleMailAdapter } from '@atlas/core';
 import type { AIAdapter } from '@atlas/core';
-import { ConfigurableAIProvider, readAiConfigFromDb } from './ai/ai-config.service';
+import { ConfigurableAIProvider } from './ai/ai-config.service';
 import { WorkspaceController } from './workspace/workspace.controller';
 import { WorkspaceService } from './workspace/workspace.service';
 import {
@@ -115,17 +115,10 @@ import {
     { provide: ConsoleMailAdapter, useFactory: () => new ConsoleMailAdapter() },
     { provide: MAIL_ADAPTER_TOKEN, useExisting: ConsoleMailAdapter },
     {
-      // 阶段 5：启动时读库初始化（界面配置 > env > Mock），保存配置后经 refresh() 热切换
+      // 配置在 onApplicationBootstrap 阶段读库（内嵌 PG 于 onModuleInit 才启动，
+      // 工厂执行时库还不可用）；保存配置后经 refresh() 热切换。
       provide: AI_ADAPTER_TOKEN,
-      useFactory: async (db: Db, env: ApiEnv): Promise<AIAdapter> => {
-        let initial: Awaited<ReturnType<typeof readAiConfigFromDb>> = null;
-        try {
-          initial = await readAiConfigFromDb(db);
-        } catch {
-          // 库尚未就绪（如首启迁移前）时先按 env/Mock 运行，配置页保存后即恢复
-        }
-        return new ConfigurableAIProvider(db, env, initial);
-      },
+      useFactory: (db: Db, env: ApiEnv): AIAdapter => new ConfigurableAIProvider(db, env, null),
       inject: [DB_TOKEN, ENV_TOKEN],
     },
     {

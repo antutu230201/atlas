@@ -8,7 +8,16 @@ import { ScreenIcon } from './icons';
  * AI 每日摘要卡：服务端按天缓存（TTL 6h / 手动强刷），此处纯展示。
  * 数据为 MockAI 模板文案时同样可读——配置真实供应商后自动升级（阶段 5 遗留项）。
  */
-export function SummaryCard({ envelope }: { envelope: SourceEnvelope<DailySummary> }) {
+export function SummaryCard({
+  envelope,
+  onRegenerate,
+  regenerating = false,
+}: {
+  envelope: SourceEnvelope<DailySummary>;
+  /** 手动重新生成当天小结（服务端按天缓存，默认 6h 才更新） */
+  onRegenerate?: () => void;
+  regenerating?: boolean;
+}) {
   // Mock 供应商会把完整提示词回显到正文；大屏只展示诚实的预览说明，不把调试文本当 AI 产出。
   const isMock = envelope.payload?.text.startsWith('[MockAI]') ?? false;
   return (
@@ -27,9 +36,27 @@ export function SummaryCard({ envelope }: { envelope: SourceEnvelope<DailySummar
             <p className="screen-label mt-0.5 !text-[10px]">Atlas intelligence</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-border bg-primary-soft px-2.5 py-1 text-[11px] text-primary">
-          <span className="size-1 animate-pulse rounded-full bg-primary" />
-          {isMock ? 'PREVIEW · 待接入' : 'AI BRIEFING'}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-full border border-border bg-primary-soft px-2.5 py-1 text-[11px] text-primary">
+            <span className="size-1 animate-pulse rounded-full bg-primary" />
+            {isMock ? 'PREVIEW · 待接入' : 'AI BRIEFING'}
+          </div>
+          {onRegenerate ? (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              disabled={regenerating}
+              className="flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[11px] text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:cursor-progress disabled:opacity-60"
+              aria-label="重新生成每日小结"
+              title="重新生成（会调用一次 AI）"
+            >
+              <ScreenIcon
+                name="refresh"
+                className={`size-3 ${regenerating ? 'animate-spin' : ''}`}
+              />
+              {regenerating ? '生成中' : '重写'}
+            </button>
+          ) : null}
         </div>
       </div>
 

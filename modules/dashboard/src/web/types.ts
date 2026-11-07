@@ -92,7 +92,12 @@ export interface DailySummary {
 export interface DashboardSnapshot {
   serverTime: string;
   city: CitySetting | null;
-  options: { sources: Record<string, boolean>; wallpaper: boolean };
+  options: {
+    sources: Record<string, boolean>;
+    wallpaper: boolean;
+    /** 关注词：命中的热榜标题会高亮 */
+    watchWords: string[];
+  };
   weather: SourceEnvelope<WeatherData>;
   hot: Record<string, SourceEnvelope<HotItem[]>>;
   quote: SourceEnvelope<Quote>;
