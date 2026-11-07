@@ -27,12 +27,14 @@
     "lunar-typescript": "^1.7.3",
     "next": "^16.0.0",
     "qrcode": "^1.5.4",
+    "three": "^0.187.0",
     "zod": "^4.1.0"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.187.0",
     "drizzle-kit": "^0.31.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

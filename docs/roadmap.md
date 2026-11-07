@@ -332,6 +332,15 @@
 - [x] 测试全链路更新：全局装置 truncate 增加 listening_daily；module-events 派发测试改循环派发防批次次序脆弱；dashboard/app-shell/todo/habit 四个 e2e spec 摘掉建空间/启用大屏步骤（注册即得），13 条全绿；习惯用例定位器改精确匹配防空态文案子串抖动
 - 后续：设置页"工作空间设置"界面收敛（成员邀请 UI 暂留底层能力）；老用户多空间取第一个为活跃空间
 
+### 听歌统计页 3D 化：three.js 数据舞台（2026-11-07）
+
+- [x] 依赖：dashboard 模块新增 three（MIT，动态导入仅统计页加载）+ @types/three
+- [x] 新组件 listening-stage.tsx：旋转黑胶唱片（Canvas 贴图标签实时显示 Top1 歌名/歌手）+ 日/周/月/年分桶声浪柱（高度弹性过渡、悬停 raycast 显示数值气泡）+ 音符粒子（数量随总时长 26~110 上浮摆动）；极坐标网格舞台
+- [x] 交互与工程：拖拽旋转视角（阻尼+闲置自转）、DPR≤1.5、页面隐藏暂停渲染、prefers-reduced-motion 静帧、卸载全量 dispose、ResizeObserver 自适应
+- [x] 主题联动：MutationObserver 监听 html class/data-theme，重读设计令牌换材质色/灯光/粒子贴图，亮暗双主题截图验收
+- [x] 统计页重排：数据卡悬浮舞台右上（总时长/播放次数/我的排名），Top 歌曲与全站排名玻璃拟态重绘（渐变徽章/进度条/hover 位移）
+- [x] e2e 13 条全绿（统计页文案断言不变）
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。
