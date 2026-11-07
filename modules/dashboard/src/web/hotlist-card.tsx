@@ -69,9 +69,9 @@ export function HotlistCard({
       className="screen-card screen-reveal group/card flex h-full flex-col hover:-translate-y-1"
       style={{ '--screen-index': index + 3 } as React.CSSProperties}
     >
-      <header className="flex items-center gap-3 border-b border-border px-4 py-3.5">
+      <header className="flex items-center gap-3 border-b border-border px-3 py-2.5">
         <span
-          className={`flex size-8 shrink-0 items-center justify-center rounded-sm font-mono text-xs font-bold ${sourceTone.tone}`}
+          className={`flex size-7 shrink-0 items-center justify-center rounded-sm font-mono text-[11px] font-bold ${sourceTone.tone}`}
         >
           {sourceTone.mark}
         </span>
@@ -91,7 +91,7 @@ export function HotlistCard({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col px-2 py-2">
+      <div className="flex flex-1 flex-col px-2 py-1">
         {envelope.payload === null ? (
           <p className="my-auto py-8 text-center text-xs text-muted">
             {envelope.status === 'empty' ? '该源未启用' : (envelope.error ?? '暂无数据')}
@@ -150,12 +150,12 @@ export function HotlistCard({
                       href={item.url}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="group flex h-11 items-center gap-3 rounded-sm px-1.5 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className="group flex h-8 items-center gap-3 rounded-sm px-1.5 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                     >
                       {body}
                     </a>
                   ) : (
-                    <div className="group flex h-11 items-center gap-3 rounded-sm px-1.5">
+                    <div className="group flex h-8 items-center gap-3 rounded-sm px-1.5">
                       {body}
                     </div>
                   )}

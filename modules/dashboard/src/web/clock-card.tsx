@@ -44,13 +44,13 @@ export function ClockCard({ displayName }: { displayName?: string }) {
   const dateText = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日 · 周${WEEKDAYS[now.getDay()]}`;
 
   return (
-    <section className="relative z-10 flex h-full flex-col justify-between gap-5">
+    <section className="relative z-10 flex h-full flex-col justify-between gap-3">
       <div>
         <div className="flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-info shadow-[var(--screen-glow)]" />
           <p className="screen-label">Local time · Living in the moment</p>
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-muted">
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">
           {dateText}
           <span className="mx-2 opacity-40">/</span>
           {lunarInfo.lunarDate}
@@ -62,16 +62,16 @@ export function ClockCard({ displayName }: { displayName?: string }) {
       </div>
 
       <div className="flex items-end gap-3" role="timer" aria-label="当前时间">
-        <p className="font-mono text-[clamp(3.8rem,7vw,7.2rem)] font-medium leading-[0.88] tracking-[-0.075em] tabular-nums">
+        <p className="font-mono text-[clamp(2.6rem,4vw,3.6rem)] font-medium leading-[0.88] tracking-[-0.075em] tabular-nums">
           {time}
         </p>
-        <span className="mb-1 rounded-sm border border-border bg-primary-soft px-2 py-1 font-mono text-lg font-normal text-primary tabular-nums">
+        <span className="mb-1 rounded-sm border border-border bg-primary-soft px-2 py-0.5 font-mono text-base font-normal text-primary tabular-nums">
           {seconds}
         </span>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <p className="text-base font-medium tracking-tight">
+        <p className="text-sm font-medium tracking-tight">
           {greetingOf(now.getHours())}
           {displayName ? `，${displayName}` : ''}
           <span className="ml-2 text-muted">今天也保持自己的节奏。</span>
@@ -95,7 +95,7 @@ export function ClockCard({ displayName }: { displayName?: string }) {
 export function TimeOrbit() {
   return (
     <div
-      className="pointer-events-none relative hidden aspect-square w-full max-w-64 items-center justify-center md:flex"
+      className="pointer-events-none relative hidden aspect-square w-full max-w-48 items-center justify-center md:flex"
       aria-hidden
     >
       <svg viewBox="0 0 240 240" className="size-full overflow-visible">

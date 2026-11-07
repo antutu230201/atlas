@@ -60,11 +60,11 @@ export function ListeningMiniCard({ base }: { base: string }) {
   return (
     <Link
       href="/m/dashboard/listening"
-      className="screen-card block p-4 transition-colors hover:border-primary/40"
+      className="screen-card block p-4 transition-colors hover:border-primary/40 xl:flex xl:items-center xl:gap-6"
       aria-label={`今日听歌 ${todayMinutes} 分钟，查看听歌统计`}
       data-testid="listening-mini-card"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 xl:w-40 xl:shrink-0">
         <div className="flex items-center gap-2.5">
           <span className="flex size-7 items-center justify-center rounded-xs border border-primary/20 bg-primary-soft text-primary">
             <ScreenIcon name="music" className="size-3.5" />
@@ -77,8 +77,8 @@ export function ListeningMiniCard({ base }: { base: string }) {
         <span className="font-mono text-[10px] tracking-wider text-muted/70">STATS →</span>
       </div>
 
-      <div className="mt-3 flex items-end justify-between gap-2">
-        <p className="font-mono text-[26px] font-semibold leading-7 tabular-nums">
+      <div className="mt-3 flex items-end justify-between gap-2 xl:mt-0 xl:w-48 xl:shrink-0">
+        <p className="font-mono text-[22px] font-semibold leading-6 tabular-nums">
           {todayMinutes}
           <span className="ml-1 text-xs font-medium text-muted">分钟</span>
         </p>
@@ -90,15 +90,31 @@ export function ListeningMiniCard({ base }: { base: string }) {
         </p>
       </div>
 
+      <p className="mt-2 w-full truncate border-t border-border/60 pt-1.5 text-[10px] text-muted xl:mt-0 xl:w-52 xl:shrink-0 xl:border-r xl:border-t-0 xl:pr-5 xl:pt-0">
+        {topSong ? (
+          <>
+            <span className="text-muted/70">最近在听</span>
+            <span className="ml-1.5 text-text">{topSong.title}</span>
+            <span className="ml-1">· {topSong.artist}</span>
+          </>
+        ) : (
+          '还没有播放记录'
+        )}
+      </p>
+
       {/* 近 7 天：每根柱有可见轨道 + 周几标签，今天用实色强调 */}
-      <div className="mt-3 flex items-end gap-1.5" role="img" aria-label="最近 7 天听歌时长">
+      <div
+        className="mt-2 flex items-end gap-1.5 xl:mt-0 xl:min-w-0 xl:flex-1"
+        role="img"
+        aria-label="最近 7 天听歌时长"
+      >
         {buckets.map((bucket, index) => {
           const isToday = index === buckets.length - 1;
           const height = bucket.seconds > 0 ? Math.max(12, (bucket.seconds / maxSeconds) * 100) : 0;
           return (
             <div key={bucket.label} className="flex min-w-0 flex-1 flex-col items-center gap-1">
               <div
-                className={`flex h-9 w-full items-end overflow-hidden rounded-xs ${
+                className={`mx-auto flex h-8 w-full max-w-10 items-end overflow-hidden rounded-xs ${
                   isToday ? 'bg-primary-soft' : 'bg-border/30'
                 }`}
                 title={`${bucket.label} · ${shortDuration(bucket.seconds)}`}
@@ -121,18 +137,6 @@ export function ListeningMiniCard({ base }: { base: string }) {
           );
         })}
       </div>
-
-      <p className="mt-2.5 truncate border-t border-border/60 pt-2 text-[11px] text-muted">
-        {topSong ? (
-          <>
-            <span className="text-muted/70">最近在听</span>
-            <span className="ml-1.5 text-text">{topSong.title}</span>
-            <span className="ml-1">· {topSong.artist}</span>
-          </>
-        ) : (
-          '还没有播放记录'
-        )}
-      </p>
     </Link>
   );
 }

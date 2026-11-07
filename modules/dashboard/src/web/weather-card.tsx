@@ -39,7 +39,7 @@ function HourlyChart({ data }: { data: WeatherData['hourly'] }) {
 
   return (
     <div className="relative" aria-label="未来数小时气温趋势">
-      <svg viewBox="0 0 200 62" className="h-20 w-full overflow-visible" role="img">
+      <svg viewBox="0 0 200 62" className="h-16 w-full overflow-visible" role="img">
         <defs>
           <linearGradient id={`weather-area-${id}`} x1="0" y1="0" x2="0" y2="1">
             <stop stopColor="var(--screen-cyan)" stopOpacity=".26" />
@@ -93,9 +93,12 @@ function HourlyChart({ data }: { data: WeatherData['hourly'] }) {
 export function WeatherCard({
   envelope,
   cityName,
+  compact = false,
 }: {
   envelope: SourceEnvelope<WeatherData>;
   cityName?: string;
+  /** 首屏紧凑模式：隐藏未来几天预报（详情弹窗里仍可看），把高度让给热榜与听歌 */
+  compact?: boolean;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -117,7 +120,7 @@ export function WeatherCard({
 
   return (
     <>
-      <section className="screen-card group flex h-full flex-col gap-4 p-5" aria-label="实时天气">
+      <section className="screen-card group flex h-full flex-col gap-3 p-4" aria-label="实时天气">
         <header className="relative flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="size-1.5 rounded-full bg-info" />
@@ -151,7 +154,7 @@ export function WeatherCard({
         >
           <div>
             <p className="flex items-start font-mono font-medium tracking-[-0.07em] tabular-nums">
-              <span className="text-7xl leading-none">{Math.round(data.now.temperature)}</span>
+              <span className="text-6xl leading-none">{Math.round(data.now.temperature)}</span>
               <span className="mt-1 ml-1 text-xl tracking-normal text-muted">°</span>
             </p>
             <p className="mt-2 text-sm font-medium">{data.now.text}</p>
@@ -181,34 +184,39 @@ export function WeatherCard({
 
         <HourlyChart data={data.hourly} />
 
-        <div
-          className="relative grid grid-cols-4 gap-2 border-t border-border pt-3"
-          aria-label="未来几天预报"
-        >
-          {data.days.slice(1, 5).map((day) => (
-            <button
-              type="button"
-              key={day.date}
-              aria-label={`查看 ${day.date} 天气详情`}
-              onClick={() => setDetailsOpen(true)}
-              className="flex flex-col items-center gap-1.5 rounded-sm py-1 text-[11px] transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              <span className="text-muted">
-                {(() => {
-                  const d = new Date(`${day.date}T00:00:00`);
-                  return Number.isNaN(d.getTime()) ? day.date.slice(5) : `周${WEEKDAY[d.getDay()]}`;
-                })()}
-              </span>
-              <WeatherIcon icon={day.icon} className="size-5 text-muted" />
-              <span className="font-mono tabular-nums">
-                {Math.round(day.min)}° <span className="text-muted">/ {Math.round(day.max)}°</span>
-              </span>
-              {day.precipProb !== undefined && day.precipProb >= 30 ? (
-                <span className="text-[11px] text-info">降水 {day.precipProb}%</span>
-              ) : null}
-            </button>
-          ))}
-        </div>
+        {compact ? null : (
+          <div
+            className="relative grid grid-cols-4 gap-2 border-t border-border pt-3"
+            aria-label="未来几天预报"
+          >
+            {data.days.slice(1, 5).map((day) => (
+              <button
+                type="button"
+                key={day.date}
+                aria-label={`查看 ${day.date} 天气详情`}
+                onClick={() => setDetailsOpen(true)}
+                className="flex flex-col items-center gap-1.5 rounded-sm py-1 text-[11px] transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                <span className="text-muted">
+                  {(() => {
+                    const d = new Date(`${day.date}T00:00:00`);
+                    return Number.isNaN(d.getTime())
+                      ? day.date.slice(5)
+                      : `周${WEEKDAY[d.getDay()]}`;
+                  })()}
+                </span>
+                <WeatherIcon icon={day.icon} className="size-5 text-muted" />
+                <span className="font-mono tabular-nums">
+                  {Math.round(day.min)}°{' '}
+                  <span className="text-muted">/ {Math.round(day.max)}°</span>
+                </span>
+                {day.precipProb !== undefined && day.precipProb >= 30 ? (
+                  <span className="text-[11px] text-info">降水 {day.precipProb}%</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
       <WeatherDetailsDialog
         data={data}

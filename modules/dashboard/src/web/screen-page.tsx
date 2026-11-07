@@ -127,10 +127,10 @@ function HeroMetric({
     <button
       type="button"
       onClick={onClick}
-      className="group/metric rounded-sm border-l border-border py-1 pl-4 text-left transition-colors first:border-l-0 first:pl-0 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:border-l-0 max-sm:pl-0"
+      className="group/metric rounded-sm border-l border-border py-0.5 pl-4 text-left transition-colors first:border-l-0 first:pl-0 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:border-l-0 max-sm:pl-0"
     >
       <span
-        className={`block font-mono text-3xl font-medium tracking-tight tabular-nums ${accent ? 'text-primary' : ''}`}
+        className={`block font-mono text-[26px] font-medium tracking-tight tabular-nums ${accent ? 'text-primary' : ''}`}
       >
         {String(value).padStart(2, '0')}
       </span>
@@ -155,7 +155,7 @@ function HeroClockCard({
 }) {
   return (
     <section
-      className="screen-card screen-reveal p-6 md:p-7 xl:col-span-7"
+      className="screen-card screen-reveal p-4 md:p-5 xl:col-span-7"
       style={{ '--screen-index': 1 } as React.CSSProperties}
     >
       <div className="flex items-center gap-6">
@@ -164,7 +164,7 @@ function HeroClockCard({
         </div>
         <TimeOrbit />
       </div>
-      <div className="mt-7 grid grid-cols-2 gap-y-5 border-t border-border pt-5 sm:grid-cols-4">
+      <div className="mt-2 grid grid-cols-2 gap-y-3 border-t border-border pt-2 sm:grid-cols-4">
         {metrics}
       </div>
     </section>
@@ -553,22 +553,6 @@ export function DashboardScreenPage({
               </div>
             ) : null}
 
-            {/* 滚动信号流 */}
-            {hasTicker ? (
-              <div
-                className="screen-card screen-reveal flex items-center gap-4 px-4 py-3"
-                style={{ '--screen-index': 1 } as React.CSSProperties}
-              >
-                <div className="hidden shrink-0 items-center gap-2 border-r border-border pr-4 text-info md:flex">
-                  <ScreenIcon name="signal" className="size-3.5" />
-                  <span className="screen-label !text-[10px] !text-info">Signal feed</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <Ticker sources={data.hot} />
-                </div>
-              </div>
-            ) : null}
-
             {/* 时间核心 + 天气 */}
             <div className="grid gap-4 xl:grid-cols-12">
               <HeroClockCard
@@ -604,7 +588,7 @@ export function DashboardScreenPage({
                 style={{ '--screen-index': 2 } as React.CSSProperties}
               >
                 {weather && weather.status !== 'empty' ? (
-                  <WeatherCard envelope={weather} cityName={data.city?.name} />
+                  <WeatherCard envelope={weather} cityName={data.city?.name} compact />
                 ) : (
                   <div className="screen-card flex h-full min-h-64 flex-col items-center justify-center gap-3 p-6 text-center">
                     <WeatherIcon icon="cloud" className="size-10 text-muted" />
@@ -616,48 +600,31 @@ export function DashboardScreenPage({
               </div>
             </div>
 
-            {/* 个人内容优先于外部信息：首屏先回答“我今天怎么样”，再向下浏览热榜。 */}
-            <section
-              id="overview-section"
-              aria-label="今日节奏"
-              className="grid scroll-mt-6 items-stretch gap-4 xl:grid-cols-12"
-            >
-              <div className="flex flex-col gap-4 xl:col-span-7">
-                <SummaryCard envelope={data.summary} />
-                {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
-              </div>
-              <div id="activity-section" className="flex scroll-mt-6 flex-col gap-4 xl:col-span-5">
-                <ActivityCard stats={data.activity} />
-                <ListeningMiniCard base={base} />
-              </div>
+            {/* 今日听歌：首屏横向一条（今日 / 本周 / 7 天柱 / 最近在听 四块并排） */}
+            <section aria-label="今日听歌" className="min-w-0">
+              <ListeningMiniCard base={base} />
             </section>
 
-            {/* 实时热榜：个人摘要之后，保持完整五源视野。 */}
+            {/* 实时热榜：紧跟时间/天气，五源横向铺满，放在听歌之后 */}
             {enabledSources.length > 0 ? (
-              <section
-                id="hotlist-section"
-                aria-label="热榜"
-                className="scroll-mt-6 space-y-3 pt-2"
-              >
+              <section id="hotlist-section" aria-label="热榜" className="scroll-mt-6 space-y-2">
                 <div
                   className="screen-reveal flex items-end justify-between px-1"
                   style={{ '--screen-index': 3 } as React.CSSProperties}
                 >
-                  <div>
+                  <div className="flex items-baseline gap-3">
                     <div className="flex items-center gap-2">
                       <ScreenIcon name="layers" className="size-4 text-primary" />
                       <h2 className="text-sm font-semibold">实时热榜</h2>
                     </div>
-                    <p className="screen-label mt-1 !text-[11px]">
-                      Real-time pulse · Across the internet
-                    </p>
+                    <p className="screen-label !text-[10px]">Real-time pulse</p>
                   </div>
                   <span className="font-mono text-[10px] tracking-wider text-muted">
                     {String(enabledSources.length).padStart(2, '0')} SOURCES
                   </span>
                 </div>
-                {/* 保留全屏五列；较窄容器自动降列，标题最多两行 */}
-                <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+                {/* 宽屏固定五列单行；窄屏自动降列。每条源只取前 4 条，保证一屏可读完 */}
+                <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                   {enabledSources.map(([key, envelope], index) => (
                     <HotlistCard
                       key={key}
@@ -665,10 +632,42 @@ export function DashboardScreenPage({
                       index={index}
                       label={HOT_SOURCE_LABELS[key] ?? key}
                       envelope={envelope}
+                      limit={4}
                     />
                   ))}
                 </div>
               </section>
+            ) : null}
+
+            {/* 每日小结 + 打卡 + 一言：第二屏，长期停留时向下浏览 */}
+            <section
+              id="overview-section"
+              aria-label="今日节奏"
+              className="grid items-stretch gap-4 xl:grid-cols-12"
+            >
+              <div className="flex min-w-0 flex-col gap-4 xl:col-span-7">
+                <SummaryCard envelope={data.summary} />
+                {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
+              </div>
+              <div id="activity-section" className="min-w-0 scroll-mt-6 xl:col-span-5">
+                <ActivityCard stats={data.activity} />
+              </div>
+            </section>
+
+            {/* 滚动信号流：从首屏移到下方，首屏优先给时钟/天气/热榜/听歌 */}
+            {hasTicker ? (
+              <div
+                className="screen-card screen-reveal flex items-center gap-4 px-4 py-3"
+                style={{ '--screen-index': 4 } as React.CSSProperties}
+              >
+                <div className="hidden shrink-0 items-center gap-2 border-r border-border pr-4 text-info md:flex">
+                  <ScreenIcon name="signal" className="size-3.5" />
+                  <span className="screen-label !text-[10px] !text-info">Signal feed</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Ticker sources={data.hot} />
+                </div>
+              </div>
             ) : null}
 
             {/* 倒计时 */}
