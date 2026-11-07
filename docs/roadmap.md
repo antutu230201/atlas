@@ -399,6 +399,13 @@
 - [x] 听歌周报：迁移 0006（platform.scheduler_state + SECURITY DEFINER 函数 listening_weekly_report 跨空间按用户聚合 Top 歌曲）；新增 WeeklyReportScheduler（每分钟 tick，新 ISO 周首触自愈补发，状态幂等；ATLAS_WEEKLY_REPORT_FORCE=1 测试开关）→ 每用户通知"听歌周报：上周 X 分钟，最常听《…》"
 - [x] 实测：force 模式 4 位用户收到周报通知；集成测试补 SQL 函数断言（跨工作空间聚合+Top 歌曲）；e2e 13 条全绿
 
+### 听歌报告模板：导出从 JSON 到漂亮报告单页（2026-11-07 续 7）
+
+- [x] 用户反馈：JSON 导出用户看不懂，要"非常漂亮的模板"
+- [x] 新增 listening-report.ts：把统计页数据渲染成自包含大屏风格 HTML 报告单页（深色玻璃质感、渐变大数字、HTML 柱状趋势图带峰值高亮、Top 歌曲占比条、全站排名含"我"标记、打印存 PDF 提示）；无外部依赖，全部动态文本 escapeHtml
+- [x] 统计页导出入口拆两个："报告"（HTML 单页）/ "数据"（JSON 原始数据，进阶用途）
+- [x] 实测：UI 点击"报告"→ Playwright 捕获下载 → 打开报告全页截图验收；e2e 13 条全绿
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。

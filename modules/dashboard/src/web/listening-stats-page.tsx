@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { dispatchPlaySong } from './listening-pulse';
+import { buildListeningReportHtml, downloadFile } from './listening-report';
+import type { ListeningReportInput } from './listening-report';
 import { ListeningStage } from './listening-stage';
 import { ScreenIcon } from './icons';
 
@@ -135,8 +137,24 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
   const activeBuckets = summary?.buckets.filter((bucket) => bucket.seconds > 0).length ?? 0;
   const duration = splitDuration(totalSeconds);
 
-  // 数据导出（宪法 §4：所有数据可导出）：当前窗口的汇总 + 全站排名落 JSON
-  const exportData = () => {
+  // 数据导出（宪法 §4：所有数据可导出）：漂亮报告（HTML 单页，可打印存 PDF）+ 原始数据（JSON）
+  const today = new Date().toISOString().slice(0, 10);
+  const downloadReport = () => {
+    if (!summary) return;
+    const input: ListeningReportInput = {
+      range,
+      rangeHint: RANGE_HINTS[range],
+      generatedAt: new Date(),
+      summary,
+      ranking: ranking ?? null,
+    };
+    downloadFile(
+      `atlas_listening_report_${range}_${today}.html`,
+      buildListeningReportHtml(input),
+      'text/html;charset=utf-8',
+    );
+  };
+  const downloadJson = () => {
     if (!summary && !ranking) return;
     const payload = {
       generatedAt: new Date().toISOString(),
@@ -144,13 +162,11 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
       summary: summary ?? null,
       ranking: ranking ?? null,
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `atlas_listening_${range}_${new Date().toISOString().slice(0, 10)}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    downloadFile(
+      `atlas_listening_data_${range}_${today}.json`,
+      JSON.stringify(payload, null, 2),
+      'application/json',
+    );
   };
 
   return (
@@ -184,13 +200,24 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
             <button
               type="button"
               className="screen-icon-button !min-h-9"
-              onClick={exportData}
+              onClick={downloadReport}
               disabled={!summary}
-              aria-label="导出听歌数据 JSON"
-              title="导出听歌数据 JSON"
+              aria-label="导出听歌报告（HTML，可打印存 PDF）"
+              title="导出听歌报告（HTML，可打印存 PDF）"
             >
               <ScreenIcon name="external" className="size-3.5" />
-              <span className="hidden sm:inline">导出</span>
+              <span className="hidden sm:inline">报告</span>
+            </button>
+            <button
+              type="button"
+              className="screen-icon-button !min-h-9"
+              onClick={downloadJson}
+              disabled={!summary}
+              aria-label="导出听歌数据（JSON）"
+              title="导出听歌数据（JSON）"
+            >
+              <span className="hidden sm:inline text-xs">数据</span>
+              <span className="sm:hidden text-xs">JSON</span>
             </button>
             <div
               className="flex shrink-0 rounded-full border border-border bg-surface/70 p-1 shadow-soft backdrop-blur-md"
