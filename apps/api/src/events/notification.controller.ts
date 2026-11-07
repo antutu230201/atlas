@@ -22,11 +22,18 @@ export class NotificationController {
   ) {}
 
   @Get()
-  async list(@Req() request: Request, @Query('limit') limit?: string) {
+  async list(
+    @Req() request: Request,
+    @Query('limit') limit?: string,
+    @Query('type') type?: string,
+  ) {
     const user = request.user as RequestUser;
     const parsed = Number(limit);
     return {
-      data: await this.notificationService.list(user.id, Number.isInteger(parsed) ? parsed : 50),
+      data: await this.notificationService.list(user.id, {
+        limit: Number.isInteger(parsed) ? parsed : 50,
+        type,
+      }),
     };
   }
 

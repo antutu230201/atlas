@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Card, CardContent, EmptyState, Skeleton } from '@atlas/ui';
 import { api } from '@/lib/api';
-import { useNotifications } from '@/lib/queries';
+import { useNotifications, type NotificationItem } from '@/lib/queries';
 
 /** 通知正文与跳转目标由服务端写入 body（如周报的 text / link），这里只做类型守卫后渲染 */
 function readBodyText(body: Record<string, unknown>): string | null {
@@ -34,6 +34,8 @@ export default function NotificationsPage() {
   const notifications = useNotifications();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'listening' | 'system'>('all');
+  const [limit, setLimit] = useState(20);
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
@@ -47,9 +49,20 @@ export default function NotificationsPage() {
     onSuccess: invalidate,
   });
 
+  // 列表按类型 + 条数分页；未读数取全量缓存（导航铃铛同一份）
+  const listQuery = useQuery({
+    queryKey: ['notifications', 'list', typeFilter, limit],
+    queryFn: () =>
+      api<NotificationItem[]>(
+        `/notifications?limit=${limit}${typeFilter === 'all' ? '' : `&type=${typeFilter}`}`,
+      ),
+  });
+
   const all = notifications.data ?? [];
   const unread = all.filter((n) => n.readAt === null).length;
-  const items = filter === 'unread' ? all.filter((n) => n.readAt === null) : all;
+  const rows = listQuery.data ?? [];
+  const items = filter === 'unread' ? rows.filter((n) => n.readAt === null) : rows;
+  const hasMore = rows.length >= limit;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
@@ -69,20 +82,21 @@ export default function NotificationsPage() {
       </header>
 
       {all.length > 0 ? (
-        <div className="flex items-center gap-1.5" role="group" aria-label="通知筛选">
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="通知筛选">
           {(
             [
-              { key: 'all', label: `全部 ${all.length}` },
-              { key: 'unread', label: `未读 ${unread}` },
+              { key: 'all', label: '全部' },
+              { key: 'listening', label: '听歌周报' },
+              { key: 'system', label: '系统' },
             ] as const
           ).map((option) => (
             <button
               key={option.key}
               type="button"
-              aria-pressed={filter === option.key}
-              onClick={() => setFilter(option.key)}
+              aria-pressed={typeFilter === option.key}
+              onClick={() => setTypeFilter(option.key)}
               className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                filter === option.key
+                typeFilter === option.key
                   ? 'border-primary/40 bg-primary-soft text-primary'
                   : 'border-border bg-surface/60 text-muted hover:text-text'
               }`}
@@ -90,19 +104,40 @@ export default function NotificationsPage() {
               {option.label}
             </button>
           ))}
+          <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted">
+            <input
+              type="checkbox"
+              className="size-3.5 accent-[var(--primary)]"
+              checked={filter === 'unread'}
+              onChange={(event) => setFilter(event.target.checked ? 'unread' : 'all')}
+            />
+            只看未读{unread > 0 ? `（${unread}）` : ''}
+          </label>
         </div>
       ) : null}
 
-      {notifications.isPending ? (
+      {listQuery.isPending ? (
         <div className="space-y-3">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
       ) : items.length === 0 ? (
         <EmptyState
-          title={filter === 'unread' ? '没有未读通知' : '暂无通知'}
+          title={
+            filter === 'unread'
+              ? '没有未读通知'
+              : typeFilter === 'listening'
+                ? '还没有听歌周报'
+                : typeFilter === 'system'
+                  ? '没有系统通知'
+                  : '暂无通知'
+          }
           description={
-            filter === 'unread' ? '都看完了，去干点别的吧。' : '有新动态时会出现在这里。'
+            filter === 'unread'
+              ? '都看完了，去干点别的吧。'
+              : typeFilter === 'listening'
+                ? '每周一自动汇总上周听歌数据，生成后会出现在这里。'
+                : '有新动态时会出现在这里。'
           }
         />
       ) : (
@@ -155,6 +190,19 @@ export default function NotificationsPage() {
           })}
         </div>
       )}
+
+      {hasMore && items.length > 0 ? (
+        <div className="flex justify-center">
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={listQuery.isFetching}
+            onClick={() => setLimit((value) => value + 20)}
+          >
+            加载更多
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

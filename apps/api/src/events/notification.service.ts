@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, like, notLike } from 'drizzle-orm';
 import { Inject, Injectable } from '@nestjs/common';
 import { notification, user } from '../db/schema';
 import { withUser } from '../db/tenant';
@@ -70,14 +70,27 @@ export class NotificationService {
     });
   }
 
-  async list(userId: string, limit = 50) {
+  /**
+   * 通知列表。type 支持三类：listening（听歌周报等 listening.* 前缀）、
+   * system（其余系统通知）、或精确的 type 值。
+   */
+  async list(
+    userId: string,
+    options: { limit?: number; type?: string } = {},
+  ): Promise<Array<typeof notification.$inferSelect>> {
+    const limit = Math.min(options.limit ?? 50, 200);
+    const filters = [eq(notification.userId, userId)];
+    if (options.type === 'listening') filters.push(like(notification.type, 'listening.%'));
+    else if (options.type === 'system') filters.push(notLike(notification.type, 'listening.%'));
+    else if (options.type) filters.push(eq(notification.type, options.type));
+
     return withUser(this.db, userId, (tx) =>
       tx
         .select()
         .from(notification)
-        .where(eq(notification.userId, userId))
+        .where(and(...filters))
         .orderBy(desc(notification.createdAt))
-        .limit(Math.min(limit, 200)),
+        .limit(limit),
     );
   }
 

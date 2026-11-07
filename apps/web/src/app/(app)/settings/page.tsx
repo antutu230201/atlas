@@ -175,6 +175,8 @@ function AuditTab({ slug }: { slug: string }) {
     queryFn: () => api<AuditRow[]>(`/workspaces/${slug}/audit`),
     retry: false,
   });
+  const [days, setDays] = useState<'7' | '30' | 'all'>('30');
+  const [keyword, setKeyword] = useState('');
 
   if (audit.isPending) return <Skeleton className="h-40 w-full" />;
   const err = audit.error;
@@ -189,42 +191,93 @@ function AuditTab({ slug }: { slug: string }) {
   }
 
   const rows = audit.data ?? [];
-  if (rows.length === 0) {
-    return (
-      <Card>
-        <CardContent className="text-sm text-muted">暂无审计记录。</CardContent>
-      </Card>
-    );
-  }
+  const cutoff = days === 'all' ? 0 : Date.now() - Number(days) * 86_400_000;
+  const query = keyword.trim().toLowerCase();
+  const filtered = rows.filter((row) => {
+    if (cutoff && new Date(row.createdAt).getTime() < cutoff) return false;
+    if (!query) return true;
+    return `${row.action} ${row.objectType} ${row.objectId} ${row.actorType}`
+      .toLowerCase()
+      .includes(query);
+  });
 
   return (
-    <Table>
-      <THead>
-        <TR>
-          <TH>时间</TH>
-          <TH>动作</TH>
-          <TH>对象</TH>
-          <TH>触发者</TH>
-        </TR>
-      </THead>
-      <TBody>
-        {rows.map((row) => (
-          <TR key={row.id}>
-            <TD className="text-xs text-muted">
-              {new Date(row.createdAt).toLocaleString('zh-CN')}
-            </TD>
-            <TD>{row.action}</TD>
-            <TD className="text-xs">
-              {row.objectType}
-              {row.objectId ? ` · ${row.objectId.slice(0, 12)}` : ''}
-            </TD>
-            <TD>
-              <Badge variant={row.actorType === 'user' ? 'neutral' : 'info'}>{row.actorType}</Badge>
-            </TD>
-          </TR>
-        ))}
-      </TBody>
-    </Table>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5" role="group" aria-label="审计时间范围">
+          {(
+            [
+              { key: '7', label: '近 7 天' },
+              { key: '30', label: '近 30 天' },
+              { key: 'all', label: '全部' },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={days === option.key}
+              onClick={() => setDays(option.key)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                days === option.key
+                  ? 'border-primary/40 bg-primary-soft text-primary'
+                  : 'border-border bg-surface/60 text-muted hover:text-text'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <Input
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder="搜索动作 / 对象 / 触发者"
+          aria-label="搜索审计日志"
+          className="ml-auto w-full sm:w-60"
+        />
+      </div>
+
+      <p className="text-xs text-muted">
+        {filtered.length} / {rows.length} 条
+      </p>
+
+      {filtered.length === 0 ? (
+        <Card>
+          <CardContent className="text-sm text-muted">
+            {rows.length === 0 ? '暂无审计记录。' : '没有匹配的审计记录。'}
+          </CardContent>
+        </Card>
+      ) : (
+        <Table>
+          <THead>
+            <TR>
+              <TH>时间</TH>
+              <TH>动作</TH>
+              <TH>对象</TH>
+              <TH>触发者</TH>
+            </TR>
+          </THead>
+          <TBody>
+            {filtered.map((row) => (
+              <TR key={row.id}>
+                <TD className="text-xs text-muted">
+                  {new Date(row.createdAt).toLocaleString('zh-CN')}
+                </TD>
+                <TD>{row.action}</TD>
+                <TD className="text-xs">
+                  {row.objectType}
+                  {row.objectId ? ` · ${row.objectId.slice(0, 12)}` : ''}
+                </TD>
+                <TD>
+                  <Badge variant={row.actorType === 'user' ? 'neutral' : 'info'}>
+                    {row.actorType}
+                  </Badge>
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      )}
+    </div>
   );
 }
 

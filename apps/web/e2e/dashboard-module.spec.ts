@@ -582,10 +582,14 @@ test.describe('个人大屏模块（假数据源）', () => {
     await expect(page.getByTestId('listening-stats')).toBeVisible({ timeout: 15_000 });
     const shareButton = page.getByRole('button', { name: '生成分享卡 PNG' });
     await expect(shareButton).toBeEnabled({ timeout: 15_000 });
-    const shareDownload = page.waitForEvent('download');
     await shareButton.click();
+    // 先选尺寸（4:5 / 1:1 / 9:16），再等下载
+    const shareDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: /^4:5/ }).click();
     const shareCard = await shareDownload;
-    expect(shareCard.suggestedFilename()).toMatch(/^atlas_listening_share_\d{4}-\d{2}-\d{2}\.png$/);
+    expect(shareCard.suggestedFilename()).toMatch(
+      /^atlas_listening_share_4x5_\d{4}-\d{2}-\d{2}\.png$/,
+    );
 
     // 周报通知直达：切到上周并自动下载当期报告，URL 参数随即清理（刷新不重复下载）
     const reportDownload = page.waitForEvent('download');

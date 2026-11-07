@@ -122,6 +122,8 @@ const listeningHeartbeatSchema = z.object({
 type ListeningRange = 'day' | 'lastWeek' | 'week' | 'month' | 'year';
 const listeningRangeSchema = z.object({
   range: z.enum(['day', 'lastWeek', 'week', 'month', 'year']),
+  /** 向前平移的周期数（0=当前窗口，1=上一周期），报告环比用 */
+  offset: z.number().int().min(0).max(24).optional(),
 });
 /** unikey 为网易云签发的 uuid；只用于轮询，不落库 */
 const neteaseQrPollSchema = z.object({ unikey: z.string().min(10).max(64) });
@@ -289,71 +291,86 @@ function localDay(date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-/** 听歌统计窗口：day=今天 / week=近7天 / month=近30天 / year=近12个月（按月桶） */
-function rangeWindow(range: ListeningRange): {
+/** 听歌统计窗口：day=今天 / week=近7天 / month=近30天 / year=近12个月（按月桶）；offset=向前平移几个周期 */
+function rangeWindow(
+  range: ListeningRange,
+  offset = 0,
+): {
   startDay: string;
   endDay: string;
   bucket: 'day' | 'month';
 } {
   const today = new Date();
-  const endDay = localDay(today);
-  if (range === 'day') return { startDay: endDay, endDay, bucket: 'day' };
+  const windowOf = (days: number, end: Date) => {
+    const start = new Date(end);
+    start.setDate(end.getDate() - (days - 1));
+    return { startDay: localDay(start), endDay: localDay(end) };
+  };
+
+  if (range === 'day') {
+    const end = new Date(today);
+    end.setDate(today.getDate() - offset);
+    return { startDay: localDay(end), endDay: localDay(end), bucket: 'day' };
+  }
+  if (range === 'week') {
+    const end = new Date(today);
+    end.setDate(today.getDate() - 7 * offset);
+    return { ...windowOf(7, end), bucket: 'day' };
+  }
   if (range === 'lastWeek') {
-    // 上一个自然周（周一~周日）：本周一往前推 7 天为起点、往前推 1 天为终点
+    // 上一个自然周（周一~周日）：offset=1 即再往前推一周
     const dayNum = (today.getDay() + 6) % 7;
     const thisMonday = new Date(today);
     thisMonday.setDate(today.getDate() - dayNum);
-    const start = new Date(thisMonday);
-    start.setDate(thisMonday.getDate() - 7);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return { startDay: localDay(start), endDay: localDay(end), bucket: 'day' };
-  }
-  if (range === 'week') {
-    const start = new Date(today);
-    start.setDate(start.getDate() - 6);
-    return { startDay: localDay(start), endDay, bucket: 'day' };
+    const end = new Date(thisMonday);
+    end.setDate(thisMonday.getDate() - 1 - 7 * offset);
+    return { ...windowOf(7, end), bucket: 'day' };
   }
   if (range === 'month') {
-    const start = new Date(today);
-    start.setDate(start.getDate() - 29);
-    return { startDay: localDay(start), endDay, bucket: 'day' };
+    const end = new Date(today);
+    end.setDate(today.getDate() - 30 * offset);
+    return { ...windowOf(30, end), bucket: 'day' };
   }
+  // year：近 12 个月按 offset 年整体平移，终点不超过今天
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() - 12 * offset + 1, 0);
+  const end = monthEnd > today ? today : monthEnd;
   return {
-    startDay: localDay(new Date(today.getFullYear(), today.getMonth() - 11, 1)),
-    endDay,
+    startDay: localDay(new Date(end.getFullYear(), end.getMonth() - 11, 1)),
+    endDay: localDay(end),
     bucket: 'month',
   };
 }
 
 /** 把稀疏聚合补成连续桶（前端直接画柱状图） */
 function fillBuckets(
-  range: ListeningRange,
   map: Map<string, number>,
   bucket: 'day' | 'month',
+  window: { startDay: string; endDay: string },
 ): Array<{ label: string; seconds: number }> {
   const out: Array<{ label: string; seconds: number }> = [];
-  const today = new Date();
+  const parseDay = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year!, (month ?? 1) - 1, day ?? 1);
+  };
+  const start = parseDay(window.startDay);
+  const end = parseDay(window.endDay);
+
   if (bucket === 'month') {
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    const last = new Date(end.getFullYear(), end.getMonth(), 1);
+    while (cursor <= last) {
+      const label = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
       out.push({ label, seconds: map.get(label) ?? 0 });
+      cursor.setMonth(cursor.getMonth() + 1);
     }
     return out;
   }
-  // lastWeek 的窗口终点是上周日（不是今天）
-  const anchor = new Date(today);
-  if (range === 'lastWeek') {
-    const dayNum = (today.getDay() + 6) % 7;
-    anchor.setDate(today.getDate() - dayNum - 1);
-  }
-  const days = range === 'week' || range === 'lastWeek' ? 7 : range === 'day' ? 1 : 30;
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(anchor);
-    d.setDate(anchor.getDate() - i);
-    const label = localDay(d);
+
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const label = localDay(cursor);
     out.push({ label, seconds: map.get(label) ?? 0 });
+    cursor.setDate(cursor.getDate() + 1);
   }
   return out;
 }
@@ -719,7 +736,10 @@ export const definition: ModuleDefinition = {
       handler: async (ctx, input) => {
         const parsed = listeningRangeSchema.safeParse(input ?? {});
         if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
-        const { startDay, endDay, bucket } = rangeWindow(parsed.data.range);
+        const { startDay, endDay, bucket } = rangeWindow(
+          parsed.data.range,
+          parsed.data.offset ?? 0,
+        );
         const rows = await ctx.db
           .select({
             day: listeningDaily.day,
@@ -791,7 +811,7 @@ export const definition: ModuleDefinition = {
               plays: Number(row.plays ?? 0),
             });
         }
-        const buckets = fillBuckets(parsed.data.range, bucketSeconds, bucket);
+        const buckets = fillBuckets(bucketSeconds, bucket, { startDay, endDay });
         const topSongs = [...songSeconds.values()]
           .sort((a, b) => b.seconds - a.seconds)
           .slice(0, 10);
@@ -814,6 +834,7 @@ export const definition: ModuleDefinition = {
           });
         return {
           range: parsed.data.range,
+          offset: parsed.data.offset ?? 0,
           totalSeconds,
           totalPlays,
           buckets,

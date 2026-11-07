@@ -51,6 +51,8 @@ export interface ListeningReportInput {
     list: ReportRank[];
     me: { userId: string; rank: number; userName: string; seconds: number } | null;
   } | null;
+  /** 上一周期的汇总（仅用于环比；取不到时为 null） */
+  previous?: { totalSeconds: number; totalPlays: number } | null;
 }
 
 function escapeHtml(text: string): string {
@@ -120,6 +122,11 @@ export function buildListeningReportHtml(input: ListeningReportInput): string {
   const peakLabel = peakBucket && peakSeconds > 0 ? fullLabel(peakBucket.label) : '—';
   const topSong = songs[0] ?? null;
   const topShare = topSong && total > 0 ? Math.round((topSong.seconds / total) * 100) : 0;
+  const prevTotal = input.previous?.totalSeconds ?? 0;
+  const prevPlays = input.previous?.totalPlays ?? 0;
+  const totalDelta = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
+  const playsDelta = prevPlays > 0 ? Math.round(((plays - prevPlays) / prevPlays) * 100) : null;
+  const deltaText = (delta: number) => `较上期 ${delta > 0 ? '+' : ''}${delta}%`;
   const maxBucket = Math.max(1, ...buckets.map((bucket) => bucket.seconds));
   const labelEvery = buckets.length > 16 ? 7 : buckets.length > 10 ? 3 : 1;
   // 年视图按月分桶，其余按天
@@ -149,6 +156,10 @@ export function buildListeningReportHtml(input: ListeningReportInput): string {
 
   const streakBadge =
     streak > 1 ? `<span class="badge badge-violet">连续 ${streak} ${bucketUnit}有听歌</span>` : '';
+  const deltaBadge =
+    totalDelta === null
+      ? ''
+      : `<span class="badge ${totalDelta >= 0 ? 'badge-teal' : 'badge-muted'}">${totalDelta >= 0 ? '↑' : '↓'} ${deltaText(totalDelta)}</span>`;
 
   const bucketBars = buckets
     .map((bucket, index) => {
@@ -348,6 +359,7 @@ export function buildListeningReportHtml(input: ListeningReportInput): string {
   .badge-violet { background: var(--violet-soft); color: var(--violet); }
   .badge-teal { background: var(--teal-soft); color: var(--teal); }
   .badge-amber { background: rgba(232, 135, 58, 0.12); color: #b4611f; }
+  .badge-muted { background: rgba(25, 25, 34, 0.06); color: var(--muted); }
   .big {
     margin: 14px 0 8px;
     display: flex;
@@ -618,6 +630,7 @@ export function buildListeningReportHtml(input: ListeningReportInput): string {
     <section class="card hero">
       <div>
         <div class="hero-range">
+          ${deltaBadge}
           ${streakBadge}
           ${activeDays > 0 ? `<span class="badge badge-teal">活跃 ${activeDays} / ${buckets.length} ${bucketUnit}</span>` : ''}
         </div>
@@ -641,7 +654,7 @@ export function buildListeningReportHtml(input: ListeningReportInput): string {
         }
       </div>
       <div class="kpis">
-        <div class="kpi"><div class="k">播放次数</div><div class="v">${plays}<small>次</small></div><div class="s">上榜 ${songs.length} 首</div></div>
+        <div class="kpi"><div class="k">播放次数</div><div class="v">${plays}<small>次</small></div><div class="s">${playsDelta === null ? `上榜 ${songs.length} 首` : deltaText(playsDelta)}</div></div>
         <div class="kpi"><div class="k">活跃${bucketUnit === '个月' ? '月份' : '天数'}</div><div class="v">${activeDays}<small>/ ${buckets.length} ${bucketUnit}</small></div><div class="s">窗口共 ${buckets.length} ${bucketUnit}</div></div>
         <div class="kpi"><div class="k">日均时长</div><div class="v">${activeDays > 0 ? formatDuration(avgPerActive) : '—'}</div><div class="s">仅统计有听歌的日子</div></div>
         <div class="kpi"><div class="k">峰值日</div><div class="v">${peakBucket && peakSeconds > 0 ? escapeHtml(shortLabel(peakBucket.label)) : '—'}</div><div class="s">${peakSeconds > 0 ? formatDuration(peakSeconds) : '暂无数据'}</div></div>

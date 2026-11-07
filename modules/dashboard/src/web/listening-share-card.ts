@@ -1,11 +1,13 @@
 import { formatDurationReport } from './listening-report';
 
 /**
- * 社交尺寸分享卡（1080×1350，3:4）：Canvas 一键绘制听歌数据卡并下载 PNG。
- * 深色大屏质感：光晕 + 玻璃卡 + 渐变大数字 + 专辑封面 + Top 歌曲榜。
+ * 社交尺寸分享卡：Canvas 一键绘制听歌数据卡并下载 PNG。
+ * 支持 4:5 / 1:1 / 9:16 三种尺寸（同一套文案与视觉，按画布高度重排区块）。
  * 封面来自网易云 CDN（Access-Control-Allow-Origin: *），需 crossOrigin 才能导出画布；
  * 任一封面加载失败或超时都退回首字占位，不阻断导出。
  */
+
+export type ShareCardSize = '4:5' | '1:1' | '9:16';
 
 export interface ShareCardBucket {
   label: string;
@@ -27,10 +29,87 @@ export interface ShareCardInput {
   meRank: number | null;
   buckets: ShareCardBucket[];
   topSongs: ShareCardSong[];
+  size?: ShareCardSize;
 }
 
-const W = 1080;
-const H = 1350;
+interface CardLayout {
+  W: number;
+  H: number;
+  brandY: number;
+  subY: number;
+  heroY: number;
+  unitY: number;
+  kpiY: number;
+  coverX: number;
+  coverY: number;
+  coverSize: number;
+  chartTop: number;
+  chartH: number;
+  cardTop: number;
+  cardBottom: number;
+  maxSongs: number;
+}
+
+export const SHARE_CARD_SIZES: Array<{ key: ShareCardSize; label: string; hint: string }> = [
+  { key: '4:5', label: '4:5', hint: '朋友圈 / 小红书' },
+  { key: '1:1', label: '1:1', hint: '头像 / 方图' },
+  { key: '9:16', label: '9:16', hint: '竖屏 / Story' },
+];
+
+const LAYOUTS: Record<ShareCardSize, CardLayout> = {
+  '4:5': {
+    W: 1080,
+    H: 1350,
+    brandY: 96,
+    subY: 132,
+    heroY: 300,
+    unitY: 352,
+    kpiY: 404,
+    coverX: 720,
+    coverY: 168,
+    coverSize: 260,
+    chartTop: 490,
+    chartH: 240,
+    cardTop: 790,
+    cardBottom: 1260,
+    maxSongs: 4,
+  },
+  '1:1': {
+    W: 1080,
+    H: 1080,
+    brandY: 84,
+    subY: 118,
+    heroY: 266,
+    unitY: 316,
+    kpiY: 364,
+    coverX: 790,
+    coverY: 140,
+    coverSize: 200,
+    chartTop: 410,
+    chartH: 160,
+    cardTop: 610,
+    cardBottom: 1000,
+    maxSongs: 3,
+  },
+  '9:16': {
+    W: 1080,
+    H: 1920,
+    brandY: 110,
+    subY: 148,
+    heroY: 360,
+    unitY: 414,
+    kpiY: 470,
+    coverX: 690,
+    coverY: 180,
+    coverSize: 300,
+    chartTop: 570,
+    chartH: 500,
+    cardTop: 1150,
+    cardBottom: 1810,
+    maxSongs: 6,
+  },
+};
+
 const COVER_TIMEOUT_MS = 4_000;
 const FONT = "'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif";
 
@@ -138,7 +217,10 @@ function drawCover(
 }
 
 export async function buildShareCardCanvas(input: ShareCardInput): Promise<HTMLCanvasElement> {
-  const songs = input.topSongs.slice(0, 4);
+  const size = input.size ?? '4:5';
+  const layout = LAYOUTS[size];
+  const { W, H } = layout;
+  const songs = input.topSongs.slice(0, layout.maxSongs);
   // 并发预取，统一在绘制前就绪（封面缺失不影响其余排版）
   const covers = await Promise.all([
     songs[0]?.cover ? loadCover(songs[0].cover, 400) : Promise.resolve(null),
@@ -170,34 +252,41 @@ export async function buildShareCardCanvas(input: ShareCardInput): Promise<HTMLC
   ctx.textAlign = 'center';
   ctx.fillStyle = COLOR.accent;
   ctx.font = `700 44px ${FONT}`;
-  ctx.fillText('ATLAS', W / 2, 96);
+  ctx.fillText('ATLAS', W / 2, layout.brandY);
   ctx.fillStyle = COLOR.muted;
   ctx.font = `600 20px ${FONT}`;
-  ctx.fillText('LISTENING · 个人成长系统', W / 2, 132);
+  ctx.fillText('LISTENING · 个人成长系统', W / 2, layout.subY);
 
   // 主视觉左列：数字 + 窗口 + KPI（右列留给 Top1 封面）
   const minutes = Math.round(input.totalSeconds / 60);
   ctx.textAlign = 'left';
   ctx.fillStyle = COLOR.text;
   ctx.font = `700 132px ${FONT}`;
-  ctx.fillText(String(minutes), 90, 300);
+  ctx.fillText(String(minutes), 90, layout.heroY);
   ctx.fillStyle = COLOR.muted;
   ctx.font = `500 30px ${FONT}`;
-  ctx.fillText(`分钟 · ${input.rangeHint}`, 94, 352);
+  ctx.fillText(`分钟 · ${input.rangeHint}`, 94, layout.unitY);
 
   ctx.font = `500 26px ${FONT}`;
   ctx.fillStyle = '#c9c9dc';
   const kpi = `${input.totalPlays} 次播放${input.meRank ? ` · 全站第 ${input.meRank} 名` : ''}`;
-  ctx.fillText(kpi, 94, 404);
+  ctx.fillText(kpi, 94, layout.kpiY);
 
   // 右列：Top1 专辑封面
-  drawCover(ctx, covers[0] ?? null, 720, 168, 260, 18, songs[0]?.title ?? '无', 0.34);
+  drawCover(
+    ctx,
+    covers[0] ?? null,
+    layout.coverX,
+    layout.coverY,
+    layout.coverSize,
+    layout.coverSize * 0.07,
+    songs[0]?.title ?? '无',
+    0.34,
+  );
 
-  // 柱状趋势（最多取前 14 个桶，避免拥挤）
+  // 柱状趋势（最多 14 个桶，避免拥挤）
   const buckets = input.buckets.slice(-14);
   const maxSeconds = Math.max(1, ...buckets.map((b) => b.seconds));
-  const chartTop = 490;
-  const chartH = 240;
   const chartLeft = 120;
   const chartRight = W - 120;
   const slot = (chartRight - chartLeft) / Math.max(1, buckets.length);
@@ -206,9 +295,9 @@ export async function buildShareCardCanvas(input: ShareCardInput): Promise<HTMLC
     const x = chartLeft + slot * index + (slot - barW) / 2;
     // 0 秒的桶不画柱体（画最小高度会变成一条莫名其妙的短线）
     if (bucket.seconds > 0) {
-      const height = Math.max(6, (bucket.seconds / maxSeconds) * chartH);
-      const y = chartTop + chartH - height;
-      const grad = ctx.createLinearGradient(0, y, 0, chartTop + chartH);
+      const height = Math.max(6, (bucket.seconds / maxSeconds) * layout.chartH);
+      const y = layout.chartTop + layout.chartH - height;
+      const grad = ctx.createLinearGradient(0, y, 0, layout.chartTop + layout.chartH);
       grad.addColorStop(0, COLOR.accent);
       grad.addColorStop(1, 'rgba(170, 155, 255, 0.25)');
       ctx.fillStyle = grad;
@@ -218,12 +307,12 @@ export async function buildShareCardCanvas(input: ShareCardInput): Promise<HTMLC
     ctx.fillStyle = COLOR.muted;
     ctx.font = `500 18px ${FONT}`;
     ctx.textAlign = 'center';
-    ctx.fillText(bucket.label.slice(5), x + barW / 2, chartTop + chartH + 34);
+    ctx.fillText(bucket.label.slice(5), x + barW / 2, layout.chartTop + layout.chartH + 34);
   });
 
   // Top 歌曲玻璃卡：高度随曲目数收缩，在剩余空间里居中（少歌时不至于空一大片）
-  const cardAreaTop = 790;
-  const cardAreaBottom = 1260;
+  const cardAreaTop = layout.cardTop;
+  const cardAreaBottom = layout.cardBottom;
   const cardHeight = Math.min(cardAreaBottom - cardAreaTop, 118 + songs.length * 82);
   const cardTop = cardAreaTop + Math.round((cardAreaBottom - cardAreaTop - cardHeight) / 2);
   ctx.fillStyle = COLOR.panel;
@@ -288,9 +377,12 @@ export async function buildShareCardCanvas(input: ShareCardInput): Promise<HTMLC
 }
 
 export async function downloadShareCardPng(input: ShareCardInput): Promise<void> {
-  const canvas = await buildShareCardCanvas(input);
+  const size = input.size ?? '4:5';
+  const canvas = await buildShareCardCanvas({ ...input, size });
   const anchor = document.createElement('a');
   anchor.href = canvas.toDataURL('image/png');
-  anchor.download = `atlas_listening_share_${input.generatedAt.toISOString().slice(0, 10)}.png`;
+  anchor.download = `atlas_listening_share_${size.replace(':', 'x')}_${input.generatedAt
+    .toISOString()
+    .slice(0, 10)}.png`;
   anchor.click();
 }

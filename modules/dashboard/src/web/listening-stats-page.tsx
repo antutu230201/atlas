@@ -2,10 +2,25 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { cn, useToast } from '@atlas/ui';
+import {
+  cn,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+  useToast,
+} from '@atlas/ui';
 import { api } from '@/lib/api';
 import { dispatchPlaySong } from './listening-pulse';
-import { downloadShareCardPng } from './listening-share-card';
+import { SHARE_CARD_SIZES, downloadShareCardPng, type ShareCardSize } from './listening-share-card';
 import { buildListeningReportHtml, downloadFile } from './listening-report';
 import type { ListeningReportInput } from './listening-report';
 import { ListeningStage } from './listening-stage';
@@ -132,6 +147,7 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
   const pendingDownloadRef = useRef<Range | null>(null);
   const { toast } = useToast();
   const [sharing, setSharing] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -163,24 +179,39 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
   const totalPlays = summary?.totalPlays ?? 0;
   const activeBuckets = summary?.buckets.filter((bucket) => bucket.seconds > 0).length ?? 0;
   const duration = splitDuration(totalSeconds);
+  // 空窗口不导出：空报告对用户没有价值，直接引导去产生数据
+  const hasData = Boolean(summary && (summary.totalSeconds > 0 || summary.totalPlays > 0));
+  const emptyHint = '当前窗口还没有播放记录';
 
   // 数据导出（宪法 §4：所有数据可导出）：漂亮报告（HTML 单页，可打印存 PDF）+ 原始数据（JSON）
   const today = new Date().toISOString().slice(0, 10);
-  const downloadReport = useCallback(() => {
+  const downloadReport = useCallback(async () => {
     if (!summary) return;
+    // 环比：多取一个上一周期；失败不阻断报告主体
+    let previous: { totalSeconds: number; totalPlays: number } | null = null;
+    try {
+      const prev = await api<SummaryPayload>(`${base}/listeningSummary`, {
+        method: 'POST',
+        json: { range, offset: 1 },
+      });
+      previous = { totalSeconds: prev.totalSeconds, totalPlays: prev.totalPlays };
+    } catch {
+      previous = null;
+    }
     const input: ListeningReportInput = {
       range,
       rangeHint: RANGE_HINTS[range],
       generatedAt: new Date(),
       summary,
       ranking: ranking ?? null,
+      previous,
     };
     downloadFile(
       `atlas_listening_report_${range}_${today}.html`,
       buildListeningReportHtml(input),
       'text/html;charset=utf-8',
     );
-  }, [summary, ranking, range, today]);
+  }, [summary, ranking, range, today, base]);
   const downloadJson = () => {
     if (!summary && !ranking) return;
     const payload = {
@@ -197,7 +228,7 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
   };
 
   // 分享卡：先加载专辑封面再绘制（封面失败退回首字占位，不阻断导出）
-  const shareCard = async () => {
+  const shareCard = async (size: ShareCardSize) => {
     if (!summary || sharing) return;
     setSharing(true);
     try {
@@ -209,10 +240,12 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
         meRank: ranking?.me?.rank ?? null,
         buckets: summary.buckets,
         topSongs: summary.topSongs,
+        size,
       });
+      setShareOpen(false);
       toast({
         title: '分享卡已生成',
-        description: '1080×1350 PNG，可直接发社交平台',
+        description: `${size} · PNG，可直接发社交平台`,
         variant: 'ok',
       });
     } catch (error) {
@@ -227,10 +260,10 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
   };
 
   // 报告下载：下载本身没有视觉反馈，补一条 toast 让用户确认文件已落盘
-  const exportReport = () => {
+  const exportReport = async () => {
     if (!summary) return;
     try {
-      downloadReport();
+      await downloadReport();
       toast({
         title: '报告已生成',
         description: 'HTML 单页 · 浏览器打开可打印存 PDF',
@@ -250,7 +283,7 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
     const target = pendingDownloadRef.current;
     if (!target || !summary || range !== target) return;
     pendingDownloadRef.current = null;
-    downloadReport();
+    void downloadReport();
     window.history.replaceState(null, '', window.location.pathname);
   }, [summary, range, downloadReport]);
 
@@ -282,25 +315,52 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="screen-icon-button !min-h-9"
+                  disabled={!hasData}
+                  aria-label="生成分享卡 PNG"
+                  title={hasData ? '生成分享卡 PNG（4:5 / 1:1 / 9:16）' : emptyHint}
+                >
+                  <ScreenIcon name="layers" className="size-3.5" />
+                  <span className="hidden sm:inline text-xs">分享卡</span>
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>生成分享卡</DialogTitle>
+                  <DialogDescription>选一个尺寸，直接下载 PNG（含专辑封面）</DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-3 gap-2">
+                  {SHARE_CARD_SIZES.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      disabled={sharing}
+                      onClick={() => void shareCard(item.key)}
+                      className="flex flex-col items-center gap-1.5 rounded-sm border border-border bg-surface p-3 transition-colors hover:border-primary/40 hover:bg-primary-soft disabled:opacity-50"
+                    >
+                      <span
+                        className="rounded-sm border border-primary/25 bg-primary-soft"
+                        style={{ aspectRatio: item.key.replace(':', ' / '), height: 56 }}
+                        aria-hidden
+                      />
+                      <span className="text-xs font-semibold">{item.label}</span>
+                      <span className="text-[10px] text-muted">{item.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
             <button
               type="button"
               className="screen-icon-button !min-h-9"
-              onClick={() => void shareCard()}
-              disabled={!summary || sharing}
-              aria-label="生成分享卡 PNG"
-              aria-busy={sharing}
-              title="生成分享卡 PNG（1080×1350）"
-            >
-              <ScreenIcon name="layers" className="size-3.5" />
-              <span className="hidden sm:inline text-xs">{sharing ? '生成中…' : '分享卡'}</span>
-            </button>
-            <button
-              type="button"
-              className="screen-icon-button !min-h-9"
-              onClick={exportReport}
-              disabled={!summary}
+              onClick={() => void exportReport()}
+              disabled={!hasData}
               aria-label="导出听歌报告（HTML，可打印存 PDF）"
-              title="导出听歌报告（HTML，可打印存 PDF）"
+              title={hasData ? '导出听歌报告（HTML，可打印存 PDF）' : emptyHint}
             >
               <ScreenIcon name="external" className="size-3.5" />
               <span className="hidden sm:inline text-xs">报告</span>
@@ -309,9 +369,9 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
               type="button"
               className="screen-icon-button !min-h-9"
               onClick={downloadJson}
-              disabled={!summary}
+              disabled={!hasData}
               aria-label="导出听歌数据（JSON）"
-              title="导出听歌数据（JSON）"
+              title={hasData ? '导出听歌数据（JSON）' : emptyHint}
             >
               <ScreenIcon name="grid" className="size-3.5" />
               <span className="hidden sm:inline text-xs">数据</span>
@@ -341,6 +401,19 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
             </div>
           </div>
         </header>
+
+        {summary && !hasData ? (
+          <div className="screen-card flex flex-wrap items-center gap-x-3 gap-y-2 p-4 text-sm text-muted">
+            <ScreenIcon name="music" className="size-4 text-primary" />
+            <span>{RANGE_HINTS[range]}还没有播放记录，去大屏放首歌，这里就会长出数据。</span>
+            <a
+              href="/m/dashboard/screen"
+              className="ml-auto text-xs font-semibold text-primary hover:underline"
+            >
+              去大屏 →
+            </a>
+          </div>
+        ) : null}
 
         {summaryQuery.isError || rankingQuery.isError ? (
           <div className="screen-card p-6 text-center text-sm text-warn">
@@ -848,9 +921,44 @@ function RankingCard({
             {RANGE_HINTS[range]} · {list.length >= 50 ? '50+' : list.length} 人参与
           </p>
         </div>
-        <span className="font-mono text-[10px] tracking-wider text-muted/70">
-          {me ? `我 · 第 ${me.rank} 名` : 'GLOBAL RANKING'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] tracking-wider text-muted/70">
+            {me ? `我 · 第 ${me.rank} 名` : 'GLOBAL RANKING'}
+          </span>
+          {list.length > RANKING_LIMIT ? (
+            <Drawer>
+              <DrawerTrigger asChild>
+                <button
+                  type="button"
+                  className="rounded-full border border-primary/30 bg-primary-soft px-2.5 py-1 text-[10px] font-semibold text-primary transition-colors hover:bg-primary/15"
+                >
+                  完整榜单
+                </button>
+              </DrawerTrigger>
+              <DrawerContent side="right" className="w-[min(92vw,380px)] overflow-y-auto pb-12">
+                <DrawerHeader>
+                  <DrawerTitle>全站排名</DrawerTitle>
+                  <p className="mt-1 text-[11px] text-muted">
+                    {RANGE_HINTS[range]} · 共 {list.length} 人上榜
+                  </p>
+                </DrawerHeader>
+                <DrawerBody>
+                  <ol className="space-y-1">
+                    {list.map((item) => (
+                      <RankingRow
+                        key={item.userId}
+                        item={item}
+                        max={max}
+                        isMe={me?.userId === item.userId}
+                        compact
+                      />
+                    ))}
+                  </ol>
+                </DrawerBody>
+              </DrawerContent>
+            </Drawer>
+          ) : null}
+        </div>
       </div>
 
       {loading ? (
@@ -897,7 +1005,17 @@ function RankingCard({
   );
 }
 
-function RankingRow({ item, max, isMe }: { item: RankingEntry; max: number; isMe: boolean }) {
+function RankingRow({
+  item,
+  max,
+  isMe,
+  compact = false,
+}: {
+  item: RankingEntry;
+  max: number;
+  isMe: boolean;
+  compact?: boolean;
+}) {
   return (
     <li
       className={cn(
@@ -917,20 +1035,27 @@ function RankingRow({ item, max, isMe }: { item: RankingEntry; max: number; isMe
       >
         {item.rank}
       </span>
-      <span className="w-16 shrink-0 truncate text-[13px] sm:w-20">
+      <span className={cn('shrink-0 truncate text-[13px]', compact ? 'w-20' : 'w-16 sm:w-20')}>
         {item.userName}
         {isMe ? <span className="ml-1 text-[10px] font-semibold text-primary">我</span> : null}
       </span>
-      <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-border/50">
-        <span
-          className={cn(
-            'block h-full rounded-full transition-[width] duration-slow',
-            isMe ? 'bg-primary' : 'bg-primary/45',
-          )}
-          style={{ width: `${Math.max(2, (item.seconds / max) * 100)}%` }}
-        />
-      </span>
-      <span className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted">
+      {compact ? null : (
+        <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-border/50">
+          <span
+            className={cn(
+              'block h-full rounded-full transition-[width] duration-slow',
+              isMe ? 'bg-primary' : 'bg-primary/45',
+            )}
+            style={{ width: `${Math.max(2, (item.seconds / max) * 100)}%` }}
+          />
+        </span>
+      )}
+      <span
+        className={cn(
+          'shrink-0 text-right font-mono text-[11px] tabular-nums text-muted',
+          compact ? 'ml-auto whitespace-nowrap' : 'w-[74px] whitespace-nowrap',
+        )}
+      >
         {formatDuration(item.seconds)}
       </span>
     </li>

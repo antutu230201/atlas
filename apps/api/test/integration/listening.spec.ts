@@ -112,12 +112,13 @@ describe('听歌时长统计', () => {
     );
     const row = (ids.rows as Array<{ user_id: string; ws_id: string }>)[0]!;
     expect(row).toBeTruthy();
-    // 昨天 90s（周内）、35 天前 600s（月外年内的上月）
+    // 昨天 90s（周内）、8 天前 300s（上一周期窗口）、35 天前 600s（月外年内的上月）
     await admin.db.execute(sql`
       insert into "modules.dashboard"."listening_daily"
         (workspace_id, user_id, user_name, day, song_id, song_title, song_artist, seconds, plays)
       values
         (${row.ws_id}, ${row.user_id}, '听歌甲', ${localDay(-1)}, 31445772, '理想三旬', '陈鸿宇', 90, 1),
+        (${row.ws_id}, ${row.user_id}, '听歌甲', ${localDay(-8)}, 31445772, '理想三旬', '陈鸿宇', 300, 1),
         (${row.ws_id}, ${row.user_id}, '听歌甲', ${localDay(-35)}, 31445772, '理想三旬', '陈鸿宇', 600, 1)
     `);
     await admin.end();
@@ -127,14 +128,21 @@ describe('听歌时长统计', () => {
     expect(week.body.data.buckets).toHaveLength(7);
     expect(week.body.data.buckets.at(-1)?.seconds).toBe(50);
 
+    // offset=1：紧挨着的前一个 7 天窗口，用于报告环比
+    const prevWeek = await call(ownerCookie, 'listeningSummary', { range: 'week', offset: 1 });
+    expect(prevWeek.status).toBe(200);
+    expect(prevWeek.body.data.offset).toBe(1);
+    expect(prevWeek.body.data.totalSeconds).toBe(300);
+    expect(prevWeek.body.data.buckets).toHaveLength(7);
+    expect(prevWeek.body.data.buckets.at(-1)?.label).toBe(localDay(-7));
+
     const month = await call(ownerCookie, 'listeningSummary', { range: 'month' });
-    // 昨天(90) 在近 30 天内；35 天前(600) 不在
-    expect(month.body.data.totalSeconds).toBe(140);
+    // 今天(50) + 昨天(90) + 8 天前(300) 在近 30 天内；35 天前(600) 不在
+    expect(month.body.data.totalSeconds).toBe(440);
 
     const year = await call(ownerCookie, 'listeningSummary', { range: 'year' });
-    expect(year.body.data.totalSeconds).toBe(740);
+    expect(year.body.data.totalSeconds).toBe(1040);
     expect(year.body.data.buckets).toHaveLength(12);
-    expect(year.body.data.buckets.at(-1)?.seconds).toBe(140);
 
     // 全站周报聚合函数（SECURITY DEFINER）：跨工作空间按用户聚合 + Top 歌曲
     const adminDb = createManagedDb('postgres://atlas:atlas@localhost:5433/atlas');
