@@ -184,6 +184,19 @@ export function WeatherCard({
 
         <HourlyChart data={data.hourly} />
 
+        {compact && data.days[1] ? (
+          <div className="flex items-center justify-between border-t border-border pt-2 text-[11px] text-muted">
+            <span>明天</span>
+            <span className="flex items-center gap-2">
+              <WeatherIcon icon={data.days[1].icon} className="size-4 text-muted" />
+              <span className="font-mono tabular-nums">
+                {Math.round(data.days[1].min)}° / {Math.round(data.days[1].max)}°
+              </span>
+              <span>{data.days[1].text}</span>
+            </span>
+          </div>
+        ) : null}
+
         {compact ? null : (
           <div
             className="relative grid grid-cols-4 gap-2 border-t border-border pt-3"

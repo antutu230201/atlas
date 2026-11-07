@@ -81,6 +81,9 @@ export function ListeningMiniCard({ base }: { base: string }) {
           <span className="mx-1.5 opacity-40">/</span>
           {activeDays} 天在听
         </p>
+        <p className="text-[10px] text-muted/70">
+          日均 {shortDuration(Math.round(weekSeconds / Math.max(1, activeDays)))}
+        </p>
       </div>
 
       <p className="truncate border-t border-border/60 pt-2 text-[11px] text-muted">

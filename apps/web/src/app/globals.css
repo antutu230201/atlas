@@ -678,6 +678,16 @@
   animation: none !important;
 }
 
+/* 滚动浏览时右下播放器淡出，避免遮挡热榜/打卡；停止滚动 350ms 后自动恢复。
+   播放器挂在应用外壳层，不在 .dashboard-screen 内，所以用 body 上的标记选中。 */
+[data-testid='vinyl-player'] {
+  transition: opacity 0.25s ease;
+}
+body[data-screen-scrolling='1'] [data-testid='vinyl-player'] {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
 /* 挂墙低功耗：壁纸/天气层不挂载，其余持续动画与入场动画全部停掉；音乐与时钟数据仍正常。 */
 .dashboard-screen[data-low-power] .screen-reveal,
 .dashboard-screen[data-low-power] .screen-marquee,

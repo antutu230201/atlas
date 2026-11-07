@@ -233,6 +233,13 @@ export function DashboardScreenPage({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lowPowerMode, setLowPowerMode] = useState(false);
   const scrolling = useScrollActive();
+  // 播放器挂在应用外壳层，用 body 标记让全局样式在滚动时把它淡出
+  useEffect(() => {
+    document.body.dataset.screenScrolling = scrolling ? '1' : '';
+    return () => {
+      delete document.body.dataset.screenScrolling;
+    };
+  }, [scrolling]);
   const chromeHidden = useUiStore((state) => state.chromeHidden);
   const setChromeHidden = useUiStore((state) => state.setChromeHidden);
   const base = `/modules/workspaces/${workspaceSlug}/${moduleName}/call`;
@@ -641,7 +648,7 @@ export function DashboardScreenPage({
                       index={index}
                       label={HOT_SOURCE_LABELS[key] ?? key}
                       envelope={envelope}
-                      limit={5}
+                      limit={6}
                     />
                   ))}
                 </div>
