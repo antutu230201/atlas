@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Card, CardContent, EmptyState, Skeleton } from '@atlas/ui';
@@ -32,6 +33,7 @@ function relativeTime(value: string): string {
 export default function NotificationsPage() {
   const notifications = useNotifications();
   const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
@@ -45,25 +47,51 @@ export default function NotificationsPage() {
     onSuccess: invalidate,
   });
 
-  const items = notifications.data ?? [];
-  const unread = items.filter((n) => n.readAt === null).length;
+  const all = notifications.data ?? [];
+  const unread = all.filter((n) => n.readAt === null).length;
+  const items = filter === 'unread' ? all.filter((n) => n.readAt === null) : all;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
-      <header className="flex items-center justify-between">
+      <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">通知</h1>
           <p className="screen-label mt-1 !text-[10px]">Atlas · Notifications</p>
-          {unread > 0 ? (
-            <p className="mt-1 text-sm text-muted">
-              {unread} 条未读
-              <Button size="sm" variant="ghost" className="ml-3" onClick={() => markAll.mutate()}>
-                全部已读
-              </Button>
-            </p>
-          ) : null}
+          <p className="mt-1 text-sm text-muted">
+            {unread > 0 ? `${unread} 条未读` : all.length > 0 ? '全部已读' : '还没有收到通知'}
+          </p>
         </div>
+        {unread > 0 ? (
+          <Button size="sm" variant="ghost" onClick={() => markAll.mutate()}>
+            全部已读
+          </Button>
+        ) : null}
       </header>
+
+      {all.length > 0 ? (
+        <div className="flex items-center gap-1.5" role="group" aria-label="通知筛选">
+          {(
+            [
+              { key: 'all', label: `全部 ${all.length}` },
+              { key: 'unread', label: `未读 ${unread}` },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={filter === option.key}
+              onClick={() => setFilter(option.key)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                filter === option.key
+                  ? 'border-primary/40 bg-primary-soft text-primary'
+                  : 'border-border bg-surface/60 text-muted hover:text-text'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {notifications.isPending ? (
         <div className="space-y-3">
@@ -71,7 +99,12 @@ export default function NotificationsPage() {
           <Skeleton className="h-16 w-full" />
         </div>
       ) : items.length === 0 ? (
-        <EmptyState title="暂无通知" description="有新动态时会出现在这里。" />
+        <EmptyState
+          title={filter === 'unread' ? '没有未读通知' : '暂无通知'}
+          description={
+            filter === 'unread' ? '都看完了，去干点别的吧。' : '有新动态时会出现在这里。'
+          }
+        />
       ) : (
         <div className="space-y-3">
           {items.map((n) => {

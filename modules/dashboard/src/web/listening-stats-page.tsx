@@ -226,6 +226,25 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
     }
   };
 
+  // 报告下载：下载本身没有视觉反馈，补一条 toast 让用户确认文件已落盘
+  const exportReport = () => {
+    if (!summary) return;
+    try {
+      downloadReport();
+      toast({
+        title: '报告已生成',
+        description: 'HTML 单页 · 浏览器打开可打印存 PDF',
+        variant: 'ok',
+      });
+    } catch (error) {
+      toast({
+        title: '报告生成失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'err',
+      });
+    }
+  };
+
   // 通知直达：数据就绪后自动下载一次当期报告，并清理 URL 参数（防刷新重复下载）
   useEffect(() => {
     const target = pendingDownloadRef.current;
@@ -278,7 +297,7 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
             <button
               type="button"
               className="screen-icon-button !min-h-9"
-              onClick={downloadReport}
+              onClick={exportReport}
               disabled={!summary}
               aria-label="导出听歌报告（HTML，可打印存 PDF）"
               title="导出听歌报告（HTML，可打印存 PDF）"
