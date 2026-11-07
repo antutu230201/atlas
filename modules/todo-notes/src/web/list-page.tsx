@@ -6,7 +6,16 @@ import { Badge, Button, Card, CardContent, EmptyState, Input, Skeleton, useToast
 import { api } from '@/lib/api';
 import type { ModulePageProps, TodoRow } from './types';
 
-/** 待办列表：创建/状态流转/筛选/搜索/删除（软删进回收站） */
+const STATUSES = ['open', 'doing', 'done'] as const;
+type TodoStatus = (typeof STATUSES)[number];
+
+const STATUS_LABELS: Record<TodoStatus, string> = {
+  open: '待办',
+  doing: '进行中',
+  done: '已完成',
+};
+
+/** 待办列表：创建/状态流转/筛选/搜索/删除（软删进回收站）；看板视图支持拖拽换列 */
 export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -14,14 +23,26 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
   const [title, setTitle] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<'list' | 'board'>('list');
   const [error, setError] = useState<string | null>(null);
 
   const list = useQuery({
-    queryKey: ['module', moduleName, workspaceSlug, 'list', statusFilter, search],
+    queryKey: [
+      'module',
+      moduleName,
+      workspaceSlug,
+      'list',
+      view === 'board' ? '' : statusFilter,
+      search,
+    ],
     queryFn: () =>
       api<{ todos: TodoRow[] }>(`${base}/list`, {
         method: 'POST',
-        json: { status: statusFilter || undefined, q: search || undefined },
+        json: {
+          // 看板需要三列全量，状态由前端分组
+          status: view === 'board' ? undefined : statusFilter || undefined,
+          q: search || undefined,
+        },
       }),
   });
 
@@ -44,7 +65,7 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
   });
 
   const setStatus = useMutation({
-    mutationFn: (input: { id: string; status: 'open' | 'doing' | 'done' }) =>
+    mutationFn: (input: { id: string; status: TodoStatus }) =>
       api(`${base}/setStatus`, { method: 'POST', json: input }),
     onSuccess: invalidate,
   });
@@ -60,7 +81,7 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
   const todos = list.data?.todos ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-5">
+    <div className="mx-auto w-full max-w-5xl space-y-5">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">待办</h1>
         <p className="screen-label mt-1 !text-[10px]">Todo · Capture and organize</p>
@@ -89,22 +110,42 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
       </Card>
 
       <div className="flex flex-wrap items-center gap-2">
-        {['', 'open', 'doing', 'done'].map((status) => (
-          <Button
-            key={status || 'all'}
-            size="sm"
-            variant={statusFilter === status ? 'primary' : 'secondary'}
-            onClick={() => setStatusFilter(status)}
-          >
-            {status === ''
-              ? '全部'
-              : status === 'open'
-                ? '待办'
-                : status === 'doing'
-                  ? '进行中'
-                  : '已完成'}
-          </Button>
-        ))}
+        <div
+          className="flex items-center gap-0.5 rounded-sm border border-border p-0.5"
+          role="group"
+          aria-label="视图切换"
+        >
+          {(
+            [
+              { key: 'list', label: '列表' },
+              { key: 'board', label: '看板' },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={view === option.key}
+              onClick={() => setView(option.key)}
+              className={`rounded-xs px-3 py-1 text-xs font-semibold transition-colors ${
+                view === option.key ? 'bg-primary-soft text-primary' : 'text-muted hover:text-text'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {view === 'list'
+          ? ['' as const, ...STATUSES].map((status) => (
+              <Button
+                key={status || 'all'}
+                size="sm"
+                variant={statusFilter === status ? 'primary' : 'secondary'}
+                onClick={() => setStatusFilter(status)}
+              >
+                {status === '' ? '全部' : STATUS_LABELS[status]}
+              </Button>
+            ))
+          : null}
         <div className="ml-auto w-44">
           <Input
             value={search}
@@ -128,13 +169,20 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
         </div>
       ) : todos.length === 0 ? (
         <EmptyState title="这里空空如也" description="添加第一条待办，或者调整筛选条件。" />
+      ) : view === 'board' ? (
+        <TodoBoard
+          todos={todos}
+          onMove={(id, status) => setStatus.mutate({ id, status })}
+          onRemove={(id) => remove.mutate(id)}
+          moving={setStatus.isPending}
+        />
       ) : (
         <div className="space-y-2">
           {todos.map((row: TodoRow) => (
             <Card key={row.id} className="py-3">
               <CardContent className="flex items-center gap-3 py-1">
                 <div className="flex gap-1">
-                  {(['open', 'doing', 'done'] as const).map((s) => (
+                  {STATUSES.map((s) => (
                     <button
                       key={s}
                       type="button"
@@ -142,7 +190,7 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
                       onClick={() => setStatus.mutate({ id: row.id, status: s })}
                       className={cnStatus(row.status, s)}
                     >
-                      {s === 'open' ? '待办' : s === 'doing' ? '进行' : '完成'}
+                      {STATUS_LABELS[s].slice(0, 2)}
                     </button>
                   ))}
                 </div>
@@ -175,6 +223,114 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** 看板视图：三列按状态分组，HTML5 原生拖拽换列（不引第三方库） */
+function TodoBoard({
+  todos,
+  onMove,
+  onRemove,
+  moving,
+}: {
+  todos: TodoRow[];
+  onMove: (id: string, status: TodoStatus) => void;
+  onRemove: (id: string) => void;
+  moving: boolean;
+}) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overColumn, setOverColumn] = useState<TodoStatus | null>(null);
+
+  const columns = STATUSES.map((status) => ({
+    status,
+    rows: todos.filter((row) => row.status === status),
+  }));
+
+  return (
+    <div className="grid gap-3 md:grid-cols-3" aria-label="待办看板">
+      {columns.map(({ status, rows }) => (
+        <div
+          key={status}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setOverColumn(status);
+          }}
+          onDragLeave={() => setOverColumn((current) => (current === status ? null : current))}
+          onDrop={(event) => {
+            event.preventDefault();
+            setOverColumn(null);
+            if (dragId) onMove(dragId, status);
+            setDragId(null);
+          }}
+          className={`flex min-h-40 flex-col gap-2 rounded-md border p-3 transition-colors ${
+            overColumn === status
+              ? 'border-primary/50 bg-primary-soft/40'
+              : 'border-border bg-surface/40'
+          }`}
+          aria-label={`${STATUS_LABELS[status]}列，${rows.length} 条`}
+        >
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-semibold">{STATUS_LABELS[status]}</span>
+            <span className="font-mono text-[10px] text-muted tabular-nums">{rows.length}</span>
+          </div>
+
+          {rows.length === 0 ? (
+            <p className="flex flex-1 items-center justify-center text-[11px] text-muted/60">
+              {moving ? '移动中…' : '拖到这里'}
+            </p>
+          ) : (
+            rows.map((row) => (
+              <div
+                key={row.id}
+                draggable
+                onDragStart={() => setDragId(row.id)}
+                onDragEnd={() => {
+                  setDragId(null);
+                  setOverColumn(null);
+                }}
+                className={`cursor-grab rounded-sm border border-border bg-surface p-2.5 shadow-soft transition-opacity active:cursor-grabbing ${
+                  dragId === row.id ? 'opacity-40' : ''
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p
+                    className={`min-w-0 flex-1 text-[13px] leading-5 ${
+                      row.status === 'done' ? 'text-muted line-through' : ''
+                    }`}
+                  >
+                    {row.title}
+                  </p>
+                  <Badge
+                    variant={
+                      row.priority === 'high'
+                        ? 'err'
+                        : row.priority === 'normal'
+                          ? 'neutral'
+                          : 'info'
+                    }
+                  >
+                    {row.priority}
+                  </Badge>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted">
+                  <span>
+                    {row.dueDate ? `截止 ${new Date(row.dueDate).toLocaleDateString('zh-CN')}` : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(row.id)}
+                    className="transition-colors hover:text-err"
+                    aria-label={`删除 ${row.title}`}
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ))}
     </div>
   );
 }

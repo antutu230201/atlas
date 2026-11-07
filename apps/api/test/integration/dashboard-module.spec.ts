@@ -164,6 +164,43 @@ describe('个人大屏模块', () => {
     expect(afterRestore.body.data.countdowns).toHaveLength(1);
   });
 
+  it('农历倒计时：创建换算为公历 + 过期循环项自动顺推', async () => {
+    // 农历纪念日：label 描述农历月日，targetDate 是未来最近一次的公历日期
+    const lunarCreated = await call(ownerCookie, 'createCountdown', {
+      title: '奶奶生日',
+      lunar: true,
+      lunarMonth: 8,
+      lunarDay: 15,
+    });
+    expect(lunarCreated.status).toBe(200);
+    const lunarView = await call(ownerCookie, 'snapshot');
+    const lunarRow = lunarView.body.data.countdowns.find(
+      (c: { title: string }) => c.title === '奶奶生日',
+    );
+    expect(lunarRow.lunar).toBe(true);
+    expect(lunarRow.lunarLabel).toBe('农历8月十五');
+    expect(lunarRow.targetDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(lunarRow.targetDate >= new Date().toISOString().slice(0, 10)).toBe(true);
+
+    // 每年循环的公历项：造一条已过期数据，snapshot 应顺推到下一年同月日
+    const pastYear = new Date().getFullYear() - 1;
+    const stale = await call(ownerCookie, 'createCountdown', {
+      title: '跨年',
+      targetDate: `${pastYear}-12-31`,
+      repeatYearly: true,
+    });
+    expect(stale.status).toBe(200);
+    const staleView = await call(ownerCookie, 'snapshot');
+    const staleRow = staleView.body.data.countdowns.find(
+      (c: { title: string }) => c.title === '跨年',
+    );
+    expect(staleRow.targetDate).toBe(`${pastYear + 1}-12-31`);
+
+    // 清理，避免影响其他用例的计数断言
+    await call(ownerCookie, 'deleteCountdown', { id: lunarCreated.body.data.id });
+    await call(ownerCookie, 'deleteCountdown', { id: stale.body.data.id });
+  });
+
   it('删除事件落 outbox（dashboard.countdown.deleted）', async () => {
     const created = await call(ownerCookie, 'createCountdown', {
       title: '待删',

@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
   pgSchema,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -49,6 +50,13 @@ export const countdown = moduleSchema.table(
     title: text('title').notNull(),
     targetDate: date('target_date').notNull(),
     pinned: boolean('pinned').notNull().default(false),
+    /** 每年循环（生日/纪念日）：展示日期过期后自动顺推到下一次 */
+    repeatYearly: boolean('repeat_yearly').notNull().default(false),
+    /** 农历纪念日：targetDate 存换算后的公历，lunar_month/day 留原始农历用于顺推 */
+    lunar: boolean('lunar').notNull().default(false),
+    lunarMonth: smallint('lunar_month'),
+    lunarDay: smallint('lunar_day'),
+    lunarLabel: text('lunar_label').notNull().default(''),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdBy: uuid('created_by').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

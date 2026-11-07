@@ -74,6 +74,11 @@ export interface CountdownItem {
   targetDate: string;
   pinned: boolean;
   deletedAt: string | null;
+  /** 每年循环：过期后展示日期自动顺推 */
+  repeatYearly?: boolean;
+  lunar?: boolean;
+  /** 农历描述，如「农历八月初五」 */
+  lunarLabel?: string;
 }
 
 /** 活跃度统计（打卡热力图 / 连续天数，事件订阅累积） */

@@ -19,15 +19,57 @@ function daysText(days: number | null): string {
   return days > 0 ? `还有 ${days} 天` : `已过 ${-days} 天`;
 }
 
+const LUNAR_DAYS = Array.from({ length: 30 }, (_, index) => index + 1);
+const LUNAR_DAY_NAMES = [
+  '初一',
+  '初二',
+  '初三',
+  '初四',
+  '初五',
+  '初六',
+  '初七',
+  '初八',
+  '初九',
+  '初十',
+  '十一',
+  '十二',
+  '十三',
+  '十四',
+  '十五',
+  '十六',
+  '十七',
+  '十八',
+  '十九',
+  '二十',
+  '廿一',
+  '廿二',
+  '廿三',
+  '廿四',
+  '廿五',
+  '廿六',
+  '廿七',
+  '廿八',
+  '廿九',
+  '三十',
+];
+
 export interface CountdownHandlers {
   canWrite: boolean;
-  create: (input: { title: string; targetDate: string; pinned?: boolean }) => void;
+  create: (input: {
+    title: string;
+    targetDate?: string;
+    pinned?: boolean;
+    lunar?: boolean;
+    lunarMonth?: number;
+    lunarDay?: number;
+    repeatYearly?: boolean;
+  }) => void;
   remove: (id: string) => void;
   togglePin: (item: CountdownItem) => void;
   creating: boolean;
 }
 
-/** 倒计时区：卡片网格 + 内联新建表单（member+ 可写，guest 只读） */
+/** 倒计时区：卡片网格 + 内联新建表单（支持农历纪念日与每年循环） */
 export function CountdownSection({
   items,
   handlers,
@@ -39,16 +81,105 @@ export function CountdownSection({
   const { toast } = useToast();
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
+  const [lunarMode, setLunarMode] = useState(false);
+  const [lunarMonth, setLunarMonth] = useState(1);
+  const [lunarDay, setLunarDay] = useState(1);
+  const [repeatYearly, setRepeatYearly] = useState(true);
 
   const submit = () => {
-    if (title.trim().length === 0 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      toast({ title: '请填写标题和日期', variant: 'err' });
+    if (title.trim().length === 0) {
+      toast({ title: '请填写标题', variant: 'err' });
       return;
     }
-    create({ title: title.trim(), targetDate: date });
+    if (lunarMode) {
+      create({
+        title: title.trim(),
+        lunar: true,
+        lunarMonth,
+        lunarDay,
+        repeatYearly,
+      });
+    } else {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        toast({ title: '请填写日期', variant: 'err' });
+        return;
+      }
+      create({ title: title.trim(), targetDate: date, repeatYearly });
+    }
     setTitle('');
     setDate('');
+    setLunarDay(1);
   };
+
+  const formFields = (
+    <>
+      {lunarMode ? (
+        <div className="flex gap-2">
+          <select
+            value={lunarMonth}
+            onChange={(e) => setLunarMonth(Number(e.target.value))}
+            aria-label="农历月"
+            className="min-w-0 flex-1 rounded-xs border border-border bg-bg px-2 py-1.5 text-sm outline-none focus:border-primary/50"
+          >
+            {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+              <option key={month} value={month}>
+                农历 {month} 月
+              </option>
+            ))}
+          </select>
+          <select
+            value={lunarDay}
+            onChange={(e) => setLunarDay(Number(e.target.value))}
+            aria-label="农历日"
+            className="min-w-0 flex-1 rounded-xs border border-border bg-bg px-2 py-1.5 text-sm outline-none focus:border-primary/50"
+          >
+            {LUNAR_DAYS.map((day) => (
+              <option key={day} value={day}>
+                {LUNAR_DAY_NAMES[day - 1]}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <Input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          aria-label="目标日期"
+          className="mb-2"
+        />
+      )}
+      <label className="mb-2 flex items-center gap-3 text-[11px] text-muted">
+        <span
+          className="inline-flex cursor-pointer items-center gap-1"
+          onClick={() => setLunarMode((value) => !value)}
+        >
+          <input
+            type="checkbox"
+            className="size-3 accent-[var(--primary)]"
+            checked={lunarMode}
+            onChange={(event) => setLunarMode(event.target.checked)}
+          />
+          农历
+        </span>
+        <span
+          className="inline-flex cursor-pointer items-center gap-1"
+          onClick={() => setRepeatYearly((value) => !value)}
+        >
+          <input
+            type="checkbox"
+            className="size-3 accent-[var(--primary)]"
+            checked={repeatYearly}
+            onChange={(event) => setRepeatYearly(event.target.checked)}
+          />
+          每年循环
+        </span>
+      </label>
+      <Button size="sm" className="w-full" loading={creating} onClick={submit}>
+        {lunarMode ? '添加农历纪念日' : '添加倒计时'}
+      </Button>
+    </>
+  );
 
   return (
     <section
@@ -82,7 +213,17 @@ export function CountdownSection({
           return (
             <article key={item.id} className="screen-card group p-4 hover:-translate-y-0.5">
               <div className="flex items-start justify-between gap-2">
-                <p className="min-w-0 flex-1 truncate text-sm font-semibold">{item.title}</p>
+                <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+                  {item.title}
+                  {item.repeatYearly ? (
+                    <span
+                      className="ml-1.5 align-middle text-[10px] text-muted/70"
+                      title="每年循环，过期自动顺推"
+                    >
+                      ↻
+                    </span>
+                  ) : null}
+                </p>
                 {canWrite ? (
                   <button
                     type="button"
@@ -103,7 +244,14 @@ export function CountdownSection({
                 <span className="text-[11px] text-muted">{daysText(days)}</span>
               </p>
               <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                <span className="font-mono text-[10px] text-muted">{item.targetDate}</span>
+                <span className="font-mono text-[10px] text-muted">
+                  {item.lunar && item.lunarLabel ? (
+                    <span className="text-warn/90">{item.lunarLabel}</span>
+                  ) : null}
+                  <span className={item.lunar && item.lunarLabel ? 'ml-1.5' : ''}>
+                    {item.targetDate}
+                  </span>
+                </span>
                 {canWrite ? (
                   <button
                     type="button"
@@ -123,53 +271,18 @@ export function CountdownSection({
           <div
             className={`screen-card border-dashed p-4 ${items.length === 0 ? 'sm:col-span-2' : ''}`}
           >
-            {items.length === 0 ? (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="mb-1 flex shrink-0 items-center gap-2 pr-2 text-[11px] text-muted sm:mb-0">
-                  <ScreenIcon name="plus" className="size-3.5" /> 标记下一个重要时刻
-                </div>
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="事项名称，如：生日"
-                  aria-label="倒计时名称"
-                  className="min-w-0 flex-1"
-                />
-                <Input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  aria-label="目标日期"
-                  className="sm:w-44"
-                />
-                <Button size="sm" className="sm:w-32" loading={creating} onClick={submit}>
-                  添加倒计时
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="mb-3 flex items-center gap-2 text-[11px] text-muted">
-                  <ScreenIcon name="plus" className="size-3.5" /> 标记下一个重要时刻
-                </div>
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="事项名称，如：生日"
-                  aria-label="倒计时名称"
-                  className="mb-2"
-                />
-                <Input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  aria-label="目标日期"
-                  className="mb-2"
-                />
-                <Button size="sm" className="w-full" loading={creating} onClick={submit}>
-                  添加倒计时
-                </Button>
-              </>
-            )}
+            <div className="mb-3 flex items-center gap-2 text-[11px] text-muted">
+              <ScreenIcon name="plus" className="size-3.5" />
+              标记下一个重要时刻
+            </div>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="事项名称，如：妈妈生日"
+              aria-label="倒计时名称"
+              className="mb-2"
+            />
+            {formFields}
           </div>
         ) : null}
       </div>

@@ -23,6 +23,7 @@ import {
   type Wallpaper,
 } from './providers/misc';
 import { isFakeMode } from './providers/http';
+import { Lunar, Solar } from 'lunar-typescript';
 import { fetchNeteaseLyrics } from './providers/lyrics';
 import {
   fetchLikedTracks,
@@ -95,8 +96,17 @@ type WorkspaceSettings = z.infer<typeof settingsSchema>;
 
 const createCountdownSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(60),
-  targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD'),
+  targetDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD')
+    .optional(),
   pinned: z.boolean().optional(),
+  /** 农历纪念日：传农历月/日，后端换算为下一次发生的公历日期 */
+  lunar: z.boolean().optional(),
+  lunarMonth: z.number().int().min(1).max(12).optional(),
+  lunarDay: z.number().int().min(1).max(30).optional(),
+  /** 每年循环（生日/纪念日）；农历模式默认开启 */
+  repeatYearly: z.boolean().optional(),
 });
 
 const updateCountdownSchema = z.object({
@@ -252,18 +262,124 @@ async function resolveSource<T>(
 
 /* ---------------- 倒计时 ---------------- */
 
+/** DB 行形状（drizzle select 返回，deletedAt 是 Date） */
 interface CountdownRow {
   id: string;
   title: string;
   targetDate: string;
   pinned: boolean;
+  deletedAt: Date | null;
+  repeatYearly: boolean;
+  lunar: boolean;
+  lunarMonth: number | null;
+  lunarDay: number | null;
+  lunarLabel: string;
+}
+
+/** 返回给前端的形状（deletedAt 序列化为 ISO） */
+interface CountdownView {
+  id: string;
+  title: string;
+  targetDate: string;
+  pinned: boolean;
   deletedAt: string | null;
+  repeatYearly: boolean;
+  lunar: boolean;
+  lunarLabel: string;
+}
+
+/** 农历日中文名（初一~三十），给 label 用 */
+function lunarDayName(day: number): string {
+  const names = [
+    '初一',
+    '初二',
+    '初三',
+    '初四',
+    '初五',
+    '初六',
+    '初七',
+    '初八',
+    '初九',
+    '初十',
+    '十一',
+    '十二',
+    '十三',
+    '十四',
+    '十五',
+    '十六',
+    '十七',
+    '十八',
+    '十九',
+    '二十',
+    '廿一',
+    '廿二',
+    '廿三',
+    '廿四',
+    '廿五',
+    '廿六',
+    '廿七',
+    '廿八',
+    '廿九',
+    '三十',
+  ];
+  return names[day - 1] ?? String(day);
+}
+
+/** 农历月日 → 当年公历 YYYY-MM-DD；闰月按平月处理（lunar-typescript 对非法输入返回 null） */
+function lunarToSolar(lunarYear: number, month: number, day: number): string | null {
+  try {
+    return Lunar.fromYmd(lunarYear, month, day).getSolar().toYmd();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 每年循环的纪念日过期后顺推到下一次：
+ * 农历按农历年顺推（保留原始农历月日），公历按同月日顺推（2/29 落到 3/1）。
+ * 写库失败（如 guest 只读上下文）不影响本次展示——返回值始终是顺推后的日期。
+ */
+async function advanceRepeatingCountdown(ctx: ModuleContext, row: CountdownRow): Promise<string> {
+  const today = localDay();
+  if (!row.repeatYearly || row.targetDate >= today) return row.targetDate;
+  let nextDate: string | null = null;
+  if (row.lunar && row.lunarMonth && row.lunarDay) {
+    const currentLunarYear = Solar.fromDate(new Date()).getLunar().getYear();
+    for (let year = currentLunarYear + 1; year <= currentLunarYear + 3; year += 1) {
+      const candidate = lunarToSolar(year, row.lunarMonth, row.lunarDay);
+      if (candidate && candidate >= today) {
+        nextDate = candidate;
+        break;
+      }
+    }
+  } else {
+    const [y = 0, m = 1, d = 1] = row.targetDate.split('-').map(Number);
+    for (let i = 1; i <= 3; i += 1) {
+      // JS Date 自动进位：2/29 在平年落到 3/1
+      const candidateDate = new Date(y + i, m - 1, d);
+      const candidate = localDay(candidateDate);
+      if (candidate >= today) {
+        nextDate = candidate;
+        break;
+      }
+    }
+  }
+  if (!nextDate) return row.targetDate;
+  try {
+    await ctx.db
+      .update(countdown)
+      .set({ targetDate: nextDate, updatedAt: new Date() })
+      .where(eq(countdown.id, row.id));
+  } catch {
+    // 只读上下文：顺推仅体现在本次返回
+  }
+  return nextDate;
 }
 
 async function listCountdownRows(
   ctx: ModuleContext,
   includeDeleted: boolean,
-): Promise<CountdownRow[]> {
+): Promise<CountdownView[]> {
   const rows = await ctx.db
     .select()
     .from(countdown)
@@ -274,13 +390,18 @@ async function listCountdownRows(
     )
     .orderBy(desc(countdown.pinned), asc(countdown.targetDate))
     .limit(50);
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    targetDate: row.targetDate,
-    pinned: row.pinned,
-    deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
-  }));
+  return Promise.all(
+    rows.map(async (row) => ({
+      id: row.id,
+      title: row.title,
+      targetDate: row.deletedAt ? row.targetDate : await advanceRepeatingCountdown(ctx, row),
+      pinned: row.pinned,
+      deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
+      repeatYearly: row.repeatYearly,
+      lunar: row.lunar,
+      lunarLabel: row.lunarLabel,
+    })),
+  );
 }
 
 /* ---------------- 活跃度（打卡热力图 / 连续天数） ---------------- */
@@ -1057,13 +1178,38 @@ export const definition: ModuleDefinition = {
       handler: async (ctx, input) => {
         const parsed = createCountdownSchema.safeParse(input ?? {});
         if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
+        const data = parsed.data;
+        let targetDate = data.targetDate;
+        let lunarLabel = '';
+        const lunar = data.lunar === true;
+        const repeatYearly = data.repeatYearly ?? lunar;
+        if (lunar) {
+          const { lunarMonth, lunarDay } = data;
+          if (!lunarMonth || !lunarDay) bad('农历模式需要农历月和日');
+          const currentYear = Solar.fromDate(new Date()).getLunar().getYear();
+          let candidate = lunarToSolar(currentYear, lunarMonth, lunarDay);
+          const today = localDay();
+          if ((!candidate || candidate < today) && repeatYearly) {
+            candidate = lunarToSolar(currentYear + 1, lunarMonth, lunarDay);
+          }
+          if (!candidate) bad('农历日期无效');
+          targetDate = candidate;
+          lunarLabel = `农历${lunarMonth}月${lunarDayName(lunarDay)}`;
+        } else if (!targetDate) {
+          bad('请填写日期');
+        }
         const rows = await ctx.db
           .insert(countdown)
           .values({
             workspaceId: ctx.workspaceId,
-            title: parsed.data.title,
-            targetDate: parsed.data.targetDate,
-            pinned: parsed.data.pinned ?? false,
+            title: data.title,
+            targetDate,
+            pinned: data.pinned ?? false,
+            repeatYearly,
+            lunar,
+            lunarMonth: lunar ? (data.lunarMonth ?? null) : null,
+            lunarDay: lunar ? (data.lunarDay ?? null) : null,
+            lunarLabel,
             createdBy: ctx.userId,
           })
           .returning();

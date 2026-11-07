@@ -28,6 +28,7 @@ import { HotlistCard } from './hotlist-card';
 import { ListeningMiniCard } from './listening-mini-card';
 import { NotificationBell } from './notification-bell';
 import { QuoteCard } from './quote-card';
+import { AssistantBubble } from './assistant-bubble';
 import { SettingsDrawer } from './settings-drawer';
 import { ScreenHeadline } from './screen-headline';
 import { ShortcutHelp } from './shortcut-help';
@@ -316,8 +317,15 @@ export function DashboardScreenPage({
   });
 
   const createCountdown = useMutation({
-    mutationFn: (input: { title: string; targetDate: string; pinned?: boolean }) =>
-      api(`${base}/createCountdown`, { method: 'POST', json: input }),
+    mutationFn: (input: {
+      title: string;
+      targetDate?: string;
+      pinned?: boolean;
+      lunar?: boolean;
+      lunarMonth?: number;
+      lunarDay?: number;
+      repeatYearly?: boolean;
+    }) => api(`${base}/createCountdown`, { method: 'POST', json: input }),
     onSuccess: () => {
       invalidate();
       toast({ title: '已添加倒计时', variant: 'ok' });
@@ -854,6 +862,11 @@ export function DashboardScreenPage({
 
       {/* 夜间压暗覆盖层：叠在内容之上（不拦截点击），比给整棵树加 filter 便宜 */}
       {night ? <div className="screen-night" aria-hidden /> : null}
+
+      {/* AI 快聊：固定在播放器上方，滚动时不随内容移动 */}
+      <div className="absolute right-5 bottom-24 z-30 flex flex-col items-end">
+        <AssistantBubble />
+      </div>
 
       <ShortcutHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 
