@@ -23,14 +23,7 @@ import {
 import { api, ApiError } from '@/lib/api';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
 
-type Tab = 'members' | 'modules' | 'audit' | 'ai';
-
-interface MemberRow {
-  userId: string;
-  email: string;
-  displayName: string;
-  role: 'owner' | 'admin' | 'member' | 'guest';
-}
+type Tab = 'modules' | 'audit' | 'ai';
 
 interface AuditRow {
   id: number;
@@ -42,8 +35,8 @@ interface AuditRow {
 }
 
 export default function SettingsPage() {
-  const { workspace, user } = useActiveWorkspace();
-  const [tab, setTab] = useState<Tab>('members');
+  const { workspace } = useActiveWorkspace();
+  const [tab, setTab] = useState<Tab>('modules');
 
   if (!workspace) {
     return (
@@ -56,14 +49,13 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">工作空间设置</h1>
-        <p className="mt-1 text-sm text-muted">「{workspace.name}」的管理页。</p>
+        <h1 className="text-2xl font-semibold">设置</h1>
+        <p className="mt-1 text-sm text-muted">个人大屏「{workspace.name}」。</p>
       </header>
 
       <nav aria-label="设置分区" className="flex gap-2">
         {(
           [
-            ['members', '成员'],
             ['modules', '模块'],
             ['audit', '审计日志'],
             ['ai', 'AI 配置'],
@@ -80,136 +72,10 @@ export default function SettingsPage() {
         ))}
       </nav>
 
-      {tab === 'members' ? <MembersTab slug={workspace.slug} me={user?.id ?? ''} /> : null}
       {tab === 'modules' ? <ModulesTab slug={workspace.slug} /> : null}
       {tab === 'audit' ? <AuditTab slug={workspace.slug} /> : null}
       {tab === 'ai' ? <AiConfigTab /> : null}
     </div>
-  );
-}
-
-function MembersTab({ slug, me }: { slug: string; me: string }) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const members = useQuery({
-    queryKey: ['members', slug],
-    queryFn: () => api<MemberRow[]>(`/workspaces/${slug}/members`),
-  });
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState('member');
-  const [error, setError] = useState<string | null>(null);
-
-  const invite = useMutation({
-    mutationFn: () =>
-      api(`/workspaces/${slug}/members/invite`, { method: 'POST', json: { email, role } }),
-    onSuccess: () => {
-      setError(null);
-      setEmail('');
-      toast({ title: '邀请已发送', description: email, variant: 'ok' });
-      void queryClient.invalidateQueries({ queryKey: ['members', slug] });
-    },
-    onError: (e: Error) => setError(e.message),
-  });
-
-  const changeRole = useMutation({
-    mutationFn: (input: { userId: string; role: string }) =>
-      api(`/workspaces/${slug}/members/${input.userId}`, {
-        method: 'PATCH',
-        json: { role: input.role },
-      }),
-    onSuccess: () => {
-      toast({ title: '角色已更新', variant: 'ok' });
-      void queryClient.invalidateQueries({ queryKey: ['members', slug] });
-    },
-  });
-
-  const remove = useMutation({
-    mutationFn: (userId: string) =>
-      api(`/workspaces/${slug}/members/${userId}`, { method: 'DELETE' }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['members', slug] }),
-  });
-
-  if (members.isPending) return <Skeleton className="h-40 w-full" />;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>成员管理</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Table>
-          <THead>
-            <TR>
-              <TH>成员</TH>
-              <TH>角色</TH>
-              <TH>操作</TH>
-            </TR>
-          </THead>
-          <TBody>
-            {(members.data ?? []).map((row) => (
-              <TR key={row.userId}>
-                <TD>
-                  <span className="font-medium">{row.displayName}</span>
-                  <span className="ml-2 text-xs text-muted">{row.email}</span>
-                </TD>
-                <TD>
-                  <Badge variant={row.role === 'owner' ? 'primary' : 'neutral'}>{row.role}</Badge>
-                </TD>
-                <TD>
-                  {row.role !== 'owner' && row.userId !== me ? (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => changeRole.mutate({ userId: row.userId, role: 'admin' })}
-                      >
-                        设为 admin
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => remove.mutate(row.userId)}>
-                        移除
-                      </Button>
-                    </div>
-                  ) : null}
-                </TD>
-              </TR>
-            ))}
-          </TBody>
-        </Table>
-
-        <div className="space-y-3 rounded-sm border border-border p-4">
-          <p className="text-sm font-semibold">邀请成员</p>
-          <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
-            <Field id="invite-email" label="邮箱">
-              <Input id="invite-email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </Field>
-            <Field id="invite-role" label="角色">
-              <select
-                id="invite-role"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                aria-label="角色"
-                className="h-10 w-full rounded-sm border border-border bg-surface px-3 text-sm"
-              >
-                <option value="admin">admin</option>
-                <option value="member">member</option>
-                <option value="guest">guest</option>
-              </select>
-            </Field>
-            <div className="flex items-end">
-              <Button loading={invite.isPending} onClick={() => invite.mutate()}>
-                发送邀请
-              </Button>
-            </div>
-          </div>
-          {error ? <p className="text-xs text-err">{error}</p> : null}
-          <p className="text-xs text-muted">
-            本地开发：邀请令牌会出现在响应与审计日志中，收件人登录后在
-            <code className="mx-1 rounded-xs bg-surface-hover px-1">/auth/invitations/accept</code>
-            接受。
-          </p>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

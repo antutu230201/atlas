@@ -1,6 +1,7 @@
 'use client';
 
 import type * as THREE from 'three';
+import { onListeningPulse, readStoredPulse } from './listening-pulse';
 import { useEffect, useRef, useState } from 'react';
 
 /**
@@ -399,6 +400,10 @@ export function ListeningStage({
       mount.addEventListener('pointerleave', onPointerLeave);
 
       /* ---- 渲染循环 ---- */
+      let pulse = readStoredPulse();
+      const removePulseListener = onListeningPulse((playing) => {
+        pulse = playing;
+      });
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       let raf = 0;
       let last = performance.now();
@@ -407,7 +412,7 @@ export function ListeningStage({
       const frame = (now: number) => {
         const dt = Math.min(0.05, (now - last) / 1000);
         last = now;
-        vinyl.rotation.z += dt * 0.85;
+        vinyl.rotation.z += dt * (0.85 + (pulse ? 1.7 : 0));
         // 无操作时缓慢自转
         if (!dragging && now - idleSince > 2500) yaw += dt * 0.05;
         yawVelocity *= 0.92;
@@ -415,8 +420,9 @@ export function ListeningStage({
         stage.rotation.y = yaw;
         // 声浪柱弹性趋近目标高度
         const maxSeconds = Math.max(...bars.map((bar) => bar.seconds), 60);
+        const beat = pulse ? Math.sin(now / 260) * 0.1 : 0;
         for (const bar of bars) {
-          bar.target = Math.max(0.12, (bar.seconds / maxSeconds) * 2.6);
+          bar.target = Math.max(0.12, (bar.seconds / maxSeconds) * 3.2) * (1 + beat);
           bar.current += (bar.target - bar.current) * Math.min(1, dt * 6);
           bar.mesh.scale.y = Math.max(0.02, bar.current);
           bar.mesh.position.y = bar.mesh.scale.y / 2;
@@ -424,8 +430,9 @@ export function ListeningStage({
           bar.material.emissiveIntensity = intensity;
         }
         // 音符上浮 + 摆动
+        const speedBoost = pulse ? 1.9 : 1;
         for (const note of notes) {
-          note.sprite.position.y += note.speed * dt;
+          note.sprite.position.y += note.speed * speedBoost * dt;
           note.sprite.position.x += Math.sin(now / 900 + note.phase) * note.sway * dt;
           if (note.sprite.position.y > 4.2) {
             note.sprite.position.y = 0;
@@ -478,6 +485,7 @@ export function ListeningStage({
         applyColors,
         dispose: () => {
           stop();
+          removePulseListener();
           document.removeEventListener('visibilitychange', onVisibility);
           themeObserver.disconnect();
           resizeObserver.disconnect();

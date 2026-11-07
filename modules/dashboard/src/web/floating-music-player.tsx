@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { DesktopLyrics, type LyricLine } from './desktop-lyrics';
+import { dispatchListeningPulse } from './listening-pulse';
 import { NeteaseLoginDialog } from './netease-login-dialog';
 import { ScreenIcon } from './icons';
 
@@ -481,6 +482,11 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
   useEffect(() => {
     if (!isPlaying) void flushListening();
   }, [isPlaying, flushListening]);
+
+  // 播放状态广播：听歌统计 3D 舞台据此加速黑胶/粒子/律动（页内事件，模块内通信）
+  useEffect(() => {
+    dispatchListeningPulse(isPlaying);
+  }, [isPlaying]);
 
   useEffect(() => {
     const onPageHideFlush = () => void flushListening();
