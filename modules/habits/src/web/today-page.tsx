@@ -81,6 +81,7 @@ export function HabitsTodayPage({
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">今日打卡</h1>
+          <p className="screen-label mt-0.5 !text-[10px]">Habits · Daily check-in</p>
           <p className="mt-1 text-xs text-muted">
             {data
               ? allDone

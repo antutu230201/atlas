@@ -31,7 +31,11 @@ export function TodoTrashPage({ workspaceSlug, moduleName }: ModulePageProps) {
 
   if (trash.isPending) {
     return (
-      <div className="mx-auto w-full max-w-3xl space-y-3">
+      <div className="mx-auto w-full max-w-4xl space-y-3">
+        <header className="space-y-1">
+          <h1 className="text-2xl font-semibold">回收站</h1>
+          <p className="screen-label mt-1 !text-[10px]">Todo · Trash</p>
+        </header>
         <Skeleton className="h-14 w-full" />
         <Skeleton className="h-14 w-full" />
       </div>
@@ -40,7 +44,7 @@ export function TodoTrashPage({ workspaceSlug, moduleName }: ModulePageProps) {
 
   if (todos.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-4xl">
         <EmptyState title="回收站是空的" description="删除的待办会在这里保留，可随时恢复。" />
       </div>
     );

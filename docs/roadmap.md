@@ -362,6 +362,13 @@
 - [x] 听歌统计页迭代（周几标签、Top1 歌曲上卡、Top10 两列、榜外钉"我的位置"等）+ 两处 noUncheckedIndexedAccess 类型修复；e2e 断言随改版更新
 - [x] 本地一次性脚本（atlas-seed/atlas-shot/atlas-visual）加入 eslint ignores；e2e 13 条全绿
 
+### 全部内容页面大屏化重构（2026-11-07 续 2）
+
+- [x] 页头统一：待办/回收站/笔记/习惯/设置/AI 助手/通知页补齐 h1 + screen-label 副标（Todo · Capture and organize 等模块化英文副标）
+- [x] ui EmptyState 玻璃化：虚线白框 → screen 面板玻璃卡（一处改，全站空态统一）
+- [x] 版心放宽：待办/回收站/笔记 max-w-3xl → 4xl，减少大面积空白悬浮感
+- [x] e2e 13 条全绿（todo/habit/app-shell spec 覆盖全部改动页面）
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。

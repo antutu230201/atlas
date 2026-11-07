@@ -69,7 +69,11 @@ export function SampleNoteListPage({ workspaceSlug, moduleName }: ModulePageProp
   const notes = list.data?.notes ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-4xl space-y-6">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold">笔记</h1>
+        <p className="screen-label mt-1 !text-[10px]">Notes · Write it down</p>
+      </header>
       <Card>
         <CardHeader>
           <CardTitle>新建笔记</CardTitle>

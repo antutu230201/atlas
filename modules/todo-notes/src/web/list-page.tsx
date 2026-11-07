@@ -60,7 +60,11 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
   const todos = list.data?.todos ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5">
+    <div className="mx-auto w-full max-w-4xl space-y-5">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold">待办</h1>
+        <p className="screen-label mt-1 !text-[10px]">Todo · Capture and organize</p>
+      </header>
       <Card>
         <CardContent className="flex items-center gap-2 py-4">
           <Input

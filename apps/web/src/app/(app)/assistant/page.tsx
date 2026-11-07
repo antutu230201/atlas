@@ -55,6 +55,7 @@ export default function AssistantPage() {
     <div className="mx-auto flex h-[calc(100vh-8rem)] w-full max-w-2xl flex-col">
       <header className="mb-4">
         <h1 className="text-xl font-semibold">AI 成长助手</h1>
+        <p className="screen-label mt-1 !text-[10px]">Assistant · Always here</p>
         <p className="text-xs text-muted">温暖、直接、有智慧——像一位老朋友。</p>
       </header>
 
