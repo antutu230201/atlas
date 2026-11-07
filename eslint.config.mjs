@@ -6,6 +6,9 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     ignores: [
+      '**/atlas-seed.mjs',
+      '**/atlas-shot.mjs',
+      '**/atlas-visual.mjs',
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',

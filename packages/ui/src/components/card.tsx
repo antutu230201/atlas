@@ -11,9 +11,12 @@ export function Card({
     <div
       ref={ref}
       className={cn(
-        'rounded-[var(--radius-md)] p-5 transition-all duration-[var(--duration-base)]',
-        variant === 'glass' ? 'glass shadow-soft' : 'border border-border bg-surface shadow-soft',
-        'hover:shadow-md',
+        // 全局视觉统一（大屏 screen 体系）：面板底/描边/阴影走 --screen-* 令牌，亮暗主题自动切换
+        'rounded-[var(--screen-radius)] p-5 transition-all duration-[var(--duration-base)]',
+        variant === 'glass'
+          ? 'glass shadow-soft'
+          : 'border border-[var(--screen-border)] bg-[var(--screen-panel)] shadow-[var(--screen-card-shadow)]',
+        'hover:border-[var(--screen-border-bright)] hover:shadow-[var(--screen-card-shadow-hover)]',
         className,
       )}
       {...props}

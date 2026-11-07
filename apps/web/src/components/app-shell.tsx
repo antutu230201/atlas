@@ -121,8 +121,8 @@ function ShellBody({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       {/* 全局氛围背景：大屏同款天空渐变 + 网格（低强度，所有 Shell 页面共享） */}
       <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
-        <div className="screen-sky opacity-60" />
-        <div className="screen-grid absolute inset-0 opacity-30" />
+        <div className="screen-sky opacity-80" />
+        <div className="screen-grid absolute inset-0 opacity-45" />
       </div>
       {/* chromeHidden：沉浸模式（大屏全屏），侧栏/顶栏/抽屉隐藏，命令面板仍可用 */}
       {!chromeHidden ? (

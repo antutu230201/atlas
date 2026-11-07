@@ -29,6 +29,7 @@ export default function NotificationsPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">通知</h1>
+          <p className="screen-label mt-1 !text-[10px]">Atlas · Notifications</p>
           {unread > 0 ? (
             <p className="mt-1 text-sm text-muted">
               {unread} 条未读
