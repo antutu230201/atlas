@@ -36,6 +36,13 @@ import { HOT_SOURCE_LABELS, type DashboardSnapshot, type CountdownItem } from '.
 /** 每台设备独立记住挂墙模式：同一账号在墙面屏和笔记本上可有不同取舍。 */
 const LOW_POWER_KEY = 'atlas.dashboard.low-power';
 
+/**
+ * 天气氛围动效（雨雪/云/雾/雷闪）默认关闭：
+ * 这些图层会随天气持续合成并大面积重绘，在集显或远程投屏上是大屏卡顿的主要来源。
+ * 组件与样式都保留，需要恢复时把这里改成 true 即可（低功耗模式仍会二次拦截）。
+ */
+const WEATHER_ATMOSPHERE_ENABLED = false;
+
 /** 氛围背景：必应壁纸（可关，onError 自动降级）→ 极光渐变兜底；视觉值全部来自 tokens */
 function ScreenBackground({
   wallpaperUrl,
@@ -383,7 +390,7 @@ export function DashboardScreenPage({
         }
         copyright={data?.wallpaper.payload?.copyright}
       />
-      {!lowPowerMode && weather?.payload ? (
+      {WEATHER_ATMOSPHERE_ENABLED && !lowPowerMode && weather?.payload ? (
         <WeatherAtmosphere icon={weather.payload.now.icon} isDay={weather.payload.now.isDay} />
       ) : null}
 
