@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, like, notLike } from 'drizzle-orm';
+import { and, desc, eq, isNull, like, notLike, sql } from 'drizzle-orm';
 import { Inject, Injectable } from '@nestjs/common';
 import { notification, user } from '../db/schema';
 import { withUser } from '../db/tenant';
@@ -74,22 +74,33 @@ export class NotificationService {
    * 通知列表。type 支持三类：listening（听歌周报等 listening.* 前缀）、
    * system（其余系统通知）、或精确的 type 值。
    */
+  /** 游标分页：cursor 为最后一条的 id，行比较 (created_at, id) 保证不重不漏 */
   async list(
     userId: string,
-    options: { limit?: number; type?: string } = {},
+    options: { limit?: number; type?: string; cursor?: { id: string } } = {},
   ): Promise<Array<typeof notification.$inferSelect>> {
     const limit = Math.min(options.limit ?? 50, 200);
     const filters = [eq(notification.userId, userId)];
     if (options.type === 'listening') filters.push(like(notification.type, 'listening.%'));
     else if (options.type === 'system') filters.push(notLike(notification.type, 'listening.%'));
     else if (options.type) filters.push(eq(notification.type, options.type));
+    if (options.cursor) {
+      // cursor 只传 id：时间戳精度留在 PG 侧（JS Date 只有毫秒，同毫秒边界会漏行）；
+      // 子查询带 user_id 校验，防止拿别人的 id 当游标探测
+      filters.push(
+        sql`(${notification.createdAt}, ${notification.id}) < (
+          select c.created_at, c.id from platform.notification c
+          where c.id = ${options.cursor.id} and c.user_id = ${userId}
+        )`,
+      );
+    }
 
     return withUser(this.db, userId, (tx) =>
       tx
         .select()
         .from(notification)
         .where(and(...filters))
-        .orderBy(desc(notification.createdAt))
+        .orderBy(desc(notification.createdAt), desc(notification.id))
         .limit(limit),
     );
   }

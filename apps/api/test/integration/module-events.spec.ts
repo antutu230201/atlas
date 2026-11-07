@@ -94,7 +94,7 @@ describe('事件总线与通知（2c，ADR-0005 §8）', () => {
     await dispatchOnce();
     const list = await apiFetch(app.url, '/notifications', { cookie: memberCookie });
     expect(list.status).toBe(200);
-    const invited = list.body.data.find((n: { type: string }) => n.type === 'member.invited');
+    const invited = list.body.data.items.find((n: { type: string }) => n.type === 'member.invited');
     expect(invited).toBeTruthy();
 
     const read = await apiFetch(app.url, `/notifications/${invited.id}/read`, {
@@ -124,6 +124,25 @@ describe('事件总线与通知（2c，ADR-0005 §8）', () => {
     expect(dead.attempts).toBe(8);
   });
 
+  it('通知游标分页：limit=1 翻页取全量且不重不漏', async () => {
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 10; page += 1) {
+      const url = `/notifications?limit=1${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+      // cursor 现在是纯 uuid（最后一条的 id），翻页应不重不漏
+      const res = await apiFetch(app.url, url, { cookie: memberCookie });
+      expect(res.status).toBe(200);
+      const { items, nextCursor } = res.body.data;
+      seen.push(...items.map((n: { id: string }) => n.id));
+      if (!nextCursor) break;
+      cursor = nextCursor;
+    }
+    const full = await apiFetch(app.url, '/notifications?limit=50', { cookie: memberCookie });
+    const allIds = full.body.data.items.map((n: { id: string }) => n.id);
+    expect(new Set(seen).size).toBe(seen.length);
+    expect(seen).toEqual(allIds);
+  });
+
   it('通知 read-all', async () => {
     const all = await apiFetch(app.url, '/notifications/read-all', {
       method: 'POST',
@@ -131,7 +150,7 @@ describe('事件总线与通知（2c，ADR-0005 §8）', () => {
     });
     expect(all.status).toBe(200);
     const list = await apiFetch(app.url, '/notifications', { cookie: memberCookie });
-    const unread = list.body.data.filter((n: { readAt: string | null }) => n.readAt === null);
+    const unread = list.body.data.items.filter((n: { readAt: string | null }) => n.readAt === null);
     expect(unread).toHaveLength(0);
   });
 

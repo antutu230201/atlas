@@ -17,12 +17,12 @@ interface NotificationRow {
 export function NotificationBell() {
   const query = useQuery({
     queryKey: ['notifications', 'screen-badge'],
-    queryFn: () => api<NotificationRow[]>('/notifications?limit=50'),
+    queryFn: () => api<{ items: NotificationRow[] }>('/notifications?limit=50'),
     refetchInterval: 5 * 60_000,
     staleTime: 2 * 60_000,
     retry: false,
   });
-  const unread = (query.data ?? []).filter((item) => item.readAt === null).length;
+  const unread = (query.data?.items ?? []).filter((item) => item.readAt === null).length;
 
   return (
     <Link

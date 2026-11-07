@@ -80,6 +80,31 @@ describe('越权防护（应用层 + RLS，ADR-0005 §4）', () => {
     expect(ownerView.body.data.length).toBeGreaterThan(0);
   });
 
+  it('审计过滤：days 白名单生效，关键词命中动作', async () => {
+    // 非白名单 days 被忽略（等价全部），不抛错
+    const bad = await apiFetch(app.url, '/workspaces/sec-team/audit?days=999', {
+      cookie: ownerCookie,
+    });
+    expect(bad.status).toBe(200);
+
+    // 关键词按现有动作取首个词，保证命中且都在结果里
+    const base = await apiFetch(app.url, '/workspaces/sec-team/audit', { cookie: ownerCookie });
+    const firstAction = base.body.data[0].action as string;
+    const keyword = firstAction.split(/[.:_]/)[0] ?? firstAction;
+    const hit = await apiFetch(app.url, `/workspaces/sec-team/audit?q=${keyword}`, {
+      cookie: ownerCookie,
+    });
+    expect(hit.status).toBe(200);
+    expect(hit.body.data.length).toBeGreaterThan(0);
+    for (const row of hit.body.data) {
+      expect(
+        `${row.action} ${row.objectType} ${row.objectId} ${row.actorType}`
+          .toLowerCase()
+          .includes(keyword.toLowerCase()),
+      ).toBe(true);
+    }
+  });
+
   it('未登录 → 401', async () => {
     const res = await apiFetch(app.url, '/workspaces/sec-team/members');
     expect(res.status).toBe(401);

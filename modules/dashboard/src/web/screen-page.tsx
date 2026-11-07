@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -198,6 +199,9 @@ function ModuleLauncher({
       <DropdownMenuContent align="end" className="min-w-44">
         <DropdownMenuLabel>延伸功能</DropdownMenuLabel>
         <DropdownMenuItem asChild>
+          <Link href="/assistant">✦ AI 助手</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <Link href={`/m/${currentModule}/listening`}>🎵 听歌统计</Link>
         </DropdownMenuItem>
         {others.map((mod) =>
@@ -248,6 +252,7 @@ export function DashboardScreenPage({
       delete document.body.dataset.screenScrolling;
     };
   }, [scrolling]);
+  const router = useRouter();
   const chromeHidden = useUiStore((state) => state.chromeHidden);
   const setChromeHidden = useUiStore((state) => state.setChromeHidden);
   const base = `/modules/workspaces/${workspaceSlug}/${moduleName}/call`;
@@ -476,6 +481,9 @@ export function DashboardScreenPage({
     } else if (key === 'r') {
       event.preventDefault();
       if (!refresh.isPending) refresh.mutate();
+    } else if (key === 'a') {
+      event.preventDefault();
+      void router.push('/assistant');
     } else if (key === 's') {
       if (!canWrite) return;
       event.preventDefault();

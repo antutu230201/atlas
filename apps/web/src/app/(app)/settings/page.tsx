@@ -1,7 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 import {
   Badge,
   Button,
@@ -170,13 +170,27 @@ function ModulesTab({ slug }: { slug: string }) {
 }
 
 function AuditTab({ slug }: { slug: string }) {
-  const audit = useQuery({
-    queryKey: ['audit', slug],
-    queryFn: () => api<AuditRow[]>(`/workspaces/${slug}/audit`),
-    retry: false,
-  });
+  // 时间范围与关键词下沉到 SQL（服务端过滤），输入防抖 400ms 后才发请求
   const [days, setDays] = useState<'7' | '30' | 'all'>('30');
   const [keyword, setKeyword] = useState('');
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(keyword.trim()), 400);
+    return () => window.clearTimeout(timer);
+  }, [keyword]);
+
+  const audit = useQuery({
+    queryKey: ['audit', slug, days, debounced],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (days !== 'all') params.set('days', days);
+      if (debounced) params.set('q', debounced);
+      params.set('limit', '200');
+      const suffix = params.size > 0 ? `?${params.toString()}` : '';
+      return api<AuditRow[]>(`/workspaces/${slug}/audit${suffix}`);
+    },
+    retry: false,
+  });
 
   if (audit.isPending) return <Skeleton className="h-40 w-full" />;
   const err = audit.error;
@@ -191,15 +205,7 @@ function AuditTab({ slug }: { slug: string }) {
   }
 
   const rows = audit.data ?? [];
-  const cutoff = days === 'all' ? 0 : Date.now() - Number(days) * 86_400_000;
-  const query = keyword.trim().toLowerCase();
-  const filtered = rows.filter((row) => {
-    if (cutoff && new Date(row.createdAt).getTime() < cutoff) return false;
-    if (!query) return true;
-    return `${row.action} ${row.objectType} ${row.objectId} ${row.actorType}`
-      .toLowerCase()
-      .includes(query);
-  });
+  const filtered = rows;
 
   return (
     <div className="space-y-3">
@@ -237,7 +243,7 @@ function AuditTab({ slug }: { slug: string }) {
       </div>
 
       <p className="text-xs text-muted">
-        {filtered.length} / {rows.length} 条
+        {filtered.length >= 200 ? '最近 200 条（更早的已省略）' : `${filtered.length} 条记录`}
       </p>
 
       {filtered.length === 0 ? (

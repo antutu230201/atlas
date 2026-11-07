@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Card, CardContent, EmptyState, Skeleton } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { useNotifications, type NotificationItem } from '@/lib/queries';
@@ -35,7 +35,6 @@ export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'listening' | 'system'>('all');
-  const [limit, setLimit] = useState(20);
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
@@ -49,20 +48,25 @@ export default function NotificationsPage() {
     onSuccess: invalidate,
   });
 
-  // 列表按类型 + 条数分页；未读数取全量缓存（导航铃铛同一份）
-  const listQuery = useQuery({
-    queryKey: ['notifications', 'list', typeFilter, limit],
-    queryFn: () =>
-      api<NotificationItem[]>(
-        `/notifications?limit=${limit}${typeFilter === 'all' ? '' : `&type=${typeFilter}`}`,
+  // 服务端游标分页：切换类型回到第一页；未读数取全量缓存（导航铃铛同一份）
+  const listQuery = useInfiniteQuery({
+    queryKey: ['notifications', 'list', typeFilter],
+    queryFn: ({ pageParam }) =>
+      api<{ items: NotificationItem[]; nextCursor: string | null }>(
+        `/notifications?limit=20${typeFilter === 'all' ? '' : `&type=${typeFilter}`}${
+          pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''
+        }`,
       ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
   });
 
   const all = notifications.data ?? [];
   const unread = all.filter((n) => n.readAt === null).length;
-  const rows = listQuery.data ?? [];
+  const rows = listQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const items = filter === 'unread' ? rows.filter((n) => n.readAt === null) : rows;
-  const hasMore = rows.length >= limit;
+  const hasMore = listQuery.hasNextPage;
+  const loadingMore = listQuery.isFetchingNextPage;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
@@ -196,8 +200,8 @@ export default function NotificationsPage() {
           <Button
             size="sm"
             variant="secondary"
-            loading={listQuery.isFetching}
-            onClick={() => setLimit((value) => value + 20)}
+            loading={loadingMore}
+            onClick={() => void listQuery.fetchNextPage()}
           >
             加载更多
           </Button>

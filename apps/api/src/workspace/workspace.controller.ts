@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -125,8 +126,23 @@ export class WorkspaceController {
 
   @Get(':slug/audit')
   @RequireWorkspace('audit:read')
-  async audit(@Req() request: Request) {
+  async audit(
+    @Req() request: Request,
+    @Query('days') days?: string,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+  ) {
     const user = request.user as RequestUser;
-    return { data: await this.workspaceService.listAudit(request.workspace!.id, user.id) };
+    // days 只接受白名单值，防止任意数字扫全表；limit 上限 200 由 service 收口
+    const parsedDays = Number(days);
+    const allowedDays = new Set([7, 30, 90]);
+    const parsedLimit = Number(limit);
+    return {
+      data: await this.workspaceService.listAudit(request.workspace!.id, user.id, {
+        days: allowedDays.has(parsedDays) ? parsedDays : undefined,
+        q: q?.trim() || undefined,
+        limit: Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined,
+      }),
+    };
   }
 }

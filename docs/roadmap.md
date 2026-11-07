@@ -491,6 +491,14 @@
 - 修复：AI 配置改在 onApplicationBootstrap 读库——工厂执行时内嵌 PG 未就绪，静默失败导致"库里有 key 却一直 Mock"；config/test 的 maxTokens 16→64（推理模型 16 会截空）
 - 验证：typecheck 16/16、lint、format、API 测试 10/10（dashboard）+ 全量 105 通过、build 8/8、dashboard e2e 6/6；夜间/位移/高亮/铃铛实机截图确认
 
+### 通知游标分页、审计 SQL 下沉与大屏接 AI（2026-11-08 续 4）
+
+- [x] 通知中心改服务端游标分页：`GET /notifications` 返回 `{ items, nextCursor }`，cursor 为最后一条 id，行比较 (created_at, id) 不重不漏；前端改 useInfiniteQuery，「加载更多」走真实翻页（实测 26 条 20→25 全部渲染、按钮按需消失）
+- [x] 修复游标毫秒精度坑：JS Date 序列化丢失微秒，同毫秒边界会漏 1 条——cursor 改为纯 id，PG 子查询取精确时间戳（带 user_id 校验防跨用户探测）
+- [x] 审计日志筛选下沉 SQL：days 白名单（7/30/90）+ 关键词 ilike（转义 LIKE 通配符）+ limit≤200；前端 400ms 防抖后才请求，超 200 条显示「最近 200 条」
+- [x] 大屏接入 AI 助手：延伸功能菜单第一项、快捷键 A 直达、每日小结卡「继续和 AI 聊 →」链接
+- 验证：api 16 文件全过（新增游标翻页不重不漏 + 审计过滤用例）、typecheck/lint/format 全绿、dashboard e2e 6/6（一次 flaky 重跑确认）、页面实测 AI 跳转 / 通知翻页 / 审计搜索正常
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。

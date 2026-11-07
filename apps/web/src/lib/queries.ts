@@ -83,10 +83,13 @@ export function useEnabledModules(slug: string | null) {
 }
 
 export function useNotifications(enabled = true) {
+  // 列表接口已改游标分页（{ items, nextCursor }）；这里只要未读数，select 还原数组
   return useQuery({
     queryKey: ['notifications'],
-    queryFn: () => api<NotificationItem[]>('/notifications'),
+    queryFn: () =>
+      api<{ items: NotificationItem[]; nextCursor: string | null }>('/notifications?limit=50'),
     enabled,
+    select: (data) => data.items,
   });
 }
 

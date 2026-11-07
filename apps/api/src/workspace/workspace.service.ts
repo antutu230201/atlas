@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, isNull, or } from 'drizzle-orm';
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { Role } from '@atlas/core';
 import {
@@ -322,14 +322,36 @@ export class WorkspaceService {
     });
   }
 
-  async listAudit(workspaceId: string, userId: string, limit = 50) {
+  /** 审计查询：时间范围与关键词在 SQL 侧过滤，避免全量返回后前端筛选 */
+  async listAudit(
+    workspaceId: string,
+    userId: string,
+    options: { days?: number; q?: string; limit?: number } = {},
+  ) {
+    const filters = [eq(auditLogTable.workspaceId, workspaceId)];
+    if (options.days && options.days > 0) {
+      filters.push(gte(auditLogTable.createdAt, new Date(Date.now() - options.days * 86_400_000)));
+    }
+    const q = options.q?.trim();
+    if (q) {
+      // LIKE 通配符转义：匹配到的 % 或 _ 前补反斜杠（$& 为整个匹配）
+      const pattern = `%${q.replace(/[%_]/g, '\\$&')}%`;
+      filters.push(
+        or(
+          ilike(auditLogTable.action, pattern),
+          ilike(auditLogTable.objectType, pattern),
+          ilike(auditLogTable.objectId, pattern),
+          ilike(auditLogTable.actorType, pattern),
+        )!,
+      );
+    }
     return withUser(this.db, userId, (tx) =>
       tx
         .select()
         .from(auditLogTable)
-        .where(eq(auditLogTable.workspaceId, workspaceId))
+        .where(and(...filters))
         .orderBy(desc(auditLogTable.createdAt))
-        .limit(Math.min(limit, 200)),
+        .limit(Math.min(options.limit ?? 50, 200)),
     );
   }
 }

@@ -26,15 +26,21 @@ export class NotificationController {
     @Req() request: Request,
     @Query('limit') limit?: string,
     @Query('type') type?: string,
+    @Query('cursor') cursor?: string,
   ) {
     const user = request.user as RequestUser;
     const parsed = Number(limit);
-    return {
-      data: await this.notificationService.list(user.id, {
-        limit: Number.isInteger(parsed) ? parsed : 50,
-        type,
-      }),
-    };
+    // cursor 为上一页最后一条的 id：非法值直接忽略（回到第一页）
+    const validCursor = cursor?.trim() ? { id: cursor.trim() } : undefined;
+    const rows = await this.notificationService.list(user.id, {
+      limit: Number.isInteger(parsed) ? parsed : 50,
+      type,
+      cursor: validCursor,
+    });
+    const pageSize = Number.isInteger(parsed) ? parsed : 50;
+    const last = rows.at(-1);
+    const nextCursor = last && rows.length >= pageSize ? last.id : null;
+    return { data: { items: rows, nextCursor } };
   }
 
   @Post(':id/read')

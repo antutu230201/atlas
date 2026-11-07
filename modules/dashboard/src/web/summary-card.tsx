@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Skeleton } from '@atlas/ui';
 import type { SourceEnvelope, DailySummary } from './types';
 import { ScreenIcon } from './icons';
@@ -77,7 +78,19 @@ export function SummaryCard({
             )}
             <div className="mt-3 flex items-center justify-between gap-3">
               <p className="text-[10px] text-muted">
-                {isMock ? '预览模式 · 不消耗 AI 配额' : '从今天的天气、进度与节奏里，提炼给你。'}
+                {isMock ? (
+                  '预览模式 · 不消耗 AI 配额'
+                ) : (
+                  <>
+                    从今天的天气、进度与节奏里，提炼给你。
+                    <Link
+                      href="/assistant"
+                      className="ml-1.5 text-primary/80 transition-colors hover:text-primary"
+                    >
+                      继续和 AI 聊 →
+                    </Link>
+                  </>
+                )}
               </p>
               {envelope.fetchedAt ? (
                 <span className="shrink-0 font-mono text-[10px] text-muted">
