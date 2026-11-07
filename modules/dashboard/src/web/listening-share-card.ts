@@ -272,6 +272,23 @@ export async function buildShareCardCanvas(input: ShareCardInput): Promise<HTMLC
   const kpi = `${input.totalPlays} 次播放${input.meRank ? ` · 全站第 ${input.meRank} 名` : ''}`;
   ctx.fillText(kpi, 94, layout.kpiY);
 
+  // 9:16 空白多，补一行峰值日，避免顶部数字与图表之间空一大块
+  if (size === '9:16' && input.buckets.length > 0) {
+    const peak = input.buckets.reduce(
+      (best, bucket) => (bucket.seconds > best.seconds ? bucket : best),
+      input.buckets[0]!,
+    );
+    if (peak.seconds > 0) {
+      ctx.fillStyle = COLOR.muted;
+      ctx.font = `400 22px ${FONT}`;
+      ctx.fillText(
+        `峰值 ${peak.label.slice(5)} · ${formatDurationReport(peak.seconds)}`,
+        94,
+        layout.kpiY + 44,
+      );
+    }
+  }
+
   // 右列：Top1 专辑封面
   drawCover(
     ctx,
@@ -313,7 +330,12 @@ export async function buildShareCardCanvas(input: ShareCardInput): Promise<HTMLC
   // Top 歌曲玻璃卡：高度随曲目数收缩，在剩余空间里居中（少歌时不至于空一大片）
   const cardAreaTop = layout.cardTop;
   const cardAreaBottom = layout.cardBottom;
-  const cardHeight = Math.min(cardAreaBottom - cardAreaTop, 118 + songs.length * 82);
+  // 9:16 画布更高，卡片底部补一条摘要（曲目数 / 歌手数 / 排名），避免下方留空
+  const summaryHeight = size === '9:16' ? 52 : 0;
+  const cardHeight = Math.min(
+    cardAreaBottom - cardAreaTop,
+    118 + songs.length * 82 + summaryHeight,
+  );
   const cardTop = cardAreaTop + Math.round((cardAreaBottom - cardAreaTop - cardHeight) / 2);
   ctx.fillStyle = COLOR.panel;
   roundRect(ctx, 90, cardTop, W - 180, cardHeight, 22);
@@ -363,6 +385,32 @@ export async function buildShareCardCanvas(input: ShareCardInput): Promise<HTMLC
     ctx.fillText(formatDurationReport(song.seconds), W - 130, rowTop + 42);
     ctx.textAlign = 'left';
   });
+
+  // 9:16 专属摘要行：曲目数 / 歌手数 + 全站排名
+  if (size === '9:16' && songs.length > 0) {
+    const dividerY = cardTop + 92 + songs.length * 82;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(130, dividerY);
+    ctx.lineTo(W - 130, dividerY);
+    ctx.stroke();
+    ctx.restore();
+
+    const artistCount = new Set(songs.map((song) => song.artist)).size;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = COLOR.dim;
+    ctx.font = `400 20px ${FONT}`;
+    ctx.fillText(`${songs.length} 首 · ${artistCount} 位歌手`, 130, dividerY + 34);
+
+    if (input.meRank) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = COLOR.accent;
+      ctx.font = `600 20px ${FONT}`;
+      ctx.fillText(`全站第 ${input.meRank} 名`, W - 130, dividerY + 34);
+    }
+  }
 
   // 页脚
   ctx.textAlign = 'center';
