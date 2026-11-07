@@ -96,11 +96,13 @@ function ShellBody({ children }: { children: React.ReactNode }) {
   const modules = useEnabledModules(workspace?.slug ?? null);
   // 大屏主导（产品定位，ADR-0008）：根路径渲染 dashboard 大屏时内容全宽（去内边距），
   // 但保留 Shell 顶栏 —— 用户菜单/通知等系统级操作必须始终可达，也避免顶栏随模块
-  // 查询结果挂载/卸载抖动。仅 /m/dashboard/screen（大屏自己的完整形态）隐藏顶栏。
+  // 查询结果挂载/卸载抖动。/m/dashboard/screen（完整形态）与 listening（自绘氛围）
+  // 隐藏顶栏。
   const onDashboardHome =
     pathname === '/' && (modules.data ?? []).some((mod) => mod.name === 'dashboard');
   const isImmersiveScreen = /^\/m\/dashboard\/screen\/?$/.test(pathname);
-  const fullBleed = isImmersiveScreen || onDashboardHome;
+  const isListeningPage = /^\/m\/dashboard\/listening\/?$/.test(pathname);
+  const fullBleed = isImmersiveScreen || onDashboardHome || isListeningPage;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -117,6 +119,11 @@ function ShellBody({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
+      {/* 全局氛围背景：大屏同款天空渐变 + 网格（低强度，所有 Shell 页面共享） */}
+      <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
+        <div className="screen-sky opacity-60" />
+        <div className="screen-grid absolute inset-0 opacity-30" />
+      </div>
       {/* chromeHidden：沉浸模式（大屏全屏），侧栏/顶栏/抽屉隐藏，命令面板仍可用 */}
       {!chromeHidden ? (
         <aside
