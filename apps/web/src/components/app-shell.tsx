@@ -121,6 +121,12 @@ function ShellBody({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       {/* 全局氛围背景：大屏同款天空渐变 + 网格（低强度，所有 Shell 页面共享） */}
       <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
+        {/* 亮色：实心冷白底（米黄只属于大屏自己的暖色氛围）；暗色：深色柔化遮罩 */}
+        <div className="absolute inset-0 bg-[#f5f6fa] dark:hidden" />
+        <div
+          className="absolute inset-0 hidden dark:block"
+          style={{ background: 'var(--screen-scrim)' }}
+        />
         <div className="screen-sky opacity-80" />
         <div className="screen-grid absolute inset-0 opacity-45" />
       </div>
