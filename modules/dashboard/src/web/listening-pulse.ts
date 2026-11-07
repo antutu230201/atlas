@@ -29,3 +29,19 @@ export function onListeningPulse(listener: (playing: boolean) => void): () => vo
   window.addEventListener(LISTENING_PULSE_EVENT, handler);
   return () => window.removeEventListener(LISTENING_PULSE_EVENT, handler);
 }
+
+/** 统计页点歌 → 播放器播放（播放器在自己的曲目源中按 netease id 查找） */
+export const PLAY_SONG_EVENT = 'atlas:play-song';
+
+export function dispatchPlaySong(songId: number): void {
+  window.dispatchEvent(new CustomEvent(PLAY_SONG_EVENT, { detail: { songId } }));
+}
+
+export function onPlaySong(listener: (songId: number) => void): () => void {
+  const handler = (event: Event) => {
+    const songId = (event as CustomEvent<{ songId: number }>).detail?.songId;
+    if (typeof songId === 'number') listener(songId);
+  };
+  window.addEventListener(PLAY_SONG_EVENT, handler);
+  return () => window.removeEventListener(PLAY_SONG_EVENT, handler);
+}

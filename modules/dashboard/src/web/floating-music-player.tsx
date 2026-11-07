@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { DesktopLyrics, type LyricLine } from './desktop-lyrics';
-import { dispatchListeningPulse } from './listening-pulse';
+import { dispatchListeningPulse, onPlaySong } from './listening-pulse';
 import { NeteaseLoginDialog } from './netease-login-dialog';
 import { ScreenIcon } from './icons';
 
@@ -578,6 +578,44 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
     if (isPlaying) audio.pause();
     else void playAudio();
   };
+
+  // 统计页点歌联动：按 songId 在当前曲目源中查找并播放（找不到则忽略，不换歌）
+  useEffect(() => {
+    return onPlaySong((songId) => {
+      const index = tracks.findIndex((item) => item.id === songId);
+      if (index < 0) return;
+      selectTrack(index, true);
+    });
+  }, [tracks, selectTrack]);
+
+  // 键盘控制（大屏场景刚需）：空格 = 播放/暂停，←/→ = 上/下一首。
+  // 输入类元素聚焦时忽略，避免打字误触；Space preventDefault 防页面滚动。
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (event.code === 'Space') {
+        event.preventDefault();
+        togglePlay();
+      } else if (event.code === 'ArrowRight') {
+        event.preventDefault();
+        stepTrack(1);
+      } else if (event.code === 'ArrowLeft') {
+        event.preventDefault();
+        stepTrack(-1);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [togglePlay, stepTrack]);
 
   const seek = (value: number) => {
     const audio = audioRef.current;

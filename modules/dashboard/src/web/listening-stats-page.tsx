@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@atlas/ui';
 import { api } from '@/lib/api';
+import { dispatchPlaySong } from './listening-pulse';
 import { ListeningStage } from './listening-stage';
 import { ScreenIcon } from './icons';
 
@@ -134,6 +135,24 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
   const activeBuckets = summary?.buckets.filter((bucket) => bucket.seconds > 0).length ?? 0;
   const duration = splitDuration(totalSeconds);
 
+  // 数据导出（宪法 §4：所有数据可导出）：当前窗口的汇总 + 全站排名落 JSON
+  const exportData = () => {
+    if (!summary && !ranking) return;
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      range,
+      summary: summary ?? null,
+      ranking: ranking ?? null,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `atlas_listening_${range}_${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div
       className="dashboard-screen relative min-h-screen overflow-hidden bg-bg text-text"
@@ -161,28 +180,41 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
             </div>
           </div>
 
-          <div
-            className="flex shrink-0 rounded-full border border-border bg-surface/70 p-1 shadow-soft backdrop-blur-md"
-            role="tablist"
-            aria-label="统计窗口"
-          >
-            {RANGES.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                role="tab"
-                aria-selected={range === item.value}
-                className={cn(
-                  'min-w-11 rounded-full px-3.5 py-1.5 text-sm transition-colors',
-                  range === item.value
-                    ? 'bg-primary font-semibold text-on-primary shadow-soft'
-                    : 'text-muted hover:text-text',
-                )}
-                onClick={() => setRange(item.value)}
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              className="screen-icon-button !min-h-9"
+              onClick={exportData}
+              disabled={!summary}
+              aria-label="导出听歌数据 JSON"
+              title="导出听歌数据 JSON"
+            >
+              <ScreenIcon name="external" className="size-3.5" />
+              <span className="hidden sm:inline">导出</span>
+            </button>
+            <div
+              className="flex shrink-0 rounded-full border border-border bg-surface/70 p-1 shadow-soft backdrop-blur-md"
+              role="tablist"
+              aria-label="统计窗口"
+            >
+              {RANGES.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={range === item.value}
+                  className={cn(
+                    'min-w-11 rounded-full px-3.5 py-1.5 text-sm transition-colors',
+                    range === item.value
+                      ? 'bg-primary font-semibold text-on-primary shadow-soft'
+                      : 'text-muted hover:text-text',
+                  )}
+                  onClick={() => setRange(item.value)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
         </header>
 
@@ -619,6 +651,16 @@ function TopSongsCard({
                   {totalSeconds > 0 ? Math.round((song.seconds / totalSeconds) * 100) : 0}%
                 </span>
               </span>
+              {/* 点歌播放：经页内事件交给全局播放器（曲目在播放器源中即可播） */}
+              <button
+                type="button"
+                className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary transition-all hover:bg-primary hover:text-on-primary focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                onClick={() => dispatchPlaySong(song.songId)}
+                aria-label={`播放 ${song.title}`}
+                title={`播放 ${song.title}`}
+              >
+                <ScreenIcon name="play" className="size-3" />
+              </button>
             </li>
           ))}
         </ol>
