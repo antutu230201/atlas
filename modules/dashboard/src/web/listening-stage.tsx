@@ -50,35 +50,95 @@ function makeNoteTexture(accent: string): HTMLCanvasElement {
   return canvas;
 }
 
-function makeLabelTexture(title: string, artist: string, accent: string): HTMLCanvasElement {
+/** 黑胶盘面贴图：底色 + 沟槽环纹 + 高光弧 + 中央曲目标签（1024²，一次画全张盘面） */
+function makeVinylFaceTexture(title: string, artist: string, accent: string): HTMLCanvasElement {
+  const size = 1024;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const c = size / 2;
+
+  // 底：径向近黑，边缘略亮（环境反射下有"深度"）
+  const base = ctx.createRadialGradient(c, c, size * 0.18, c, c, c);
+  base.addColorStop(0, '#191926');
+  base.addColorStop(0.72, '#0e0e16');
+  base.addColorStop(1, '#08080d');
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, size, size);
+
+  // 沟槽：细密同心圆（透明度/线宽抖动，模拟黑胶纹理）
+  for (let i = 0; i < 42; i += 1) {
+    const radius = size * 0.235 + (i / 42) * size * 0.265;
+    ctx.beginPath();
+    ctx.arc(c, c, radius + (Math.random() - 0.5) * 1.5, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,255,255,${0.025 + Math.random() * 0.05})`;
+    ctx.lineWidth = 1 + Math.random() * 1.4;
+    ctx.stroke();
+  }
+
+  // 高光弧：两道斜向"反光"，转起来会流动
+  for (const [start, alpha] of [
+    [-2.4, 0.1],
+    [0.7, 0.07],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(c, c, size * 0.38, start, start + 1.1);
+    ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+    ctx.lineWidth = size * 0.055;
+    ctx.stroke();
+  }
+
+  // 中央标签区
+  const labelRadius = size * 0.19;
+  ctx.fillStyle = '#14141f';
+  ctx.beginPath();
+  ctx.arc(c, c, labelRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.arc(c, c, labelRadius - 6, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(c, c, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.textAlign = 'center';
+  const titleText = title.length > 8 ? `${title.slice(0, 7)}…` : title || '♪';
+  ctx.fillStyle = '#f5f5fa';
+  ctx.font = 'bold 44px "Microsoft YaHei", sans-serif';
+  ctx.fillText(titleText, c, c - 22);
+  const artistText = artist.length > 12 ? `${artist.slice(0, 11)}…` : artist || ' ';
+  ctx.fillStyle = '#9a9ab4';
+  ctx.font = '24px "Microsoft YaHei", sans-serif';
+  ctx.fillText(artistText, c, c + 26);
+  ctx.font = '20px "Consolas", monospace';
+  ctx.fillStyle = '#6d6d8a';
+  ctx.fillText('ATLAS', c, c + labelRadius * 0.62);
+
+  // 盘缘细环
+  ctx.strokeStyle = accent;
+  ctx.globalAlpha = 0.8;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(c, c, c - 8, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  return canvas;
+}
+
+/** 柔和接触阴影贴图（径向渐变） */
+function makeShadowTexture(): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#14141f';
-  ctx.beginPath();
-  ctx.arc(128, 128, 128, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.arc(128, 128, 116, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.arc(128, 128, 10, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#f5f5fa';
-  ctx.textAlign = 'center';
-  const titleText = title.length > 10 ? `${title.slice(0, 9)}…` : title;
-  ctx.font = 'bold 22px "Microsoft YaHei", sans-serif';
-  ctx.fillText(titleText, 128, 96);
-  ctx.fillStyle = '#9a9ab4';
-  const artistText = artist.length > 12 ? `${artist.slice(0, 11)}…` : artist;
-  ctx.font = '14px "Microsoft YaHei", sans-serif';
-  ctx.fillText(artistText, 128, 124);
-  ctx.font = '11px "Consolas", monospace';
-  ctx.fillText('ATLAS · LISTENING', 128, 168);
+  const gradient = ctx.createRadialGradient(128, 128, 10, 128, 128, 128);
+  gradient.addColorStop(0, 'rgba(10, 10, 18, 0.5)');
+  gradient.addColorStop(1, 'rgba(10, 10, 18, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 256, 256);
   return canvas;
 }
 
@@ -137,9 +197,25 @@ export function ListeningStage({
       const renderer = new THREElib.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.setSize(mount.clientWidth, mount.clientHeight);
+      // ACES 色调映射：高光更柔、材质更有"摄影感"
+      renderer.toneMapping = THREElib.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.12;
       mount.appendChild(renderer.domElement);
 
       const scene = new THREElib.Scene();
+
+      // 环境反射：RoomEnvironment + PMREM，让金属/清漆材质有真实高光（黑胶质感的关键）
+      let envTexture: THREE.Texture | null = null;
+      try {
+        const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
+        const pmrem = new THREElib.PMREMGenerator(renderer);
+        envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        scene.environment = envTexture;
+        pmrem.dispose();
+      } catch {
+        // 环境贴图加载失败时退回纯灯光，材质仍可用
+      }
+
       const camera = new THREElib.PerspectiveCamera(
         40,
         mount.clientWidth / mount.clientHeight,
@@ -176,54 +252,72 @@ export function ListeningStage({
       floor.position.y = 0;
       stage.add(floor);
 
-      /* ---- 黑胶唱片（左侧，持续旋转） ---- */
+      /* ---- 黑胶唱片（左侧，持续旋转；物理材质 + 盘面贴图 + 接触阴影） ---- */
       const vinyl = new THREElib.Group();
-      vinyl.position.set(-3.05, 1.0, 0);
+      vinyl.position.set(-3.05, 1.16, 0);
       vinyl.rotation.y = 0.42;
       stage.add(vinyl);
-      const disc = new THREElib.Mesh(
-        new THREElib.CylinderGeometry(1.38, 1.38, 0.09, 96),
-        new THREElib.MeshStandardMaterial({ color: 0x101018, roughness: 0.32, metalness: 0.55 }),
+
+      // 盘面贴图（沟槽/高光/标签一体）
+      const faceTexture = new THREElib.CanvasTexture(
+        makeVinylFaceTexture(topRef.current.title, topRef.current.artist, colors.accent),
       );
+      faceTexture.anisotropy = 8;
+      const drawFace = () => {
+        const { title, artist } = topRef.current;
+        faceTexture.image = makeVinylFaceTexture(title, artist, colors.accent);
+        faceTexture.needsUpdate = true;
+      };
+
+      // 盘体：侧壁清漆金属 + 上下贴图盘面；环境反射让沟槽"活"起来
+      const sideMaterial = new THREElib.MeshPhysicalMaterial({
+        color: 0x0b0b12,
+        metalness: 0.9,
+        roughness: 0.28,
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.12,
+      });
+      const faceMaterial = new THREElib.MeshStandardMaterial({
+        map: faceTexture,
+        roughness: 0.38,
+        metalness: 0.42,
+      });
+      const disc = new THREElib.Mesh(new THREElib.CylinderGeometry(1.38, 1.38, 0.075, 96), [
+        sideMaterial,
+        faceMaterial,
+        faceMaterial,
+      ]);
       disc.rotation.x = Math.PI / 2;
       vinyl.add(disc);
-      const grooveMaterial = new THREElib.MeshStandardMaterial({
-        color: 0x2a2a3a,
-        roughness: 0.5,
-        metalness: 0.3,
-      });
-      const grooves: THREE.Mesh[] = [];
-      for (let i = 0; i < 5; i += 1) {
-        const groove = new THREElib.Mesh(
-          new THREElib.TorusGeometry(0.8 + i * 0.115, 0.006, 8, 96),
-          grooveMaterial,
-        );
-        vinyl.add(groove);
-        grooves.push(groove);
-      }
+
+      // 盘缘细环（主题色点睛）
       const edgeRing = new THREElib.Mesh(
-        new THREElib.TorusGeometry(1.38, 0.022, 10, 96),
-        new THREElib.MeshStandardMaterial({
+        new THREElib.TorusGeometry(1.39, 0.016, 12, 96),
+        new THREElib.MeshPhysicalMaterial({
           color: new THREElib.Color(colors.accent),
           emissive: new THREElib.Color(colors.accent),
-          emissiveIntensity: 0.55,
-          roughness: 0.3,
+          emissiveIntensity: 0.45,
+          metalness: 0.6,
+          roughness: 0.25,
         }),
       );
       vinyl.add(edgeRing);
-      const labelTexture = new THREElib.CanvasTexture(makeLabelTexture('', '', colors.accent));
-      const labelMesh = new THREElib.Mesh(
-        new THREElib.CircleGeometry(0.57, 64),
-        new THREElib.MeshBasicMaterial({ map: labelTexture, transparent: true }),
+
+      // 接触阴影：把唱片"钉"在地面上
+      const shadowTexture = new THREElib.CanvasTexture(makeShadowTexture());
+      const contactShadow = new THREElib.Mesh(
+        new THREElib.PlaneGeometry(3.8, 3.8),
+        new THREElib.MeshBasicMaterial({
+          map: shadowTexture,
+          transparent: true,
+          opacity: 0.45,
+          depthWrite: false,
+        }),
       );
-      labelMesh.position.z = 0.052;
-      vinyl.add(labelMesh);
-      const drawLabel = () => {
-        const { title, artist } = topRef.current;
-        labelTexture.image = makeLabelTexture(title, artist, colors.accent);
-        labelTexture.needsUpdate = true;
-      };
-      drawLabel();
+      contactShadow.rotation.x = -Math.PI / 2;
+      contactShadow.position.set(-3.05, 0.01, 0.1);
+      stage.add(contactShadow);
+      const drawLabel = drawFace;
 
       /* ---- 声浪柱（数据分桶） ---- */
       const barsGroup = new THREElib.Group();
@@ -510,9 +604,13 @@ export function ListeningStage({
             note.material.map?.dispose();
             note.material.dispose();
           }
-          grooveMaterial.dispose();
           barGeometryCache.forEach((geometry) => geometry.dispose());
-          labelTexture.dispose();
+          faceTexture.dispose();
+          shadowTexture.dispose();
+          sideMaterial.dispose();
+          faceMaterial.dispose();
+          scene.environment = null;
+          envTexture?.dispose();
           scene.traverse((object) => {
             const mesh = object as THREE.Mesh;
             if (mesh.geometry) mesh.geometry.dispose();
