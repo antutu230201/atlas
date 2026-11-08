@@ -26,6 +26,7 @@ import { CountdownSection } from './countdown-card';
 import { AtlasMark, HealthDot, ScreenIcon, WeatherIcon } from './icons';
 import { HotlistCard } from './hotlist-card';
 import { ListeningMiniCard } from './listening-mini-card';
+import { useLaterReading, LaterReadingPanel } from './later-reading';
 import { NotificationBell } from './notification-bell';
 import { QuoteCard } from './quote-card';
 import { AssistantBubble } from './assistant-bubble';
@@ -388,6 +389,8 @@ export function DashboardScreenPage({
     retry: false,
   });
   const todoOpenCount = todoOpenQuery.data?.todos.length ?? null;
+  // 稍后读：热榜条目的设备级收藏
+  const later = useLaterReading(HOT_SOURCE_LABELS);
 
   const data = snapshot.data;
   const enabledSources = data ? Object.entries(data.hot) : [];
@@ -800,9 +803,10 @@ export function DashboardScreenPage({
             {enabledSources.length > 0 ? (
               <section id="hotlist-section" aria-label="热榜" className="scroll-mt-6 space-y-2">
                 <div
-                  className="screen-reveal flex items-end justify-between px-1"
+                  className="screen-reveal relative z-30 flex items-end justify-between px-1"
                   style={{ '--screen-index': 3 } as React.CSSProperties}
                 >
+                  {/* z-30：入场动画创建 stacking context，不提升的话后面的卡片会盖住浮层面板 */}
                   <div className="flex items-baseline gap-3">
                     <div className="flex items-center gap-2">
                       <ScreenIcon name="layers" className="size-4 text-primary" />
@@ -822,6 +826,11 @@ export function DashboardScreenPage({
                         关注 {watchHits}
                       </span>
                     ) : null}
+                    <LaterReadingPanel
+                      items={later.items}
+                      onRemove={later.remove}
+                      labelOf={later.labelOf}
+                    />
                   </div>
                 </div>
                 {/* 宽屏固定五列单行；窄屏自动降列。每条源只取前 4 条，保证一屏可读完 */}
@@ -835,6 +844,9 @@ export function DashboardScreenPage({
                       envelope={envelope}
                       limit={6}
                       watchWords={watchWords}
+                      onLater={later.add}
+                      hasLater={later.has}
+                      onAddLater={later.add}
                     />
                   ))}
                 </div>

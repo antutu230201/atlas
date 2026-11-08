@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HotItem, SourceEnvelope } from './types';
 import { HealthDot, TagChip } from './icons';
+import { LaterPinButton } from './later-reading';
 
 export function formatHeat(heat?: number): string | undefined {
   if (heat === undefined || Number.isNaN(heat)) return undefined;
@@ -61,6 +62,9 @@ export function HotlistCard({
   sourceKey,
   index = 0,
   watchWords = [],
+  onLater,
+  hasLater,
+  onAddLater,
 }: {
   label: string;
   envelope: SourceEnvelope<HotItem[]>;
@@ -69,6 +73,10 @@ export function HotlistCard({
   index?: number;
   /** 关注词：命中的标题高亮 */
   watchWords?: string[];
+  /** 稍后读：未提供时不显示行内按钮 */
+  onLater?: (item: HotItem, source: string) => void;
+  hasLater?: (item: HotItem) => boolean;
+  onAddLater?: (item: HotItem, source: string) => void;
 }) {
   // useMemo 稳定 items 引用：否则 slice 每次渲染产生新数组，useRankChanges 的 effect 会无限重跑
   const items = useMemo(() => (envelope.payload ?? []).slice(0, limit), [envelope.payload, limit]);
@@ -166,6 +174,14 @@ export function HotlistCard({
                   <span className="w-11 shrink-0 text-right font-mono text-[12px] leading-none tabular-nums text-muted">
                     {heat ?? <span className="text-muted/30">—</span>}
                   </span>
+                  {onLater && item.url ? (
+                    <LaterPinButton
+                      item={item}
+                      source={sourceKey ?? label}
+                      saved={hasLater ? hasLater(item) : false}
+                      onAdd={onAddLater ?? onLater}
+                    />
+                  ) : null}
                 </>
               );
               return (
