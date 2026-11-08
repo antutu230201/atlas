@@ -235,7 +235,7 @@ export function SettingsDrawer({
           {/* 关注词 */}
           <section aria-label="关注词">
             <p className="mb-1 text-xs font-semibold text-muted">关注词</p>
-            <p className="mb-2 text-[11px] text-muted/80">命中的热榜标题会高亮，最多 20 个。</p>
+            <p className="mb-2 text-[11px] text-muted">命中的热榜标题会高亮，最多 20 个。</p>
             <div className="flex gap-2">
               <Input
                 value={wordInput}
@@ -274,7 +274,7 @@ export function SettingsDrawer({
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-[11px] text-muted/60">还没有关注词。</p>
+              <p className="mt-2 text-[11px] text-muted">还没有关注词。</p>
             )}
           </section>
 
@@ -293,7 +293,7 @@ export function SettingsDrawer({
           {/* 显示与护屏：设备级偏好，长时间挂墙时的刚需 */}
           <section aria-label="显示与护屏">
             <p className="mb-1 text-xs font-semibold text-muted">显示与护屏</p>
-            <p className="mb-3 text-[11px] text-muted/80">只对这台设备生效，适合整天挂着。</p>
+            <p className="mb-3 text-[11px] text-muted">只对这台设备生效，适合整天挂着。</p>
             <ul className="space-y-3">
               <li className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -349,7 +349,7 @@ export function SettingsDrawer({
             ) : null}
           </section>
 
-          <p className="text-center text-[11px] text-muted/60">
+          <p className="text-center text-[11px] text-muted">
             不在输入框时，按 <kbd className="rounded-xs border border-border px-1 font-mono">?</kbd>{' '}
             查看键盘快捷键
           </p>

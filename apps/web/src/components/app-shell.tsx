@@ -190,9 +190,10 @@ function ShellBody({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setPaletteOpen(true)}
-                aria-label="打开命令面板"
+                aria-keyshortcuts="Control+K"
                 className="hidden items-center gap-1.5 rounded-sm border border-border bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:inline-flex"
               >
+                {/* 名称取自可见文字（搜索 + 快捷键），不再用 aria-label，避免语音控制名称不一致 */}
                 <span>搜索</span>
                 <kbd className="rounded-xs bg-surface-hover px-1 text-[10px]">Ctrl+K</kbd>
               </button>

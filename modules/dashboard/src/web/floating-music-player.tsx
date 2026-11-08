@@ -1138,10 +1138,9 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
               type="button"
               className="min-w-0 flex-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               onClick={() => setExpanded(true)}
-              aria-label={`展开 ${track.title} 播放详情`}
             >
               <span className="block truncate text-xs font-medium">{track.title}</span>
-              <span className="mt-0.5 block truncate text-[11px] text-muted">
+              <span className="mt-0.5 block truncate text-[11px] text-text/75">
                 {resumeHint
                   ? '已恢复上次进度，点击页面任意处继续播放'
                   : isBuffering
@@ -1150,6 +1149,8 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
                       ? '播放失败，点开查看'
                       : `${track.artist} · ${formatTime(currentTime)} / ${formatTime(duration)}`}
               </span>
+              {/* 可见文字已包含曲名与进度，补一句动作说明；避免 aria-label 覆盖内容导致名称与可见文字不一致 */}
+              <span className="sr-only">展开播放详情</span>
             </button>
 
             <button

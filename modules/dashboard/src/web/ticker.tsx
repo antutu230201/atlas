@@ -54,6 +54,8 @@ export function Ticker({ sources }: { sources: Record<string, SourceEnvelope<Hot
                     href={entry.item.url}
                     target="_blank"
                     rel="noreferrer noopener"
+                    // 第二份拷贝只用于无缝滚动，已 aria-hidden，不能再进入 Tab 序列
+                    tabIndex={copy === 1 ? -1 : undefined}
                     className="max-w-64 truncate text-muted transition-colors hover:text-primary"
                   >
                     {entry.item.title}

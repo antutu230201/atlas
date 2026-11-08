@@ -48,7 +48,7 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
     await page.getByRole('combobox', { name: '排序方式' }).click();
     await page.getByRole('option', { name: '优先级' }).click();
     await expect.poll(() => latestListInput?.sort).toBe('priority');
-    await page.getByRole('button', { name: '切换为升序' }).click();
+    await page.getByRole('button', { name: /切换为升序/ }).click();
     await expect.poll(() => latestListInput?.dir).toBe('asc');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(

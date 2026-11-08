@@ -216,12 +216,15 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
             <Button
               size="sm"
               variant="secondary"
-              aria-label={sortDirection === 'desc' ? '切换为升序' : '切换为降序'}
+              aria-label={
+                sortDirection === 'desc' ? '当前降序，切换为升序' : '当前升序，切换为降序'
+              }
               onClick={() =>
                 setSortDirection((direction) => (direction === 'desc' ? 'asc' : 'desc'))
               }
             >
-              {sortDirection === 'desc' ? '↓ 降序' : '↑ 升序'}
+              <span aria-hidden="true">{sortDirection === 'desc' ? '↓' : '↑'}</span>{' '}
+              {sortDirection === 'desc' ? '降序' : '升序'}
             </Button>
           </div>
         ) : null}

@@ -48,7 +48,6 @@ export function SummaryCard({
               onClick={onRegenerate}
               disabled={regenerating}
               className="flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[11px] text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:cursor-progress disabled:opacity-60"
-              aria-label="重新生成每日小结"
               title="重新生成（会调用一次 AI）"
             >
               <ScreenIcon
@@ -56,6 +55,7 @@ export function SummaryCard({
                 className={`size-3 ${regenerating ? 'animate-spin' : ''}`}
               />
               {regenerating ? '生成中' : '重写'}
+              <span className="sr-only">每日小结</span>
             </button>
           ) : null}
         </div>

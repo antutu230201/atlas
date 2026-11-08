@@ -677,3 +677,11 @@
 - Dependency: `@tanstack/react-virtual` 3.14.24 (MIT, headless) added to the note module only. It is the second module using it, so no shared wrapper yet — a third consumer should trigger one instead of copying the pattern again.
 - Validation: 100 mixed notes (empty body / 280-char preview / expandable long body) in Playwright: 8 mounted rows at the top on 390px, 11 at the bottom, 9 at 1280px; `aria-posinset` 1 and 100; expanded row is re-measured without overlapping the next row; keyboard delete issues the right id and keeps focus inside the list; no horizontal overflow at 390px/1280px; trash restore still works. `pnpm typecheck` (16/16), `pnpm lint`, `pnpm test` (10/10 tasks, API 111 tests), `pnpm format:check` and `pnpm --filter @atlas/web build` passed; app-shell/note/todo E2E passed 4/4.
 - Remaining: the trash page still mounts up to 100 rows eagerly and has not been measured; this route has no Lighthouse or deployed-environment numbers yet.
+
+### Application accessibility audit (2026-11-08)
+
+- [x] Scan real application routes (not only Storybook) with axe-core 4.14 across 11 routes × light/dark × 1280/390: 44 scans, zero serious/critical findings, no horizontal overflow at 390px.
+- [x] Fix label-in-name mismatches (shell search, todo sort, player expand, regenerate, listening card), icon-only buttons without names, `aria-label` on a plain span, focusable links inside `aria-hidden` ticker copy, low-contrast helper text, and a non-focusable horizontally scrollable table region.
+- Dependency: `axe-core` 4.14.0 added as a devDependency of `@atlas/web` only (same engine behind `pnpm a11y`); injected at test time, not shipped in the app bundle.
+- Validation: `apps/web/e2e/a11y.spec.ts` passes 44/44 scans in ~50s when reusing local servers; typecheck (16/16), lint and format checks pass. Findings and remaining manual items are recorded in `docs/plans/accessibility-audit-2026-11-08.md`.
+- Remaining: screen-reader walkthrough, 200% zoom/reflow, full keyboard path per page, and dynamic status announcements are not yet verified.

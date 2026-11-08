@@ -83,7 +83,7 @@ test.describe('个人大屏模块（假数据源）', () => {
     await expect(page.getByRole('heading', { name: '个人大屏' })).toBeVisible();
     await expect(page.getByText('杭州').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('晴间多云').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('button', { name: '打开命令面板' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /搜索/ })).toHaveCount(0);
 
     // 天气卡可打开完整详情，包含逐时与逐日预报
     await page.getByRole('button', { name: '查看天气详情', exact: true }).click();
@@ -318,7 +318,7 @@ test.describe('个人大屏模块（假数据源）', () => {
       .waitFor({ state: 'visible', timeout: 5_000 })
       .catch(() => undefined);
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('button', { name: '展开 起风了 播放详情' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /起风了.*展开播放详情/ })).toBeVisible();
     await expect
       .poll(
         () =>

@@ -410,6 +410,8 @@ export function HealthDot({ status }: { status: string }) {
   return (
     <span
       title={title}
+      /* 圆点本身没有文字，用 role="img" 承载可访问名称；span 上直接写 aria-label 不合规 */
+      role="img"
       aria-label={title}
       className={`inline-block size-2 rounded-full ${color}`}
     />

@@ -50,7 +50,6 @@ export function ListeningMiniCard({ base }: { base: string }) {
       <Link
         href="/m/dashboard/listening"
         className="screen-card flex h-full flex-col items-start justify-between gap-3 p-4 transition-colors hover:border-primary/40"
-        aria-label="今天还没有听歌，去听一首"
         data-testid="listening-mini-card"
       >
         <div className="flex items-center gap-2.5">

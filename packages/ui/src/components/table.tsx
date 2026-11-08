@@ -3,10 +3,26 @@ import { cn } from '../cn';
 
 /** 表格样式基元：语义结构由调用方组织（thead/tbody），虚拟滚动在阶段 4 引入 */
 
-export function Table({ className, ref, ...props }: ComponentPropsWithRef<'table'>) {
+export function Table({
+  className,
+  ref,
+  'aria-label': ariaLabel,
+  ...props
+}: ComponentPropsWithRef<'table'>) {
   return (
-    <div className="w-full overflow-x-auto rounded-md border border-border bg-surface">
-      <table ref={ref} className={cn('w-full border-collapse text-sm', className)} {...props} />
+    // 横向滚动容器必须是可聚焦区域，否则键盘用户无法滚到右侧列（WCAG 2.1.1）
+    <div
+      className="w-full overflow-x-auto rounded-md border border-border bg-surface"
+      tabIndex={0}
+      role="region"
+      aria-label={ariaLabel ? `${ariaLabel}（可横向滚动）` : '表格（可横向滚动）'}
+    >
+      <table
+        ref={ref}
+        aria-label={ariaLabel}
+        className={cn('w-full border-collapse text-sm', className)}
+        {...props}
+      />
     </div>
   );
 }

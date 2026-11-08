@@ -608,7 +608,6 @@ export function DashboardScreenPage({
               disabled={refresh.isPending || snapshot.isFetching}
               className="mr-1 hidden items-center gap-2 rounded-full px-2 py-1 text-[11px] tracking-wider text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:cursor-progress md:flex"
               title="点击刷新全部数据源（R）"
-              aria-label="刷新全部数据源"
             >
               <HealthDot status={snapshot.isError ? 'error' : 'fresh'} />
               {snapshot.isFetching || refresh.isPending
@@ -616,6 +615,7 @@ export function DashboardScreenPage({
                 : snapshot.dataUpdatedAt > 0
                   ? `同步 ${new Date(snapshot.dataUpdatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
                   : '数据在线'}
+              <span className="sr-only">，点击刷新全部数据源</span>
             </button>
             <ModuleLauncher workspaceSlug={workspaceSlug} currentModule={moduleName} />
             <NotificationBell />
@@ -653,6 +653,8 @@ export function DashboardScreenPage({
                 <button
                   type="button"
                   className="screen-icon-button"
+                  aria-label="刷新大屏数据"
+                  title="刷新大屏数据"
                   disabled={refresh.isPending}
                   onClick={() => refresh.mutate()}
                 >
@@ -662,7 +664,13 @@ export function DashboardScreenPage({
                   />
                   <span className="hidden sm:inline">刷新</span>
                 </button>
-                <button type="button" className="screen-icon-button" onClick={openSettings}>
+                <button
+                  type="button"
+                  className="screen-icon-button"
+                  aria-label="大屏设置"
+                  title="大屏设置"
+                  onClick={openSettings}
+                >
                   <ScreenIcon name="settings" className="size-3.5" />
                   <span className="hidden sm:inline">设置</span>
                 </button>
