@@ -1,7 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ModulePageProps } from './types';
 import {
   Button,
@@ -19,6 +20,9 @@ import {
 } from '@atlas/ui';
 import { api } from '@/lib/api';
 import type { NoteRow } from './types';
+
+/** 折叠预览的字符数：超过才显示“展开全文” */
+const PREVIEW_LIMIT = 280;
 
 /** 示例模块页面：list / create / remove 三个动作经内核网关调用 */
 export function SampleNoteListPage({ workspaceSlug, moduleName }: ModulePageProps) {
@@ -166,47 +170,144 @@ export function SampleNoteListPage({ workspaceSlug, moduleName }: ModulePageProp
       ) : notes.length === 0 ? (
         <EmptyState title="还没有笔记" description="把今天值得记住的一件事写下来。" />
       ) : (
-        <div className="space-y-3">
-          {notes.map((row) => {
-            const previewLimit = 280;
-            const expanded = expandedId === row.id;
-            const canExpand = row.body.length > previewLimit;
-            return (
-              <Card key={row.id}>
-                <CardHeader>
-                  <CardTitle className="break-words">{row.title}</CardTitle>
-                  <IconButton
-                    aria-label={`删除 ${row.title}`}
-                    variant="ghost"
-                    size="sm"
-                    disabled={remove.isPending}
-                    onClick={() => remove.mutate(row.id)}
-                  >
-                    ✕
-                  </IconButton>
-                </CardHeader>
-                {row.body ? (
-                  <CardContent className="space-y-1 text-muted">
-                    <p className="break-words whitespace-pre-wrap">
-                      {canExpand && !expanded ? `${row.body.slice(0, previewLimit)}…` : row.body}
-                    </p>
-                    {canExpand ? (
-                      <button
-                        type="button"
-                        className="text-xs text-primary hover:underline"
-                        aria-expanded={expanded}
-                        onClick={() => setExpandedId(expanded ? null : row.id)}
-                      >
-                        {expanded ? '收起' : '展开全文'}
-                      </button>
-                    ) : null}
-                  </CardContent>
-                ) : null}
-              </Card>
-            );
-          })}
-        </div>
+        <VirtualNoteList
+          notes={notes}
+          expandedId={expandedId}
+          removing={remove.isPending}
+          // 列表上方的状态提示会改变列表起点，用它驱动偏移重算
+          layoutKey={`${notes.length}:${list.isFetching}:${list.isError}`}
+          onToggleExpand={(id) => setExpandedId((current) => (current === id ? null : id))}
+          onRemove={(id) => remove.mutate(id)}
+        />
       )}
+    </div>
+  );
+}
+
+/**
+ * 窗口滚动虚拟列表：最多 100 篇笔记只挂载可视区域 + overscan 的行，
+ * 行高由 measureElement 实测（标题换行、正文长度、展开状态都会改变高度）。
+ */
+function VirtualNoteList({
+  notes,
+  expandedId,
+  removing,
+  layoutKey,
+  onToggleExpand,
+  onRemove,
+}: {
+  notes: NoteRow[];
+  expandedId: string | null;
+  removing: boolean;
+  layoutKey: string;
+  onToggleExpand: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  const getItemKey = useCallback((index: number) => notes[index]?.id ?? index, [notes]);
+  // 初始估算值只影响首帧占位，实际高度以 measureElement 为准
+  const estimateSize = useCallback(() => 180, []);
+  const virtualizer = useWindowVirtualizer({
+    count: notes.length,
+    estimateSize,
+    getItemKey,
+    overscan: 6,
+    gap: 12,
+    scrollMargin,
+    useFlushSync: false,
+  });
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measureOffset = () => setScrollMargin(list.getBoundingClientRect().top + window.scrollY);
+    measureOffset();
+    window.addEventListener('resize', measureOffset);
+    return () => window.removeEventListener('resize', measureOffset);
+  }, [notes, layoutKey]);
+
+  // 删除成功后，被删行的按钮随行卸载，把焦点交给同位置（或上一行）的按钮，避免焦点回落到 body
+  const pendingFocusIndex = useRef<number | null>(null);
+  const lastCount = useRef(notes.length);
+  useEffect(() => {
+    const target = pendingFocusIndex.current;
+    pendingFocusIndex.current = null;
+    const shrank = notes.length < lastCount.current;
+    lastCount.current = notes.length;
+    if (target === null || !shrank) return;
+    const container = listRef.current;
+    if (!container) return;
+    const row =
+      container.querySelector<HTMLElement>(`[data-index="${target}"]`) ??
+      container.querySelector<HTMLElement>(`[data-index="${target - 1}"]`);
+    (row?.querySelector<HTMLElement>('button') ?? container).focus();
+  }, [notes]);
+
+  return (
+    <div
+      ref={listRef}
+      role="list"
+      aria-label="笔记列表"
+      aria-busy={removing || undefined}
+      tabIndex={-1}
+      className="relative w-full"
+      style={{ height: `${virtualizer.getTotalSize()}px` }}
+    >
+      {virtualizer.getVirtualItems().map((item) => {
+        const row = notes[item.index];
+        if (!row) return null;
+        const expanded = expandedId === row.id;
+        const canExpand = row.body.length > PREVIEW_LIMIT;
+        return (
+          <div
+            key={item.key}
+            ref={virtualizer.measureElement}
+            data-index={item.index}
+            data-testid="note-row"
+            role="listitem"
+            aria-posinset={item.index + 1}
+            aria-setsize={notes.length}
+            className="absolute left-0 top-0 w-full"
+            style={{ transform: `translateY(${item.start - scrollMargin}px)` }}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="break-words">{row.title}</CardTitle>
+                <IconButton
+                  aria-label={`删除 ${row.title}`}
+                  variant="ghost"
+                  size="sm"
+                  disabled={removing}
+                  onClick={() => {
+                    pendingFocusIndex.current = item.index;
+                    onRemove(row.id);
+                  }}
+                >
+                  ✕
+                </IconButton>
+              </CardHeader>
+              {row.body ? (
+                <CardContent className="space-y-1 text-muted">
+                  <p className="break-words whitespace-pre-wrap">
+                    {canExpand && !expanded ? `${row.body.slice(0, PREVIEW_LIMIT)}…` : row.body}
+                  </p>
+                  {canExpand ? (
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:underline"
+                      aria-expanded={expanded}
+                      onClick={() => onToggleExpand(row.id)}
+                    >
+                      {expanded ? '收起' : '展开全文'}
+                    </button>
+                  ) : null}
+                </CardContent>
+              ) : null}
+            </Card>
+          </div>
+        );
+      })}
     </div>
   );
 }

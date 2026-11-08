@@ -2,7 +2,8 @@
 
 **用途：**交给下一位 agent 按优先级执行。  
 **范围：**继续优化功能、页面体验、滚动性能与可访问性；这是一份执行路线，不代表全站已经验收完成。  
-**当前基线：**分支 `codex/command-palette-ux`；最近提交包含待办排序（`45ad37c`）和待办长列表虚拟化（`220da9a`）。
+**当前基线：**分支 `codex/command-palette-ux`；最近提交包含待办排序（`45ad37c`）和待办长列表虚拟化（`220da9a`）。  
+**最近更新：**2026-11-08 完成 P0（笔记主列表虚拟化，分支 `codex/note-list-virtualization`）；下一步从 P1 应用页面无障碍与 UI 一致性审计开始。`
 
 ## 开工前必须核对
 
@@ -15,13 +16,15 @@
 
 - 阶段 4 已完成命令搜索、导入导出、Toast、模块按需分包、首轮滚动优化；路线图仍将 Lighthouse 全面复测、完整离线能力和全站无障碍复查列为未完成。
 - 待办列表现有服务端最多返回 200 条，页面已用 `@tanstack/react-virtual` 按动态行高虚拟渲染。浏览器测试用 200 条数据验证了少于 30 个挂载行、滚动到第 200 条、390px 宽度和键盘操作。
-- 笔记模块的 `list` 和 `listTrash` 各最多返回 100 条；[list-page.tsx](../../modules/sample-note/src/web/list-page.tsx) 仍把主列表所有卡片挂载到 DOM，只折叠长正文。这是下一项明确的长列表热点。
+- 笔记模块的 `list` 和 `listTrash` 各最多返回 100 条；主列表已于 2026-11-08 改为窗口级动态行高虚拟化（证据见 P0），[trash-page.tsx](../../modules/sample-note/src/web/trash-page.tsx) 仍全量挂载，尚未测量。
 - `packages/ui` 的 `pnpm a11y` 覆盖 Storybook 组件，不等于应用页面的完整无障碍审计。全站 E2E 也只覆盖主要流程，并非每条路由、主题和错误状态。
 - 上次全仓验证记录：类型检查、lint、格式检查、10 个测试任务（API 111 项）和 Web 生产构建通过；这是最近变更的基线，不可代替本任务的回归验证。
 
 ## 优先级与实施项
 
 ### P0：笔记主列表虚拟化
+
+**状态：**2026-11-08 已完成（分支 `codex/note-list-virtualization`）。回收站未改动，见下方“未做”。
 
 **目标：**避免最多 100 篇笔记卡片及其正文预览同时进入 DOM，同时保留自然页面滚动和现有展开/删除/回收站流程。
 
@@ -34,6 +37,14 @@
 - 不改变笔记的数据模型、软删除或跨 workspace 权限，不扩大 API 返回上限来“喂给”虚拟列表。
 
 **验收：**用 100 条长短混合笔记（含空正文、长正文、展开项）验证首屏/末尾挂载节点数、滚动位置、展开、删除、恢复、键盘访问；在 390px 和桌面宽度验证无横向溢出。至少补充 Playwright 覆盖；若需要辅助纯函数/虚拟器测试，再按已有 Vitest 工作区补测试。
+
+**验收证据（2026-11-08）：**
+
+- 实现：[list-page.tsx](../../modules/sample-note/src/web/list-page.tsx) 使用 `useWindowVirtualizer` + `measureElement` 实测行高，`overscan: 6`、`gap: 12`；空正文、短正文、280 字预览、展开长正文四类行都在同一列表内混合。
+- 依赖：`@tanstack/react-virtual` 3.14.24（MIT、headless）只加到 `modules/sample-note/package.json`；未提升到共享包，也未从待办模块导入代码。
+- 用例：[note-module.spec.ts](../../apps/web/e2e/note-module.spec.ts) 用 100 条 mock 数据测得挂载行数 390px 首屏 8 / 末尾 11、1280px 9（均 < 30）；`aria-posinset` 首行 1、末行 100；展开后行高实测变大且不与下一行重叠，收起后恢复；键盘删除发出正确 id、列表变 99 且焦点留在列表内；390px / 1280px 无横向溢出；回收站恢复仍正常。
+- 门禁：`pnpm typecheck` 16/16、`pnpm lint`、`pnpm test` 10/10（API 111 项）、`pnpm format:check`、`pnpm --filter @atlas/web build` 通过；app-shell / note / todo 三个 E2E 4/4 通过。
+- 未做：回收站页仍全量挂载（未测量出明显负担，按计划不为了对称而改）；该路由尚无 Lighthouse 与发布环境数据。
 
 ### P1：应用页面无障碍与 UI 一致性审计
 

@@ -669,3 +669,11 @@
 - [x] Replace eager rendering of up to 200 task cards with window-based dynamic-height virtualization; only visible rows plus overscan are mounted, and list position metadata remains available to assistive technology.
 - Dependency: `@tanstack/react-virtual` 3.14.24, MIT, headless; upstream describes a 10–15 KB footprint and supports measured item sizes. A hand-written virtualizer was rejected because dynamic-height measurement and scroll anchoring would add maintenance risk. This is scoped to the todo module.
 - Validation: 200-row Playwright fixture verifies fewer than 30 mounted rows at the start and end of the list, access to item 200 after scrolling, 390px layout, and the existing keyboard-operated board flow; full typecheck/lint/format checks passed.
+
+### Note list virtualization (2026-11-08)
+
+- [x] Replace eager rendering of up to 100 note cards (title + 280-char preview) with window-based dynamic-height virtualization; create, expand/collapse, delete, loading, empty and error states are unchanged.
+- [x] Rows expose `aria-posinset`/`aria-setsize`; after deleting a focused row, focus moves to the row that takes its place (or the previous one) instead of falling back to `body`; the list offset is re-measured when the status line above it appears or disappears.
+- Dependency: `@tanstack/react-virtual` 3.14.24 (MIT, headless) added to the note module only. It is the second module using it, so no shared wrapper yet — a third consumer should trigger one instead of copying the pattern again.
+- Validation: 100 mixed notes (empty body / 280-char preview / expandable long body) in Playwright: 8 mounted rows at the top on 390px, 11 at the bottom, 9 at 1280px; `aria-posinset` 1 and 100; expanded row is re-measured without overlapping the next row; keyboard delete issues the right id and keeps focus inside the list; no horizontal overflow at 390px/1280px; trash restore still works. `pnpm typecheck` (16/16), `pnpm lint`, `pnpm test` (10/10 tasks, API 111 tests), `pnpm format:check` and `pnpm --filter @atlas/web build` passed; app-shell/note/todo E2E passed 4/4.
+- Remaining: the trash page still mounts up to 100 rows eagerly and has not been measured; this route has no Lighthouse or deployed-environment numbers yet.
