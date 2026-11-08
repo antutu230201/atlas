@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, Button, Card, CardContent, EmptyState, Input, Skeleton, useToast } from '@atlas/ui';
 import { api } from '@/lib/api';
 import type { ModulePageProps, TodoRow } from './types';
@@ -23,6 +23,11 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
   const [title, setTitle] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   // 视图偏好存 localStorage：上次用看板，下次打开还是看板
   const [view, setView] = useState<'list' | 'board'>(() => {
     try {
@@ -49,15 +54,16 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
       workspaceSlug,
       'list',
       view === 'board' ? '' : statusFilter,
-      search,
+      debouncedSearch,
     ],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api<{ todos: TodoRow[] }>(`${base}/list`, {
         method: 'POST',
+        signal,
         json: {
           // 看板需要三列全量，状态由前端分组
           status: view === 'board' ? undefined : statusFilter || undefined,
-          q: search || undefined,
+          q: debouncedSearch || undefined,
         },
       }),
   });
@@ -84,12 +90,15 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
     mutationFn: (input: { id: string; status: TodoStatus }) =>
       api(`${base}/setStatus`, { method: 'POST', json: input }),
     onSuccess: invalidate,
+    onError: (e: Error) => toast({ title: '状态更新失败', description: e.message, variant: 'err' }),
   });
 
   const setDue = useMutation({
     mutationFn: (input: { id: string; dueDate: string | null }) =>
       api(`${base}/update`, { method: 'POST', json: input }),
     onSuccess: invalidate,
+    onError: (e: Error) =>
+      toast({ title: '截止日期更新失败', description: e.message, variant: 'err' }),
   });
 
   const remove = useMutation({
@@ -98,6 +107,8 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
       invalidate();
       toast({ title: '已移入回收站', variant: 'info' });
     },
+    onError: (e: Error) =>
+      toast({ title: '移入回收站失败', description: e.message, variant: 'err' }),
   });
 
   const todos = list.data?.todos ?? [];
@@ -161,6 +172,7 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
               <Button
                 key={status || 'all'}
                 size="sm"
+                aria-pressed={statusFilter === status}
                 variant={statusFilter === status ? 'primary' : 'secondary'}
                 onClick={() => setStatusFilter(status)}
               >
@@ -168,7 +180,7 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
               </Button>
             ))
           : null}
-        <div className="ml-auto w-44">
+        <div className="ml-auto w-full sm:w-56">
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -177,6 +189,20 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
           />
         </div>
       </div>
+
+      {list.isFetching && list.data ? (
+        <p className="text-xs text-muted" role="status" aria-live="polite">
+          正在更新列表…
+        </p>
+      ) : null}
+      {list.isError && list.data ? (
+        <p className="text-sm text-err" role="alert">
+          刷新失败：{list.error instanceof Error ? list.error.message : '请重试'}
+          <button type="button" className="ml-2 underline" onClick={() => void list.refetch()}>
+            重试
+          </button>
+        </p>
+      ) : null}
 
       {error ? (
         <p className="rounded-sm bg-err-soft px-3 py-2 text-xs text-err" role="alert">
@@ -189,16 +215,35 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
         </div>
+      ) : list.isError && !list.data ? (
+        <div className="screen-card space-y-3 p-6 text-center" role="alert">
+          <p className="text-sm text-err">
+            待办列表加载失败：{list.error instanceof Error ? list.error.message : '请重试'}
+          </p>
+          <Button size="sm" variant="secondary" onClick={() => void list.refetch()}>
+            重新加载
+          </Button>
+        </div>
       ) : todos.length === 0 ? (
-        <EmptyState title="这里空空如也" description="添加第一条待办，或者调整筛选条件。" />
-      ) : view === 'board' ? (
-        <TodoBoard
-          todos={todos}
-          onMove={(id, status) => setStatus.mutate({ id, status })}
-          onRemove={(id) => remove.mutate(id)}
-          onSetDue={(d, id) => setDue.mutate({ id, dueDate: d })}
-          moving={setStatus.isPending || setDue.isPending}
+        <EmptyState
+          title={debouncedSearch || statusFilter ? '没有匹配的待办' : '还没有待办'}
+          description={
+            debouncedSearch || statusFilter
+              ? '尝试调整关键词或状态筛选。'
+              : '把接下来要做的事记下来，回车即可快速添加。'
+          }
         />
+      ) : view === 'board' ? (
+        <>
+          <p className="text-xs text-muted">拖动卡片切换状态；聚焦卡片后也可按左右方向键移动。</p>
+          <TodoBoard
+            todos={todos}
+            onMove={(id, status) => setStatus.mutate({ id, status })}
+            onRemove={(id) => remove.mutate(id)}
+            onSetDue={(d, id) => setDue.mutate({ id, dueDate: d })}
+            moving={setStatus.isPending || setDue.isPending}
+          />
+        </>
       ) : (
         <div className="space-y-2">
           {todos.map((row: TodoRow) => (
@@ -209,7 +254,9 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
                     <button
                       key={s}
                       type="button"
-                      aria-label={`设为 ${s}`}
+                      aria-label={`设为${STATUS_LABELS[s]}`}
+                      aria-pressed={row.status === s}
+                      disabled={setStatus.isPending}
                       onClick={() => setStatus.mutate({ id: row.id, status: s })}
                       className={cnStatus(row.status, s)}
                     >
@@ -231,7 +278,10 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
                     ) : (
                       '未设置截止'
                     )}
-                    <DueQuick onSet={(d) => setDue.mutate({ id: row.id, dueDate: d })} />
+                    <DueQuick
+                      disabled={setDue.isPending}
+                      onSet={(d) => setDue.mutate({ id: row.id, dueDate: d })}
+                    />
                   </p>
                 </div>
                 <Badge
@@ -312,6 +362,19 @@ function TodoBoard({
               <div
                 key={row.id}
                 draggable
+                tabIndex={0}
+                role="group"
+                aria-label={`${row.title}，${STATUS_LABELS[row.status]}。按左右方向键切换状态`}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                  const currentIndex = STATUSES.indexOf(row.status);
+                  const nextIndex = currentIndex + (event.key === 'ArrowRight' ? 1 : -1);
+                  const nextStatus = STATUSES[nextIndex];
+                  if (!nextStatus) return;
+                  event.preventDefault();
+                  onMove(row.id, nextStatus);
+                }}
                 onDragStart={() => setDragId(row.id)}
                 onDragEnd={() => {
                   setDragId(null);
@@ -346,7 +409,7 @@ function TodoBoard({
                     {row.dueDate
                       ? `截止 ${new Date(row.dueDate).toLocaleDateString('zh-CN')}`
                       : '未设置截止'}
-                    <DueQuick onSet={(d) => onSetDue(d, row.id)} />
+                    <DueQuick disabled={moving} onSet={(d) => onSetDue(d, row.id)} />
                   </span>
                   <button
                     type="button"
@@ -367,7 +430,13 @@ function TodoBoard({
 }
 
 /** 截止日快捷设置：今天 / 明天 / 下周，已设置时可清除 */
-function DueQuick({ onSet }: { onSet: (d: string | null) => void }) {
+function DueQuick({
+  onSet,
+  disabled = false,
+}: {
+  onSet: (d: string | null) => void;
+  disabled?: boolean;
+}) {
   const fmt = (offset: number): string => {
     const date = new Date();
     date.setDate(date.getDate() + offset);
@@ -387,6 +456,7 @@ function DueQuick({ onSet }: { onSet: (d: string | null) => void }) {
         <button
           key={label}
           type="button"
+          disabled={disabled}
           title={offset === 0 ? '截止今天' : offset === 1 ? '截止明天' : '截止下周同一天'}
           onClick={() => onSet(fmt(offset))}
           className="rounded-xs border border-border px-1 leading-4 transition-colors hover:border-primary/40 hover:text-primary"
@@ -396,6 +466,7 @@ function DueQuick({ onSet }: { onSet: (d: string | null) => void }) {
       ))}
       <button
         type="button"
+        disabled={disabled}
         title="清除截止日"
         onClick={() => onSet(null)}
         className="rounded-xs px-0.5 leading-4 transition-colors hover:text-err"

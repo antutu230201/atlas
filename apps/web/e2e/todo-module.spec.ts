@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Request } from '@playwright/test';
 
 const email = `todo-e2e-${Date.now()}@example.com`;
 const password = 'password123';
@@ -18,7 +18,7 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
 
     // 启用待办模块
     await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
+    await page.getByRole('tab', { name: '模块', exact: true }).click();
     const todoCard = page.getByTestId('module-card-todo_notes');
     const enable = todoCard.getByRole('button', { name: '启用' });
     await expect(enable).toBeVisible({ timeout: 10_000 });
@@ -51,8 +51,33 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByText('晨间跑步').first()).toBeVisible();
 
+    // 搜索快速输入时只发出一次请求；结果更新后筛选为唯一匹配项。
+    let listRequests = 0;
+    const trackListRequest = (request: Request) => {
+      if (request.url().includes('/todo_notes/call/list')) listRequests += 1;
+    };
+    page.on('request', trackListRequest);
+    await page.getByLabel('搜索标题').pressSequentially('晨间跑步', { delay: 25 });
+    await expect.poll(() => listRequests, { timeout: 5_000 }).toBe(1);
+    await expect(page.getByRole('button', { name: '删除' })).toHaveCount(1);
+    page.off('request', trackListRequest);
+    await page.getByLabel('搜索标题').fill('');
+    await expect(page.getByRole('button', { name: '删除' })).toHaveCount(3);
+
+    // 看板支持键盘切换状态，左右方向键可移动后再撤回。
+    await page.getByRole('button', { name: '看板' }).click();
+    const boardCard = page.getByRole('group', { name: /写周报，待办/ });
+    await boardCard.focus();
+    await page.keyboard.press('ArrowRight');
+    const movedCard = page.getByRole('group', { name: /写周报，进行中/ });
+    await expect(movedCard).toBeVisible();
+    await movedCard.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('group', { name: /写周报，待办/ })).toBeVisible();
+    await page.getByRole('button', { name: '列表' }).click();
+
     // 完成第一条（默认排最新在前），确认出现删除线
-    const doneButton = page.getByLabel('设为 done').first();
+    const doneButton = page.getByLabel('设为已完成').first();
     await doneButton.click();
     await expect(page.getByRole('button', { name: '已完成', exact: true })).toBeVisible({
       timeout: 5_000,

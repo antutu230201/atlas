@@ -15,7 +15,7 @@ test.describe('习惯打卡模块', () => {
     // 注册即自动开通个人空间与大屏（ADR-0008），无需手动建空间
 
     await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
+    await page.getByRole('tab', { name: '模块', exact: true }).click();
     const card = page.getByTestId('module-card-habits');
     await card.getByRole('button', { name: '启用' }).click({ timeout: 10_000 });
 
