@@ -768,11 +768,31 @@ export function DashboardScreenPage({
                         onClick={() => scrollToSection('hotlist-section')}
                       />
                     )}
-                    <HeroMetric
-                      value={data.countdowns.length}
-                      label="期待"
-                      onClick={() => scrollToSection('countdown-section')}
-                    />
+                    {(() => {
+                      // 「期待」显示最近一个未来纪念日的剩余天数（比数量更有盼头）；
+                      // 没有未来的就退回数量
+                      const today = new Date();
+                      const nextDays = data.countdowns
+                        .map((item) => {
+                          const target = new Date(`${item.targetDate}T00:00:00`);
+                          if (Number.isNaN(target.getTime())) return null;
+                          const start = new Date(
+                            today.getFullYear(),
+                            today.getMonth(),
+                            today.getDate(),
+                          );
+                          return Math.round((target.getTime() - start.getTime()) / 86_400_000);
+                        })
+                        .filter((days): days is number => days !== null && days >= 0)
+                        .sort((a, b) => a - b)[0];
+                      return (
+                        <HeroMetric
+                          value={nextDays ?? data.countdowns.length}
+                          label="期待"
+                          onClick={() => scrollToSection('countdown-section')}
+                        />
+                      );
+                    })()}
                   </>
                 }
               />
@@ -829,6 +849,7 @@ export function DashboardScreenPage({
                     <LaterReadingPanel
                       items={later.items}
                       onRemove={later.remove}
+                      onPin={later.pin}
                       labelOf={later.labelOf}
                     />
                   </div>

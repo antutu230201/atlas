@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
 import { Inject, Injectable, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import type { Db } from '../db/client';
-import { ADMIN_DB_TOKEN, NOTIFICATION_SERVICE_TOKEN } from '../tokens';
+import { ADMIN_DB_TOKEN, AI_ADAPTER_TOKEN, NOTIFICATION_SERVICE_TOKEN } from '../tokens';
 import type { NotificationService } from '../events/notification.service';
+import { ConfigurableAIProvider } from '../ai/ai-config.service';
 
 /**
  * 每日回顾调度器：
@@ -41,7 +42,24 @@ export class DailyReportScheduler implements OnApplicationBootstrap, OnModuleDes
   constructor(
     @Inject(ADMIN_DB_TOKEN) private readonly adminDb: Db,
     @Inject(NOTIFICATION_SERVICE_TOKEN) private readonly notifications: NotificationService,
+    @Inject(AI_ADAPTER_TOKEN) private readonly ai: ConfigurableAIProvider,
   ) {}
+
+  /** AI 晚间回顾语：真实供应商才生成，失败静默——日报本身不依赖 AI */
+  private async aiEveningNote(parts: string[]): Promise<string | null> {
+    if (!this.ai.config || parts.length === 0) return null;
+    try {
+      const result = await this.ai.complete({
+        prompt: `用户今天：${parts.join('，')}。现在是晚上，请用一句话（30 字内）温和地收尾这一天，像朋友道晚安，不罗列数字。`,
+        maxTokens: 80,
+        temperature: 0.8,
+      });
+      const text = result.text.trim();
+      return text.length > 0 && text.length <= 100 ? text : null;
+    } catch {
+      return null;
+    }
+  }
 
   onApplicationBootstrap(): void {
     this.timer = setInterval(() => void this.tick(), TICK_MS);
@@ -100,6 +118,9 @@ export class DailyReportScheduler implements OnApplicationBootstrap, OnModuleDes
         if (todosDone > 0) parts.push(`完成 ${todosDone} 件待办`);
         if (minutes > 0) parts.push(`听了 ${minutes} 分钟歌`);
         if (activity > 0) parts.push(`打卡 ${activity} 次`);
+        // AI 晚间回顾：真实供应商才生成，失败回落固定文案
+        const eveningNote = await this.aiEveningNote(parts);
+        const tail = eveningNote ?? '去看看今天的小结吧。';
         try {
           await this.notifications.create({
             workspaceId: row.workspace_id,
@@ -107,7 +128,7 @@ export class DailyReportScheduler implements OnApplicationBootstrap, OnModuleDes
             type: 'system.daily',
             title: '今日回顾',
             body: {
-              text: `${parts.join(' · ')}。去看看今天的小结吧。`,
+              text: `${parts.join(' · ')}。${tail}`,
               link: '/',
               day,
             },

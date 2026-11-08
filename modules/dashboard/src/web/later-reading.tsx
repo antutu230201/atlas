@@ -71,12 +71,21 @@ export function useLaterReading(sourceLabels: Record<string, string>) {
     [items, persist],
   );
 
+  /** 置顶：移到列表头（顺序持久化） */
+  const pin = useCallback(
+    (item: LaterItem) => {
+      const rest = items.filter((entry) => entry.url !== item.url);
+      persist([item, ...rest]);
+    },
+    [items, persist],
+  );
+
   const has = useCallback(
     (item: HotItem) => items.some((entry) => entry.url === item.url),
     [items],
   );
 
-  return { items, add, remove, has, labelOf: (key: string) => sourceLabels[key] ?? key };
+  return { items, add, remove, pin, has, labelOf: (key: string) => sourceLabels[key] ?? key };
 }
 
 /** 行内「稍后读」按钮：hover 显形，已收藏时常显对勾 */
@@ -117,10 +126,12 @@ export function LaterPinButton({
 export function LaterReadingPanel({
   items,
   onRemove,
+  onPin,
   labelOf,
 }: {
   items: LaterItem[];
   onRemove: (item: LaterItem) => void;
+  onPin: (item: LaterItem) => void;
   labelOf: (key: string) => string;
 }) {
   const [open, setOpen] = useState(false);
@@ -212,6 +223,15 @@ export function LaterReadingPanel({
                   >
                     {item.title}
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => onPin(item)}
+                    aria-label={`置顶 ${item.title}`}
+                    title="置顶"
+                    className="shrink-0 rounded-xs p-0.5 text-muted transition-colors hover:text-primary"
+                  >
+                    <ScreenIcon name="pin" className="size-3" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => onRemove(item)}
