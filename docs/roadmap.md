@@ -516,6 +516,14 @@
 - 修复：跨 schema 查询必须写 `"modules.todo_notes".todo`（带引号两段式）——不带引号会被 PG 当三段名解析为 database.schema.table 报 cross-database
 - 验证：api 全量 16 文件、typecheck/lint/format/build 全绿、dashboard e2e 6/6；页面实测快捷日期生效、倒计时改标题保存成功、日报通知卡片渲染正常（SQL 聚合逐字段比对）
 
+### 热重载挂起根因修复（2026-11-08 续 7）
+
+- [x] 根因定位：dev 重启只按端口杀进程，挂起的 API 不监听端口因此漏杀 → 积累多个 `nest start --watch` 实例互抢 3001 端口与 PG 数据目录；孤儿 postgres.exe 锁住 pgdata，后续启动全部「假死」
+- [x] main.ts：启动分 4 阶段日志（卡死时最后一条即卡点）；listen 前端口预检（占用即明确报错并给出清理指引）；内核迁移 30s 超时强败，不再无限挂
+- [x] embedded-postgres：复用前做 SELECT 1 真实探测（TCP 通 ≠ 能服务），无响应按 postmaster.pid 终止孤儿进程并等端口释放；启动失败自动清理重试一轮；admin 连接 5s 超时
+- [x] 实测：热重载（改 main.ts）后四阶段完整走完、API 自动恢复 200，连续两次触发均稳定
+- 验证：api 16 文件全过、typecheck/lint/format 全绿
+
 ## 每周复盘记录
 
 - 2026-10-30：项目启动。阶段 0 交付；待办：选定视觉方向。

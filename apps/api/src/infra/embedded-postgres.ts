@@ -1,5 +1,7 @@
 import { createConnection } from 'node:net';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { Client } from 'pg';
 import type { ApiEnv } from '../env';
 
 export interface EmbeddedPostgresHandle {
@@ -8,7 +10,7 @@ export interface EmbeddedPostgresHandle {
 
 const IDLE_HANDLE: EmbeddedPostgresHandle = { stop: async () => undefined };
 
-function isPortOpen(host: string, port: number, timeoutMs = 800): Promise<boolean> {
+export function isPortOpen(host: string, port: number, timeoutMs = 800): Promise<boolean> {
   return new Promise((resolvePromise) => {
     const socket = createConnection({ host, port });
     const finish = (open: boolean) => {
@@ -20,6 +22,66 @@ function isPortOpen(host: string, port: number, timeoutMs = 800): Promise<boolea
     socket.once('timeout', () => finish(false));
     socket.once('error', () => finish(false));
   });
+}
+
+/**
+ * 真实可用性探测：TCP 通不代表 PG 能服务——孤儿实例可能正处于关闭流程，
+ * SQL 会被拒绝。用 SELECT 1（2s 超时）判断"这个端口上的 PG 现在能不能干活"。
+ */
+async function pgResponds(
+  host: string,
+  port: number,
+  user: string,
+  password: string,
+  database: string,
+  timeoutMs = 2_000,
+): Promise<boolean> {
+  const client = new Client({
+    host,
+    port,
+    user,
+    password,
+    database,
+    connectionTimeoutMillis: timeoutMs,
+    statement_timeout: timeoutMs,
+  });
+  try {
+    await client.connect();
+    await client.query('select 1');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await client.end().catch(() => undefined);
+  }
+}
+
+/**
+ * 清理半死的内嵌实例：读数据目录 postmaster.pid 拿到 PG 主进程 PID（Windows 上即
+ * 进程 PID）并终止它，再等端口释放。孤儿 postgres.exe 会锁住数据目录，不清理则
+ * 后续启动全部失败——这正是热重载后 API"假死"需要手动杀进程的根因。
+ */
+async function killStalePostgres(dataDir: string, host: string, port: number): Promise<void> {
+  try {
+    const pidFile = await readFile(resolve(dataDir, 'postmaster.pid'), 'utf8');
+    const pid = Number(pidFile.split('\n')[0]?.trim());
+    if (Number.isInteger(pid) && pid > 0) {
+      try {
+        process.kill(pid);
+        console.log(`[infra] 已终止孤儿 PostgreSQL 进程（PID ${pid}）`);
+      } catch {
+        // 进程已不在：继续走端口等待
+      }
+    }
+  } catch {
+    // 没有 pid 文件：端口可能被外部实例占用，不动它
+    return;
+  }
+  for (let waited = 0; waited < 5_000; waited += 250) {
+    if (!(await isPortOpen(host, port, 300))) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  console.warn('[infra] 端口在 5s 内未释放，继续尝试启动（可能失败）');
 }
 
 /**
@@ -42,16 +104,21 @@ export async function startEmbeddedPostgres(env: ApiEnv): Promise<EmbeddedPostgr
   const user = url.username || 'atlas';
   const password = url.password || 'atlas';
   const database = decodeURIComponent(url.pathname.replace(/^\//, '')) || 'atlas';
+  // 以 apps/api（进程工作目录）为锚，避免 dist 输出层级变化导致路径漂移
+  const dataDir = resolve(process.cwd(), env.PG_DATA_DIR);
 
   if (await isPortOpen(host, port)) {
-    console.log(`[infra] ${host}:${port} 已有 PostgreSQL 实例在运行，直接复用`);
-    return IDLE_HANDLE;
+    // TCP 通 != 能服务：孤儿实例可能正在关闭。探测失败则按 postmaster.pid 清理后自启
+    if (await pgResponds(host, port, user, password, database)) {
+      console.log(`[infra] ${host}:${port} 已有健康的 PostgreSQL 实例在运行，直接复用`);
+      return IDLE_HANDLE;
+    }
+    console.warn(`[infra] ${host}:${port} 上的 PostgreSQL 无响应，尝试清理孤儿实例…`);
+    await killStalePostgres(dataDir, host, port);
   }
 
   // embedded-postgres 是 ESM 包，从 CommonJS 侧动态加载
   const { default: EmbeddedPostgres } = await import('embedded-postgres');
-  // 以 apps/api（进程工作目录）为锚，避免 dist 输出层级变化导致路径漂移
-  const dataDir = resolve(process.cwd(), env.PG_DATA_DIR);
   const pg = new EmbeddedPostgres({
     databaseDir: dataDir,
     user,
@@ -64,19 +131,28 @@ export async function startEmbeddedPostgres(env: ApiEnv): Promise<EmbeddedPostgr
     initdbFlags: ['--locale=C', '--encoding=SQL_ASCII'],
   });
 
-  try {
-    await pg.initialise();
-    console.log(`[infra] 已初始化 PostgreSQL 数据目录：${dataDir}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/exists/i.test(message)) {
+  // 数据目录可能被孤儿实例锁住：先清理再启动，仍失败则重试一轮
+  const startOnce = async (): Promise<void> => {
+    try {
+      await pg.initialise();
+      console.log(`[infra] 已初始化 PostgreSQL 数据目录：${dataDir}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/exists/i.test(message)) {
+        console.error(`[infra] initdb 失败：${message.slice(0, 200)}`);
+        throw error;
+      }
       console.log('[infra] 数据目录已存在，跳过 initdb');
-    } else {
-      console.error(`[infra] initdb 失败：${message}`);
-      throw error;
     }
+    await pg.start();
+  };
+  try {
+    await startOnce();
+  } catch {
+    console.warn('[infra] 启动失败，尝试清理孤儿实例后重试一次…');
+    await killStalePostgres(dataDir, host, port);
+    await startOnce();
   }
-  await pg.start();
   try {
     await pg.createDatabase(database);
   } catch (error) {

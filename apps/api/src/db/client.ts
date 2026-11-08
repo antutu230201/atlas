@@ -11,10 +11,18 @@ export function createDb(databaseUrl: string): Db {
 }
 
 /** 带连接池句柄的变体：迁移/测试用完可显式释放 */
-export function createManagedDb(databaseUrl: string): {
+export function createManagedDb(
+  databaseUrl: string,
+  options: { connectionTimeoutMillis?: number } = {},
+): {
   db: Db;
   end: () => Promise<void>;
 } {
-  const pool = new Pool({ connectionString: databaseUrl, max: 5 });
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    max: 5,
+    // 管理连接默认 5s 连不上就报错：PG 处于半关闭状态时无限等待会让启动"假死"
+    connectionTimeoutMillis: options.connectionTimeoutMillis,
+  });
   return { db: drizzle(pool, { schema }), end: () => pool.end() };
 }
