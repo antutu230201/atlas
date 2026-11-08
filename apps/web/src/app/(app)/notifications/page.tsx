@@ -267,6 +267,30 @@ function ConfirmButton({
 /** 已读折叠区默认露出的条数 */
 const VISIBLE_READ = 3;
 
+/**
+ * 日报/周报正文 = 数据段 + AI 点评段（以「。」分隔，点评由调度器追加）。
+ * 点评段用 ✦ 前缀与主色区分，让「机器说的话」一眼可辨；单段正文按原样渲染。
+ */
+function TextWithComment({ text }: { text: string }) {
+  const segments = text.split('。').filter((part) => part.trim().length > 0);
+  if (segments.length < 2) {
+    return <p className="mt-1.5 text-sm text-muted">{text}</p>;
+  }
+  const data = `${segments[0]}。`;
+  const comment = `${segments.slice(1).join('。')}。`;
+  return (
+    <div className="mt-1.5 space-y-1">
+      <p className="text-sm text-muted">{data}</p>
+      <p className="flex items-start gap-1.5 text-sm text-primary/90">
+        <span aria-hidden className="mt-px shrink-0 text-[11px]">
+          ✦
+        </span>
+        <span>{comment}</span>
+      </p>
+    </div>
+  );
+}
+
 /** 通知行卡片：未读描边 + 正文 + 相对时间 + 操作（下载报告 / 标为已读） */
 function renderRow(n: NotificationItem, onMarkRead: (id: string) => void): React.JSX.Element {
   const text = readBodyText(n.body);
@@ -283,7 +307,7 @@ function renderRow(n: NotificationItem, onMarkRead: (id: string) => void): React
               </Badge>
             ) : null}
           </p>
-          {text ? <p className="mt-1.5 text-sm text-muted">{text}</p> : null}
+          {text ? <TextWithComment text={text} /> : null}
           <p
             className="mt-1.5 text-xs text-muted"
             title={new Date(n.createdAt).toLocaleString('zh-CN')}
