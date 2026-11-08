@@ -82,14 +82,13 @@ export function useEnabledModules(slug: string | null) {
   };
 }
 
-export function useNotifications(enabled = true) {
-  // 列表接口已改游标分页（{ items, nextCursor }）；这里只要未读数，select 还原数组
+export function useUnreadNotificationCount(enabled = true) {
   return useQuery({
-    queryKey: ['notifications'],
-    queryFn: () =>
-      api<{ items: NotificationItem[]; nextCursor: string | null }>('/notifications?limit=50'),
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: () => api<{ count: number }>('/notifications/unread-count'),
     enabled,
-    select: (data) => data.items,
+    select: (data) => data.count,
+    refetchInterval: 5 * 60 * 1000,
   });
 }
 

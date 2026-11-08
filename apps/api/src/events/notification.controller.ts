@@ -27,6 +27,7 @@ export class NotificationController {
     @Query('limit') limit?: string,
     @Query('type') type?: string,
     @Query('cursor') cursor?: string,
+    @Query('unread') unread?: string,
   ) {
     const user = request.user as RequestUser;
     const parsed = Number(limit);
@@ -35,12 +36,20 @@ export class NotificationController {
     const rows = await this.notificationService.list(user.id, {
       limit: Number.isInteger(parsed) ? parsed : 50,
       type,
+      unreadOnly: unread === 'true',
       cursor: validCursor,
     });
     const pageSize = Number.isInteger(parsed) ? parsed : 50;
     const last = rows.at(-1);
     const nextCursor = last && rows.length >= pageSize ? last.id : null;
     return { data: { items: rows, nextCursor } };
+  }
+
+  @Get('unread-count')
+  async unreadCount(@Req() request: Request) {
+    const user = request.user as RequestUser;
+    const count = await this.notificationService.unreadCount(user.id);
+    return { data: { count } };
   }
 
   @Post(':id/read')

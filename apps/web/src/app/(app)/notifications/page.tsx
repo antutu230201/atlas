@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Card, CardContent, EmptyState, Skeleton } from '@atlas/ui';
+import { Badge, Button, Card, CardContent, EmptyState, Skeleton, useToast } from '@atlas/ui';
 import { api } from '@/lib/api';
-import { useNotifications, type NotificationItem } from '@/lib/queries';
+import { useUnreadNotificationCount, type NotificationItem } from '@/lib/queries';
 
 /** 通知正文与跳转目标由服务端写入 body（如周报的 text / link），这里只做类型守卫后渲染 */
 function readBodyText(body: Record<string, unknown>): string | null {
@@ -31,7 +31,8 @@ function relativeTime(value: string): string {
 }
 
 export default function NotificationsPage() {
-  const notifications = useNotifications();
+  const unreadCountQuery = useUnreadNotificationCount();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   // 筛选偏好存 localStorage：刷新后保持，不进 URL（个人页面无分享诉求）
   const [filter, setFilter] = useState<'all' | 'unread'>(() => {
@@ -75,34 +76,39 @@ export default function NotificationsPage() {
   const markRead = useMutation({
     mutationFn: (id: string) => api(`/notifications/${id}/read`, { method: 'POST' }),
     onSuccess: invalidate,
+    onError: (error: Error) =>
+      toast({ title: '标记已读失败', description: error.message, variant: 'err' }),
   });
 
   const markAll = useMutation({
     mutationFn: () => api('/notifications/read-all', { method: 'POST' }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast({ title: '所有通知已标记为已读', variant: 'ok' });
+    },
+    onError: (error: Error) =>
+      toast({ title: '全部已读失败', description: error.message, variant: 'err' }),
   });
 
-  // 服务端游标分页：切换类型回到第一页；未读数取全量缓存（导航铃铛同一份）
+  // 服务端游标分页；未读筛选和精确计数由服务端执行，避免只检查已加载页面。
   const listQuery = useInfiniteQuery({
-    queryKey: ['notifications', 'list', typeFilter],
-    queryFn: ({ pageParam }) =>
+    queryKey: ['notifications', 'list', typeFilter, filter],
+    queryFn: ({ pageParam, signal }) =>
       api<{ items: NotificationItem[]; nextCursor: string | null }>(
-        `/notifications?limit=20${typeFilter === 'all' ? '' : `&type=${typeFilter}`}${
-          pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''
-        }`,
+        `/notifications?limit=20${typeFilter === 'all' ? '' : `&type=${typeFilter}`}${filter === 'unread' ? '&unread=true' : ''}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
+        { signal },
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
   });
 
-  const all = notifications.data ?? [];
-  const unread = all.filter((n) => n.readAt === null).length;
+  const unread = unreadCountQuery.data ?? 0;
   const rows = listQuery.data?.pages.flatMap((page) => page.items) ?? [];
   // 未读在上，已读默认折叠（防止已读堆淹没新通知）；「只看未读」时已读组不显示
   const unreadItems = rows.filter((n) => n.readAt === null);
   const readItems = rows.filter((n) => n.readAt !== null);
-  const items = filter === 'unread' ? unreadItems : rows;
   const [readExpanded, setReadExpanded] = useState(false);
+  useEffect(() => setReadExpanded(false), [filter, typeFilter]);
   const hasMore = listQuery.hasNextPage;
   const loadingMore = listQuery.isFetchingNextPage;
 
@@ -113,7 +119,15 @@ export default function NotificationsPage() {
           <h1 className="text-2xl font-semibold">通知</h1>
           <p className="screen-label mt-1 !text-[10px]">Atlas · Notifications</p>
           <p className="mt-1 text-sm text-muted">
-            {unread > 0 ? `${unread} 条未读` : all.length > 0 ? '全部已读' : '还没有收到通知'}
+            {unreadCountQuery.isError
+              ? '未读数量暂时无法获取'
+              : unread > 0
+                ? `${unread} 条未读`
+                : rows.length > 0
+                  ? '全部已读'
+                  : typeFilter === 'all'
+                    ? '还没有收到通知'
+                    : '当前分类没有通知'}
           </p>
         </div>
         {unread > 0 ? (
@@ -129,47 +143,57 @@ export default function NotificationsPage() {
         ) : null}
       </header>
 
-      {all.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="通知筛选">
-          {(
-            [
-              { key: 'all', label: '全部' },
-              { key: 'listening', label: '听歌周报' },
-              { key: 'system', label: '系统' },
-            ] as const
-          ).map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              aria-pressed={typeFilter === option.key}
-              onClick={() => changeTypeFilter(option.key)}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                typeFilter === option.key
-                  ? 'border-primary/40 bg-primary-soft text-primary'
-                  : 'border-border bg-surface/60 text-muted hover:text-text'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-          <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted">
-            <input
-              type="checkbox"
-              className="size-3.5 accent-[var(--primary)]"
-              checked={filter === 'unread'}
-              onChange={(event) => changeFilter(event.target.checked ? 'unread' : 'all')}
-            />
-            只看未读{unread > 0 ? `（${unread}）` : ''}
-          </label>
-        </div>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="通知筛选">
+        {(
+          [
+            { key: 'all', label: '全部' },
+            { key: 'listening', label: '听歌周报' },
+            { key: 'system', label: '系统' },
+          ] as const
+        ).map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            aria-pressed={typeFilter === option.key}
+            onClick={() => changeTypeFilter(option.key)}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+              typeFilter === option.key
+                ? 'border-primary/40 bg-primary-soft text-primary'
+                : 'border-border bg-surface/60 text-muted hover:text-text'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+        <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted">
+          <input
+            type="checkbox"
+            className="size-3.5 accent-[var(--primary)]"
+            aria-label="只看未读"
+            checked={filter === 'unread'}
+            onChange={(event) => changeFilter(event.target.checked ? 'unread' : 'all')}
+          />
+          只看未读{unread > 0 ? `（${unread}）` : ''}
+        </label>
+      </div>
 
       {listQuery.isPending ? (
         <div className="space-y-3">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
-      ) : items.length === 0 ? (
+      ) : listQuery.isError && !listQuery.data ? (
+        <Card role="alert">
+          <CardContent className="space-y-3 py-5">
+            <p className="text-sm text-err">
+              通知加载失败：{listQuery.error instanceof Error ? listQuery.error.message : '请重试'}
+            </p>
+            <Button size="sm" variant="secondary" onClick={() => void listQuery.refetch()}>
+              重新加载
+            </Button>
+          </CardContent>
+        </Card>
+      ) : rows.length === 0 ? (
         <EmptyState
           title={
             filter === 'unread'
@@ -191,11 +215,11 @@ export default function NotificationsPage() {
       ) : (
         <div className="space-y-3">
           {/* 未读永远全量显示在最前；已读默认只露最近 3 条，点开看更早的 */}
-          {unreadItems.map((n) => renderRow(n, markRead.mutate))}
+          {unreadItems.map((n) => renderRow(n, markRead.mutate, markRead.isPending))}
           {filter === 'all' && readItems.length > 0 ? (
             <>
               {(readExpanded ? readItems : readItems.slice(0, VISIBLE_READ)).map((n) =>
-                renderRow(n, markRead.mutate),
+                renderRow(n, markRead.mutate, markRead.isPending),
               )}
               <button
                 type="button"
@@ -211,7 +235,29 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {hasMore && items.length > 0 ? (
+      {listQuery.isError && listQuery.data && !listQuery.isFetchNextPageError ? (
+        <p className="text-center text-sm text-err" role="alert">
+          通知刷新失败。{' '}
+          <button type="button" className="underline" onClick={() => void listQuery.refetch()}>
+            重试
+          </button>
+        </p>
+      ) : null}
+
+      {listQuery.isFetchNextPageError ? (
+        <p className="text-center text-sm text-err" role="alert">
+          加载更多失败。{' '}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => void listQuery.fetchNextPage()}
+          >
+            重试
+          </button>
+        </p>
+      ) : null}
+
+      {hasMore && rows.length > 0 ? (
         <div className="flex justify-center">
           <Button
             size="sm"
@@ -292,7 +338,11 @@ function TextWithComment({ text }: { text: string }) {
 }
 
 /** 通知行卡片：未读描边 + 正文 + 相对时间 + 操作（下载报告 / 标为已读） */
-function renderRow(n: NotificationItem, onMarkRead: (id: string) => void): React.JSX.Element {
+function renderRow(
+  n: NotificationItem,
+  onMarkRead: (id: string) => void,
+  markingRead: boolean,
+): React.JSX.Element {
   const text = readBodyText(n.body);
   const link = readBodyLink(n.body);
   return (
@@ -329,7 +379,12 @@ function renderRow(n: NotificationItem, onMarkRead: (id: string) => void): React
             </Button>
           ) : null}
           {n.readAt === null ? (
-            <Button size="sm" variant="ghost" onClick={() => onMarkRead(n.id)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={markingRead}
+              onClick={() => onMarkRead(n.id)}
+            >
               标为已读
             </Button>
           ) : null}

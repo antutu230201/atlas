@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, like, notLike, sql } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, like, notLike, sql } from 'drizzle-orm';
 import { Inject, Injectable } from '@nestjs/common';
 import { notification, user } from '../db/schema';
 import { withUser } from '../db/tenant';
@@ -77,13 +77,14 @@ export class NotificationService {
   /** 游标分页：cursor 为最后一条的 id，行比较 (created_at, id) 保证不重不漏 */
   async list(
     userId: string,
-    options: { limit?: number; type?: string; cursor?: { id: string } } = {},
+    options: { limit?: number; type?: string; unreadOnly?: boolean; cursor?: { id: string } } = {},
   ): Promise<Array<typeof notification.$inferSelect>> {
     const limit = Math.min(options.limit ?? 50, 200);
     const filters = [eq(notification.userId, userId)];
     if (options.type === 'listening') filters.push(like(notification.type, 'listening.%'));
     else if (options.type === 'system') filters.push(notLike(notification.type, 'listening.%'));
     else if (options.type) filters.push(eq(notification.type, options.type));
+    if (options.unreadOnly) filters.push(isNull(notification.readAt));
     if (options.cursor) {
       // cursor 只传 id：时间戳精度留在 PG 侧（JS Date 只有毫秒，同毫秒边界会漏行）；
       // 子查询带 user_id 校验，防止拿别人的 id 当游标探测
@@ -103,6 +104,16 @@ export class NotificationService {
         .orderBy(desc(notification.createdAt), desc(notification.id))
         .limit(limit),
     );
+  }
+
+  async unreadCount(userId: string): Promise<number> {
+    const rows = await withUser(this.db, userId, (tx) =>
+      tx
+        .select({ value: count() })
+        .from(notification)
+        .where(and(eq(notification.userId, userId), isNull(notification.readAt))),
+    );
+    return rows[0]?.value ?? 0;
   }
 
   async markRead(userId: string, id: string): Promise<void> {

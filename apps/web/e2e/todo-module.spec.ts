@@ -105,5 +105,25 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
     // 回到列表确认回来了
     await page.goto('/m/todo_notes/list');
     await expect(page.getByText('交房租')).toBeVisible({ timeout: 5_000 });
+
+    // 永久删除需要二次确认；Escape 可取消确认状态。
+    await page.getByRole('button', { name: '删除' }).first().click();
+    await page.goto('/m/todo_notes/trash');
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    const purgeButton = page.getByRole('button', { name: /^永久删除 / }).first();
+    await purgeButton.click();
+    await expect(page.getByRole('button', { name: /^确认永久删除 / })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: /^永久删除 / }).first()).toBeVisible();
+    await page
+      .getByRole('button', { name: /^永久删除 / })
+      .first()
+      .click();
+    await page.getByRole('button', { name: /^确认永久删除 / }).click();
+    await expect(page.getByText('回收站是空的')).toBeVisible({ timeout: 5_000 });
+    await page.setViewportSize({ width: 1280, height: 900 });
   });
 });

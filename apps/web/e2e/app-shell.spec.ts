@@ -27,6 +27,17 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
     await page.keyboard.press('Escape');
     await page.setViewportSize({ width: 1280, height: 900 });
 
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/notifications');
+    await expect(page.getByRole('heading', { name: '通知' })).toBeVisible();
+    await expect(page.getByText('暂无通知')).toBeVisible();
+    await page.getByRole('checkbox', { name: '只看未读' }).check();
+    await expect(page.getByText('没有未读通知')).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.setViewportSize({ width: 1280, height: 900 });
+
     // 启用示例模块（设置 → 模块页签；按 testid 定位，不依赖模块卡片顺序）
     await page.goto('/settings');
     const moduleTab = page.getByRole('tab', { name: '模块' });

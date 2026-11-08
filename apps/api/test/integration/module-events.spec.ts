@@ -97,11 +97,24 @@ describe('事件总线与通知（2c，ADR-0005 §8）', () => {
     const invited = list.body.data.items.find((n: { type: string }) => n.type === 'member.invited');
     expect(invited).toBeTruthy();
 
+    const count = await apiFetch(app.url, '/notifications/unread-count', { cookie: memberCookie });
+    expect(count.body.data.count).toBe(1);
+    const unread = await apiFetch(app.url, '/notifications?unread=true', { cookie: memberCookie });
+    expect(unread.body.data.items.map((n: { id: string }) => n.id)).toContain(invited.id);
+
     const read = await apiFetch(app.url, `/notifications/${invited.id}/read`, {
       method: 'POST',
       cookie: memberCookie,
     });
     expect(read.status).toBe(200);
+    const afterRead = await apiFetch(app.url, '/notifications/unread-count', {
+      cookie: memberCookie,
+    });
+    expect(afterRead.body.data.count).toBe(0);
+    const unreadAfterRead = await apiFetch(app.url, '/notifications?unread=true', {
+      cookie: memberCookie,
+    });
+    expect(unreadAfterRead.body.data.items).toHaveLength(0);
   });
 
   it('重试与死信：失败 handler 退避重试直至死信', async () => {
@@ -152,6 +165,8 @@ describe('事件总线与通知（2c，ADR-0005 §8）', () => {
     const list = await apiFetch(app.url, '/notifications', { cookie: memberCookie });
     const unread = list.body.data.items.filter((n: { readAt: string | null }) => n.readAt === null);
     expect(unread).toHaveLength(0);
+    const count = await apiFetch(app.url, '/notifications/unread-count', { cookie: memberCookie });
+    expect(count.body.data.count).toBe(0);
   });
 
   function call(cookie: string, action: string, body?: unknown) {
