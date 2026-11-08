@@ -367,8 +367,30 @@ export function CountdownSection({
           const days = daysFromToday(item.targetDate);
           const urgent = days !== null && days >= 0 && days <= 7;
           return (
-            <article key={item.id} className="screen-card group p-4 hover:-translate-y-0.5">
-              <div className="flex items-start justify-between gap-2">
+            <article
+              key={item.id}
+              className={`screen-card group p-4 transition-transform ${canWrite ? 'cursor-pointer hover:-translate-y-0.5' : 'hover:-translate-y-0.5'}`}
+              onClick={canWrite ? () => startEdit(item) : undefined}
+              role={canWrite ? 'button' : undefined}
+              aria-label={canWrite ? `编辑 ${item.title}` : undefined}
+              onKeyDown={
+                canWrite
+                  ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        startEdit(item);
+                      }
+                    }
+                  : undefined
+              }
+              tabIndex={canWrite ? 0 : undefined}
+            >
+              <div
+                className="flex items-start justify-between gap-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* 按钮区不触发编辑 */}
+
                 <p className="min-w-0 flex-1 truncate text-sm font-semibold">
                   {item.title}
                   {item.repeatYearly ? (
@@ -409,7 +431,10 @@ export function CountdownSection({
                 </span>
                 <span className="text-[11px] text-muted">{daysText(days)}</span>
               </p>
-              <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+              <div
+                className="mt-3 flex items-center justify-between border-t border-border pt-3"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <span className="font-mono text-[10px] text-muted">
                   {item.lunar && item.lunarLabel ? (
                     <span className="text-warn/90">{item.lunarLabel}</span>

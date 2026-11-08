@@ -98,7 +98,11 @@ export default function NotificationsPage() {
   const all = notifications.data ?? [];
   const unread = all.filter((n) => n.readAt === null).length;
   const rows = listQuery.data?.pages.flatMap((page) => page.items) ?? [];
-  const items = filter === 'unread' ? rows.filter((n) => n.readAt === null) : rows;
+  // 未读在上，已读默认折叠（防止已读堆淹没新通知）；「只看未读」时已读组不显示
+  const unreadItems = rows.filter((n) => n.readAt === null);
+  const readItems = rows.filter((n) => n.readAt !== null);
+  const items = filter === 'unread' ? unreadItems : rows;
+  const [readExpanded, setReadExpanded] = useState(false);
   const hasMore = listQuery.hasNextPage;
   const loadingMore = listQuery.isFetchingNextPage;
 
@@ -186,52 +190,24 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="space-y-3">
-          {items.map((n) => {
-            const text = readBodyText(n.body);
-            const link = readBodyLink(n.body);
-            return (
-              <Card key={n.id} className={n.readAt === null ? 'border-primary/40' : undefined}>
-                <CardContent className="flex items-start justify-between gap-3 py-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
-                      {n.title}
-                      {n.readAt === null ? (
-                        <Badge variant="primary" className="ml-2">
-                          新
-                        </Badge>
-                      ) : null}
-                    </p>
-                    {text ? <p className="mt-1.5 text-sm text-muted">{text}</p> : null}
-                    <p
-                      className="mt-1.5 text-xs text-muted"
-                      title={new Date(n.createdAt).toLocaleString('zh-CN')}
-                    >
-                      {relativeTime(n.createdAt)}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    {link ? (
-                      <Button asChild size="sm" variant="secondary">
-                        <Link
-                          href={link}
-                          onClick={() => {
-                            if (n.readAt === null) markRead.mutate(n.id);
-                          }}
-                        >
-                          下载当期报告
-                        </Link>
-                      </Button>
-                    ) : null}
-                    {n.readAt === null ? (
-                      <Button size="sm" variant="ghost" onClick={() => markRead.mutate(n.id)}>
-                        标为已读
-                      </Button>
-                    ) : null}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {/* 未读永远全量显示在最前；已读默认只露最近 3 条，点开看更早的 */}
+          {unreadItems.map((n) => renderRow(n, markRead.mutate))}
+          {filter === 'all' && readItems.length > 0 ? (
+            <>
+              {(readExpanded ? readItems : readItems.slice(0, VISIBLE_READ)).map((n) =>
+                renderRow(n, markRead.mutate),
+              )}
+              <button
+                type="button"
+                onClick={() => setReadExpanded((value) => !value)}
+                className="w-full rounded-sm border border-dashed border-border py-2.5 text-xs text-muted transition-colors hover:border-primary/40 hover:text-text"
+              >
+                {readExpanded
+                  ? '收起已读'
+                  : `展开已读（${Math.max(0, readItems.length - VISIBLE_READ)} 条更早的）`}
+              </button>
+            </>
+          ) : null}
         </div>
       )}
 
@@ -285,5 +261,56 @@ function ConfirmButton({
     >
       {confirming ? confirmText : children}
     </Button>
+  );
+}
+
+/** 已读折叠区默认露出的条数 */
+const VISIBLE_READ = 3;
+
+/** 通知行卡片：未读描边 + 正文 + 相对时间 + 操作（下载报告 / 标为已读） */
+function renderRow(n: NotificationItem, onMarkRead: (id: string) => void): React.JSX.Element {
+  const text = readBodyText(n.body);
+  const link = readBodyLink(n.body);
+  return (
+    <Card key={n.id} className={n.readAt === null ? 'border-primary/40' : undefined}>
+      <CardContent className="flex items-start justify-between gap-3 py-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">
+            {n.title}
+            {n.readAt === null ? (
+              <Badge variant="primary" className="ml-2">
+                新
+              </Badge>
+            ) : null}
+          </p>
+          {text ? <p className="mt-1.5 text-sm text-muted">{text}</p> : null}
+          <p
+            className="mt-1.5 text-xs text-muted"
+            title={new Date(n.createdAt).toLocaleString('zh-CN')}
+          >
+            {relativeTime(n.createdAt)}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {link ? (
+            <Button asChild size="sm" variant="secondary">
+              <Link
+                href={link}
+                onClick={() => {
+                  if (n.readAt === null) onMarkRead(n.id);
+                }}
+              >
+                下载当期报告
+              </Link>
+            </Button>
+          ) : null}
+          {n.readAt === null ? (
+            <Button size="sm" variant="ghost" onClick={() => onMarkRead(n.id)}>
+              标为已读
+            </Button>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
