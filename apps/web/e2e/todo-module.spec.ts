@@ -143,5 +143,51 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
     await page.getByRole('button', { name: /^确认永久删除 / }).click();
     await expect(page.getByText('回收站是空的')).toBeVisible({ timeout: 5_000 });
     await page.setViewportSize({ width: 1280, height: 900 });
+
+    await page.route('**/todo_notes/call/list', async (route) => {
+      const todos = Array.from({ length: 200 }, (_, index) => ({
+        id: `virtual-todo-${index}`,
+        title: `虚拟列表待办 ${index + 1}`,
+        notes: '',
+        status: 'open',
+        priority: 'normal',
+        dueDate: null,
+        deletedAt: null,
+        createdAt: '2026-11-08T00:00:00.000Z',
+        updatedAt: '2026-11-08T00:00:00.000Z',
+      }));
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { todos } }),
+      });
+    });
+    let virtualStatusRequest: { id?: string; status?: string } | null = null;
+    await page.route('**/todo_notes/call/setStatus', async (route) => {
+      virtualStatusRequest = JSON.parse(route.request().postData() ?? '{}') as {
+        id?: string;
+        status?: string;
+      };
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ data: {} }),
+      });
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/m/todo_notes/list');
+    await expect(page.getByText('虚拟列表待办 1', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('todo-row').first()).toHaveAttribute('aria-posinset', '1');
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    expect(await page.getByTestId('todo-row').count()).toBeLessThan(30);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(page.getByText('虚拟列表待办 200', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('todo-row').last()).toHaveAttribute('aria-posinset', '200');
+    expect(await page.getByTestId('todo-row').count()).toBeLessThan(30);
+    await page.getByTestId('todo-row').last().getByRole('button', { name: '设为已完成' }).focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => virtualStatusRequest?.id).toBe('virtual-todo-199');
+    await expect.poll(() => virtualStatusRequest?.status).toBe('done');
+    await page.setViewportSize({ width: 1280, height: 900 });
   });
 });

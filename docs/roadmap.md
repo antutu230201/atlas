@@ -663,3 +663,9 @@
 - [x] Expose existing API sorting by creation time, due date, and priority, with ascending/descending controls in list view.
 - [x] Keep tasks without due dates at the end for both directions; document the behavior and add API/E2E coverage, including 390px layout.
 - Validation: API todo integration and Playwright todo flow passed; typecheck and lint passed for changed files.
+
+### Todo long-list virtualization (2026-11-08)
+
+- [x] Replace eager rendering of up to 200 task cards with window-based dynamic-height virtualization; only visible rows plus overscan are mounted, and list position metadata remains available to assistive technology.
+- Dependency: `@tanstack/react-virtual` 3.14.24, MIT, headless; upstream describes a 10–15 KB footprint and supports measured item sizes. A hand-written virtualizer was rejected because dynamic-height measurement and scroll anchoring would add maintenance risk. This is scoped to the todo module.
+- Validation: 200-row Playwright fixture verifies fewer than 30 mounted rows at the start and end of the list, access to item 200 after scrolling, 390px layout, and the existing keyboard-operated board flow; full typecheck/lint/format checks passed.

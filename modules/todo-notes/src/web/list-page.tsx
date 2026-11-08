@@ -1,7 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -289,22 +290,95 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
           />
         </>
       ) : (
-        <div className="space-y-2">
-          {todos.map((row: TodoRow) => (
-            <Card key={row.id} className="py-3">
+        <VirtualTodoList
+          todos={todos}
+          statusPending={setStatus.isPending}
+          duePending={setDue.isPending}
+          onSetStatus={(id, status) => setStatus.mutate({ id, status })}
+          onSetDue={(id, dueDate) => setDue.mutate({ id, dueDate })}
+          onRemove={(id) => remove.mutate(id)}
+        />
+      )}
+    </div>
+  );
+}
+
+function VirtualTodoList({
+  todos,
+  statusPending,
+  duePending,
+  onSetStatus,
+  onSetDue,
+  onRemove,
+}: {
+  todos: TodoRow[];
+  statusPending: boolean;
+  duePending: boolean;
+  onSetStatus: (id: string, status: TodoStatus) => void;
+  onSetDue: (id: string, dueDate: string | null) => void;
+  onRemove: (id: string) => void;
+}) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  const getItemKey = useCallback((index: number) => todos[index]?.id ?? index, [todos]);
+  const estimateSize = useCallback(() => 76, []);
+  const virtualizer = useWindowVirtualizer({
+    count: todos.length,
+    estimateSize,
+    getItemKey,
+    overscan: 8,
+    gap: 8,
+    scrollMargin,
+    useFlushSync: false,
+  });
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measureOffset = () => setScrollMargin(list.getBoundingClientRect().top + window.scrollY);
+    measureOffset();
+    window.addEventListener('resize', measureOffset);
+    return () => window.removeEventListener('resize', measureOffset);
+  }, [todos]);
+
+  return (
+    <div
+      ref={listRef}
+      role="list"
+      aria-label="待办列表"
+      aria-busy={statusPending || duePending || undefined}
+      className="relative w-full"
+      style={{ height: `${virtualizer.getTotalSize()}px` }}
+    >
+      {virtualizer.getVirtualItems().map((item) => {
+        const row = todos[item.index];
+        if (!row) return null;
+        return (
+          <div
+            key={item.key}
+            ref={virtualizer.measureElement}
+            data-index={item.index}
+            data-testid="todo-row"
+            role="listitem"
+            aria-posinset={item.index + 1}
+            aria-setsize={todos.length}
+            className="absolute left-0 top-0 w-full"
+            style={{ transform: `translateY(${item.start - scrollMargin}px)` }}
+          >
+            <Card className="py-3">
               <CardContent className="flex items-center gap-3 py-1">
-                <div className="flex gap-1">
-                  {STATUSES.map((s) => (
+                <div className="flex shrink-0 gap-1">
+                  {STATUSES.map((status) => (
                     <button
-                      key={s}
+                      key={status}
                       type="button"
-                      aria-label={`设为${STATUS_LABELS[s]}`}
-                      aria-pressed={row.status === s}
-                      disabled={setStatus.isPending}
-                      onClick={() => setStatus.mutate({ id: row.id, status: s })}
-                      className={cnStatus(row.status, s)}
+                      aria-label={`设为${STATUS_LABELS[status]}`}
+                      aria-pressed={row.status === status}
+                      disabled={statusPending}
+                      onClick={() => onSetStatus(row.id, status)}
+                      className={cnStatus(row.status, status)}
                     >
-                      {STATUS_LABELS[s].slice(0, 2)}
+                      {STATUS_LABELS[status].slice(0, 2)}
                     </button>
                   ))}
                 </div>
@@ -316,15 +390,15 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
                   >
                     {row.title}
                   </p>
-                  <p className="flex items-center gap-1.5 text-xs text-muted">
+                  <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
                     {row.dueDate ? (
                       <>截止 {new Date(row.dueDate).toLocaleDateString('zh-CN')}</>
                     ) : (
                       '未设置截止'
                     )}
                     <DueQuick
-                      disabled={setDue.isPending}
-                      onSet={(d) => setDue.mutate({ id: row.id, dueDate: d })}
+                      disabled={duePending}
+                      onSet={(dueDate) => onSetDue(row.id, dueDate)}
                     />
                   </p>
                 </div>
@@ -335,14 +409,14 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
                 >
                   {row.priority}
                 </Badge>
-                <Button size="sm" variant="ghost" onClick={() => remove.mutate(row.id)}>
+                <Button size="sm" variant="ghost" onClick={() => onRemove(row.id)}>
                   删除
                 </Button>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          </div>
+        );
+      })}
     </div>
   );
 }
