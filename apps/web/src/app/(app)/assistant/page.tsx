@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button, Input, cn } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
@@ -20,51 +21,87 @@ const QUICK_PROMPTS = [
 /** 会话持久化：按用户存本机（刷新不丢；跨设备同步留待后端会话存储） */
 const chatKey = (userId: string) => `atlas.assistant.chat.${userId}`;
 const MAX_MESSAGES = 60;
+const AI_SOURCE_LABELS = {
+  db: '界面配置',
+  env: '环境变量',
+  mock: '本地 Mock',
+} as const;
+
+interface AiConfigView {
+  source: keyof typeof AI_SOURCE_LABELS;
+}
 
 export default function AssistantPage() {
   const { user } = useActiveWorkspace();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [failedPrompt, setFailedPrompt] = useState<string | null>(null);
+  const [historyOwner, setHistoryOwner] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const requestController = useRef<AbortController | null>(null);
+  const userId = user?.id;
+  const historyReady = Boolean(userId && historyOwner === userId);
+  const aiConfig = useQuery({
+    queryKey: ['ai-config'],
+    queryFn: () => api<AiConfigView>('/ai/config'),
+    retry: false,
+  });
 
   // 按用户恢复会话（useEffect 读取，避免 SSR 水合不一致）
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
+    setHistoryOwner(null);
+    setMessages([]);
     try {
-      const raw = window.localStorage.getItem(chatKey(user.id));
+      const raw = window.localStorage.getItem(chatKey(userId));
       if (raw) {
         const parsed = JSON.parse(raw) as ChatMessage[];
         if (Array.isArray(parsed) && parsed.length > 0) {
           setMessages(
             parsed
               .filter(
-                (m) => (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string',
+                (m) =>
+                  m !== null &&
+                  typeof m === 'object' &&
+                  (m.role === 'user' || m.role === 'assistant') &&
+                  typeof m.text === 'string',
               )
               .slice(-MAX_MESSAGES),
           );
+        } else {
+          setMessages([]);
         }
       }
     } catch {
       // 本地会话损坏：从空白开始，不影响使用。
+      setMessages([]);
+    } finally {
+      setHistoryOwner(userId);
     }
-  }, [user]);
+  }, [userId]);
 
   // 会话变化即持久化（截断到上限，防止无限膨胀）
   useEffect(() => {
-    if (!user) return;
+    if (!userId || historyOwner !== userId) return;
     try {
-      window.localStorage.setItem(chatKey(user.id), JSON.stringify(messages.slice(-MAX_MESSAGES)));
+      window.localStorage.setItem(chatKey(userId), JSON.stringify(messages.slice(-MAX_MESSAGES)));
     } catch {
       // 存储不可用（隐私模式）：对话仍可用，只是刷新后不保留。
     }
-  }, [messages, user]);
+  }, [messages, historyOwner, userId]);
+
+  useEffect(() => () => requestController.current?.abort(), []);
 
   const clearChat = () => {
+    requestController.current?.abort();
+    requestController.current = null;
+    setLoading(false);
+    setFailedPrompt(null);
     setMessages([]);
-    if (user) {
+    if (userId) {
       try {
-        window.localStorage.removeItem(chatKey(user.id));
+        window.localStorage.removeItem(chatKey(userId));
       } catch {
         // 忽略
       }
@@ -75,31 +112,39 @@ export default function AssistantPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  const send = async (text: string) => {
-    if (!text.trim() || loading) return;
-    const userMsg: ChatMessage = { role: 'user', text: text.trim() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
+  const send = async (text: string, retry = false) => {
+    const prompt = text.trim();
+    if (!prompt || loading || !historyReady) return;
+    if (!retry) {
+      setMessages((prev) =>
+        [...prev, { role: 'user' as const, text: prompt }].slice(-MAX_MESSAGES),
+      );
+      setInput('');
+    }
+    setFailedPrompt(null);
     setLoading(true);
+    const controller = new AbortController();
+    requestController.current = controller;
 
     try {
       const result = await api<{ text: string }>('/ai/chat', {
         method: 'POST',
-        json: { message: text.trim() },
+        json: { message: prompt },
+        signal: controller.signal,
       });
-      setMessages((prev) => [...prev, { role: 'assistant', text: result.text }]);
+      setMessages((prev) =>
+        [...prev, { role: 'assistant' as const, text: result.text }].slice(-MAX_MESSAGES),
+      );
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', text: '抱歉，我暂时无法回应。请稍后再试。' },
-      ]);
+      if (!controller.signal.aborted) setFailedPrompt(prompt);
     } finally {
+      if (requestController.current === controller) requestController.current = null;
       setLoading(false);
     }
   };
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] w-full max-w-2xl flex-col">
+    <div className="mx-auto flex h-[calc(100dvh-8rem)] w-full max-w-2xl flex-col">
       <header className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">AI 成长助手</h1>
@@ -113,8 +158,19 @@ export default function AssistantPage() {
         ) : null}
       </header>
 
-      <div ref={scrollRef} className="glass flex-1 overflow-y-auto rounded-[var(--radius-lg)] p-4">
-        {messages.length === 0 ? (
+      <div
+        ref={scrollRef}
+        className="glass min-h-0 flex-1 overflow-y-auto rounded-[var(--radius-lg)] p-4"
+        aria-label="对话记录"
+        role="log"
+        aria-relevant="additions"
+        aria-busy={!historyReady || loading}
+      >
+        {!historyReady ? (
+          <div className="flex h-full items-center justify-center text-sm text-muted" role="status">
+            正在恢复对话…
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
             <p className="text-3xl">🌱</p>
             <p className="text-sm font-medium text-text">有什么想聊的？</p>
@@ -123,7 +179,8 @@ export default function AssistantPage() {
                 <button
                   key={prompt}
                   type="button"
-                  onClick={() => send(prompt)}
+                  disabled={loading || !historyReady}
+                  onClick={() => void send(prompt)}
                   className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted transition-all duration-200 hover:border-primary/30 hover:text-primary"
                 >
                   {prompt}
@@ -135,7 +192,7 @@ export default function AssistantPage() {
           <div className="space-y-3">
             {messages.map((msg, i) => (
               <div
-                key={i}
+                key={`${msg.role}-${i}`}
                 className={cn(
                   'max-w-[85%] rounded-[var(--radius-md)] px-4 py-2.5 text-sm',
                   msg.role === 'user'
@@ -147,7 +204,11 @@ export default function AssistantPage() {
               </div>
             ))}
             {loading ? (
-              <div className="max-w-[85%] rounded-[var(--radius-md)] bg-surface-hover px-4 py-2.5">
+              <div
+                className="max-w-[85%] rounded-[var(--radius-md)] bg-surface-hover px-4 py-2.5"
+                role="status"
+                aria-label="AI 正在回复"
+              >
                 <span className="inline-flex gap-1">
                   <span
                     className="size-1.5 animate-bounce rounded-full bg-muted"
@@ -162,6 +223,14 @@ export default function AssistantPage() {
                     style={{ animationDelay: '300ms' }}
                   />
                 </span>
+              </div>
+            ) : null}
+            {failedPrompt ? (
+              <div className="flex items-center gap-2 text-xs text-err" role="alert">
+                <span>回复失败，请检查连接后重试。</span>
+                <Button size="sm" variant="secondary" onClick={() => void send(failedPrompt, true)}>
+                  重试
+                </Button>
               </div>
             ) : null}
           </div>
@@ -180,16 +249,22 @@ export default function AssistantPage() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="说点什么…"
           aria-label="AI 助手消息"
+          maxLength={2000}
+          disabled={!historyReady || loading}
           className="flex-1"
         />
-        <Button type="submit" loading={loading} disabled={!input.trim()}>
+        <Button type="submit" loading={loading} disabled={!input.trim() || !historyReady}>
           发送
         </Button>
       </form>
 
-      {user ? (
+      {userId ? (
         <p className="mt-2 text-center text-[11px] text-muted/60">
-          当前使用 MockAIProvider · 配置真实 AI 供应商后自动切换
+          {aiConfig.isError
+            ? 'AI 配置状态暂时不可用。'
+            : aiConfig.data
+              ? `当前使用 ${AI_SOURCE_LABELS[aiConfig.data.source]} AI 供应商。`
+              : '正在读取 AI 配置…'}
         </p>
       ) : null}
     </div>

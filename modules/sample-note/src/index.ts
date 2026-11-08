@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { ModuleDefinition } from '@atlas/sdk';
 import { ModuleActionError, moduleManifestSchema } from '@atlas/sdk';
@@ -16,10 +16,13 @@ const manifest = moduleManifestSchema.parse({
   description: '阶段 2b 验收模块：每工作空间一张 note 表，验证模块协议全链路。',
   permissions: ['note:read', 'note:write'],
   dependsOn: [],
-  routes: [{ path: 'list', title: '笔记', nav: { order: 10 } }],
+  routes: [
+    { path: 'list', title: '笔记', nav: { order: 10 } },
+    { path: 'trash', title: '回收站', nav: { order: 20 } },
+  ],
   settings: [{ key: 'maxNotes', label: '最大条数', type: 'number', default: 100 }],
   events: {
-    publishes: ['note.created', 'note.failing'],
+    publishes: ['note.created', 'note.deleted', 'note.restored', 'note.failing'],
     subscribes: [
       { event: 'note.created', handler: 'onNoteCreated' },
       { event: 'note.failing', handler: 'onFailing' },
@@ -42,7 +45,7 @@ export const definition: ModuleDefinition = {
         const rows = await ctx.db
           .select()
           .from(note)
-          .where(eq(note.workspaceId, ctx.workspaceId))
+          .where(and(eq(note.workspaceId, ctx.workspaceId), isNull(note.deletedAt)))
           .orderBy(desc(note.createdAt))
           .limit(100);
         return { notes: rows };
@@ -79,8 +82,77 @@ export const definition: ModuleDefinition = {
       handler: async (ctx, input) => {
         const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
         if (!parsed.success) throw new ModuleActionError('输入不合法：id 必须是 uuid');
-        await ctx.db.delete(note).where(eq(note.id, parsed.data.id));
-        return { removed: parsed.data.id };
+        const rows = await ctx.db
+          .update(note)
+          .set({ deletedAt: new Date(), updatedAt: new Date() })
+          .where(
+            and(
+              eq(note.id, parsed.data.id),
+              eq(note.workspaceId, ctx.workspaceId),
+              isNull(note.deletedAt),
+            ),
+          )
+          .returning({ id: note.id, title: note.title });
+        const removed = rows[0];
+        if (!removed) throw new ModuleActionError('笔记不存在或已在回收站');
+        await ctx.events.publish('note.deleted', { noteId: removed.id, title: removed.title });
+        return { removed: removed.id };
+      },
+    },
+
+    listTrash: {
+      permission: 'note:read',
+      handler: async (ctx) => {
+        const rows = await ctx.db
+          .select()
+          .from(note)
+          .where(and(eq(note.workspaceId, ctx.workspaceId), isNotNull(note.deletedAt)))
+          .orderBy(desc(note.deletedAt))
+          .limit(100);
+        return { notes: rows };
+      },
+    },
+
+    restore: {
+      permission: 'note:write',
+      handler: async (ctx, input) => {
+        const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
+        if (!parsed.success) throw new ModuleActionError('输入不合法：id 必须是 uuid');
+        const rows = await ctx.db
+          .update(note)
+          .set({ deletedAt: null, updatedAt: new Date() })
+          .where(
+            and(
+              eq(note.id, parsed.data.id),
+              eq(note.workspaceId, ctx.workspaceId),
+              isNotNull(note.deletedAt),
+            ),
+          )
+          .returning({ id: note.id, title: note.title });
+        const restored = rows[0];
+        if (!restored) throw new ModuleActionError('回收站中不存在该笔记');
+        await ctx.events.publish('note.restored', { noteId: restored.id, title: restored.title });
+        return { restored: restored.id };
+      },
+    },
+
+    purge: {
+      permission: 'note:write',
+      handler: async (ctx, input) => {
+        const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
+        if (!parsed.success) throw new ModuleActionError('输入不合法：id 必须是 uuid');
+        const rows = await ctx.db
+          .delete(note)
+          .where(
+            and(
+              eq(note.id, parsed.data.id),
+              eq(note.workspaceId, ctx.workspaceId),
+              isNotNull(note.deletedAt),
+            ),
+          )
+          .returning({ id: note.id });
+        if (!rows[0]) throw new ModuleActionError('回收站中不存在该笔记');
+        return { purged: parsed.data.id };
       },
     },
 

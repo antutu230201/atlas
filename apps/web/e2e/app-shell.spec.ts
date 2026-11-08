@@ -21,6 +21,37 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
       .catch(() => undefined);
     await page.keyboard.press('Escape');
 
+    let aiCalls = 0;
+    await page.route('**/v1/ai/chat', async (route) => {
+      aiCalls += 1;
+      if (aiCalls === 1) {
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'ai.unavailable', message: 'AI 服务暂不可用' }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { text: '已保存的回复' } }),
+      });
+    });
+    await page.goto('/assistant');
+    const assistantInput = page.getByLabel('AI 助手消息');
+    await assistantInput.fill('请帮我安排今天');
+    await assistantInput.press('Enter');
+    await expect(page.locator('[role="alert"]').filter({ hasText: '回复失败' })).toBeVisible();
+    await page.getByRole('button', { name: '重试' }).click();
+    await expect(page.getByText('已保存的回复')).toBeVisible();
+    await expect(page.getByText('请帮我安排今天', { exact: true })).toHaveCount(1);
+    await page.reload();
+    await expect(page.getByText('请帮我安排今天', { exact: true })).toBeVisible();
+    await expect(page.getByText('已保存的回复')).toBeVisible();
+    await page.getByRole('button', { name: '清空对话' }).click();
+    await expect(page.getByText('有什么想聊的？')).toBeVisible();
+
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('button', { name: '搜索页面和待办' }).click();
     await expect(page.getByRole('combobox', { name: '命令搜索' })).toBeFocused();
@@ -70,8 +101,21 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
 
     // 模块页：创建一条笔记并回显
     await page.getByLabel('标题').fill('外壳验收笔记');
-    await page.getByRole('button', { name: '保存' }).click();
+    const longBody = '每天完成一个小目标，让进步可以被看见。'.repeat(24);
+    await page.getByLabel('正文').fill(longBody);
+    await page.getByRole('button', { name: '保存笔记' }).click();
     await expect(page.getByText('外壳验收笔记')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: '展开全文' }).click();
+    await expect(page.getByText(longBody, { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: '删除 外壳验收笔记' }).click();
+    await expect(page.getByText('还没有笔记')).toBeVisible();
+    await page.goto('/m/sample_note/trash');
+    await expect(page.getByText('外壳验收笔记')).toBeVisible();
+    await page.getByRole('button', { name: '恢复' }).click();
+    await expect(page.getByText('笔记已恢复', { exact: true })).toBeVisible();
+    await page.goto('/m/sample_note/list');
+    await expect(page.getByText('外壳验收笔记')).toBeVisible();
   });
 
   test('登出后访问受保护页面跳转登录', async ({ page }) => {

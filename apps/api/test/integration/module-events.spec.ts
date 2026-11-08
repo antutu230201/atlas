@@ -82,6 +82,47 @@ describe('事件总线与通知（2c，ADR-0005 §8）', () => {
     expect(after.status).toBe('delivered');
   });
 
+  it('笔记软删除仅限当前工作空间，并可恢复或永久删除', async () => {
+    const created = await call(ownerCookie, 'create', { title: '回收站验收笔记' });
+    const noteId = created.body.data.id as string;
+
+    await apiFetch(app.url, '/workspaces', {
+      method: 'POST',
+      cookie: ownerCookie,
+      body: { name: '另一笔记空间', slug: 'ev-other' },
+    });
+    await apiFetch(app.url, '/modules/workspaces/ev-other/sample_note/enable', {
+      method: 'POST',
+      cookie: ownerCookie,
+    });
+    const crossWorkspaceDelete = await call(ownerCookie, 'remove', { id: noteId }, 'ev-other');
+    expect(crossWorkspaceDelete.status, JSON.stringify(crossWorkspaceDelete.body)).not.toBe(200);
+    const beforeDelete = await call(ownerCookie, 'list');
+    expect(beforeDelete.body.data.notes.some((row: { id: string }) => row.id === noteId)).toBe(
+      true,
+    );
+
+    const removed = await call(ownerCookie, 'remove', { id: noteId });
+    expect(removed.status).toBe(200);
+    const active = await call(ownerCookie, 'list');
+    expect(active.body.data.notes.some((row: { id: string }) => row.id === noteId)).toBe(false);
+    const trash = await call(ownerCookie, 'listTrash');
+    expect(trash.body.data.notes.some((row: { id: string }) => row.id === noteId)).toBe(true);
+
+    const restored = await call(ownerCookie, 'restore', { id: noteId });
+    expect(restored.status).toBe(200);
+    const afterRestore = await call(ownerCookie, 'list');
+    expect(afterRestore.body.data.notes.some((row: { id: string }) => row.id === noteId)).toBe(
+      true,
+    );
+
+    await call(ownerCookie, 'remove', { id: noteId });
+    const purged = await call(ownerCookie, 'purge', { id: noteId });
+    expect(purged.status).toBe(200);
+    const afterPurge = await call(ownerCookie, 'listTrash');
+    expect(afterPurge.body.data.notes.some((row: { id: string }) => row.id === noteId)).toBe(false);
+  });
+
   it('无订阅的事件直接标记 delivered', async () => {
     const result = await dispatchOnce();
     // workspace.created / member.invited 等无模块订阅（member.invited 走内核通知）
@@ -169,8 +210,8 @@ describe('事件总线与通知（2c，ADR-0005 §8）', () => {
     expect(count.body.data.count).toBe(0);
   });
 
-  function call(cookie: string, action: string, body?: unknown) {
-    return apiFetch(app.url, '/modules/workspaces/ev-team/sample_note/call/' + action, {
+  function call(cookie: string, action: string, body?: unknown, workspace = 'ev-team') {
+    return apiFetch(app.url, `/modules/workspaces/${workspace}/sample_note/call/${action}`, {
       method: 'POST',
       cookie,
       body,

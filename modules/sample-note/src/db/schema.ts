@@ -13,6 +13,7 @@ export const note = moduleSchema.table(
     workspaceId: uuid('workspace_id').notNull(),
     title: text('title').notNull(),
     body: text('body').notNull().default(''),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

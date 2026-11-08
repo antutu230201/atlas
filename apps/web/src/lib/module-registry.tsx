@@ -22,6 +22,11 @@ export const moduleWebRegistry: Record<string, Record<string, ComponentType<Modu
         default: module.SampleNoteListPage,
       })),
     ),
+    trash: lazy(() =>
+      import('@atlas/module-sample-note/web').then((module) => ({
+        default: module.SampleNoteTrashPage,
+      })),
+    ),
   },
   todo_notes: {
     list: lazy(() =>

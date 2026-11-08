@@ -3,3 +3,11 @@ export interface ModulePageProps {
   workspaceSlug: string;
   moduleName: string;
 }
+
+export interface NoteRow {
+  id: string;
+  title: string;
+  body: string;
+  deletedAt: string | null;
+  createdAt: string;
+}
