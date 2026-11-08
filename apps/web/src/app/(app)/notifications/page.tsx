@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Card, CardContent, EmptyState, Skeleton } from '@atlas/ui';
@@ -113,9 +113,15 @@ export default function NotificationsPage() {
           </p>
         </div>
         {unread > 0 ? (
-          <Button size="sm" variant="ghost" onClick={() => markAll.mutate()}>
+          <ConfirmButton
+            size="sm"
+            variant="ghost"
+            confirmText="确认全部已读？"
+            loading={markAll.isPending}
+            onConfirm={() => markAll.mutate()}
+          >
             全部已读
-          </Button>
+          </ConfirmButton>
         ) : null}
       </header>
 
@@ -242,5 +248,42 @@ export default function NotificationsPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * 二次确认按钮：第一次点击进入确认态（3s 无操作自动还原），
+ * 避免「全部已读」这类不可逆操作被误触。不引额外弹窗依赖。
+ */
+function ConfirmButton({
+  confirmText,
+  onConfirm,
+  children,
+  ...props
+}: React.ComponentProps<typeof Button> & {
+  confirmText: string;
+  onConfirm: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const timer = window.setTimeout(() => setConfirming(false), 3_000);
+    return () => window.clearTimeout(timer);
+  }, [confirming]);
+  return (
+    <Button
+      {...props}
+      variant={confirming ? 'primary' : props.variant}
+      onClick={() => {
+        if (confirming) {
+          setConfirming(false);
+          onConfirm();
+        } else {
+          setConfirming(true);
+        }
+      }}
+    >
+      {confirming ? confirmText : children}
+    </Button>
   );
 }

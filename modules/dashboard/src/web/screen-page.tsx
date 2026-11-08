@@ -375,6 +375,20 @@ export function DashboardScreenPage({
     if (cityMissing && canWrite) setSettingsOpen(true);
   }, [cityMissing, canWrite]);
 
+  // 待办剩余：聚合视图直接调 todo_notes 的公开接口（模块未启用/无权限时静默回退）
+  const todoOpenQuery = useQuery({
+    queryKey: ['todo-open', workspaceSlug],
+    queryFn: () =>
+      api<{ todos: Array<{ id: string }> }>(
+        `/modules/workspaces/${workspaceSlug}/todo_notes/call/list`,
+        { method: 'POST', json: { status: 'open' } },
+      ),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const todoOpenCount = todoOpenQuery.data?.todos.length ?? null;
+
   const data = snapshot.data;
   const enabledSources = data ? Object.entries(data.hot) : [];
   const watchWords = data?.options.watchWords ?? [];
@@ -737,11 +751,20 @@ export function DashboardScreenPage({
                       label="连续打卡"
                       onClick={() => scrollToSection('activity-section')}
                     />
-                    <HeroMetric
-                      value={enabledSources.length}
-                      label="热榜源"
-                      onClick={() => scrollToSection('hotlist-section')}
-                    />
+                    {todoOpenCount !== null ? (
+                      <HeroMetric
+                        value={todoOpenCount}
+                        label="待办"
+                        onClick={() => void router.push('/m/todo_notes/list')}
+                        accent={todoOpenCount > 0}
+                      />
+                    ) : (
+                      <HeroMetric
+                        value={enabledSources.length}
+                        label="热榜源"
+                        onClick={() => scrollToSection('hotlist-section')}
+                      />
+                    )}
                     <HeroMetric
                       value={data.countdowns.length}
                       label="期待"

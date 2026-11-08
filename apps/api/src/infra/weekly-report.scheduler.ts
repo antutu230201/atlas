@@ -1,10 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { Injectable, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import type { Db } from '../db/client';
-import { ADMIN_DB_TOKEN, ENV_TOKEN, NOTIFICATION_SERVICE_TOKEN } from '../tokens';
+import { ADMIN_DB_TOKEN, ENV_TOKEN, AI_ADAPTER_TOKEN, NOTIFICATION_SERVICE_TOKEN } from '../tokens';
 import { Inject } from '@nestjs/common';
 import type { NotificationService } from '../events/notification.service';
 import type { ApiEnv } from '../env';
+import { ConfigurableAIProvider } from '../ai/ai-config.service';
 
 /**
  * 听歌周报调度器（ADR-0007/0008 延伸）：
@@ -67,6 +68,22 @@ function formatMinutes(seconds: number): string {
 
 @Injectable()
 export class WeeklyReportScheduler implements OnApplicationBootstrap, OnModuleDestroy {
+  /** AI 一句话点评：仅在真实供应商（db/env）可用时生成；失败静默跳过，不影响周报本身 */
+  private async aiComment(summary: string): Promise<string | null> {
+    if (!this.ai.config) return null; // Mock 模式：不让占位文案进通知
+    try {
+      const result = await this.ai.complete({
+        prompt: `以下是用户上周的听歌数据：${summary}。请用一句话（40 字内）温和地点评TA的听歌状态，不要罗列数字。`,
+        maxTokens: 80,
+        temperature: 0.8,
+      });
+      const text = result.text.trim();
+      return text.length > 0 && text.length <= 120 ? text : null;
+    } catch {
+      return null;
+    }
+  }
+
   private timer: ReturnType<typeof setInterval> | null = null;
   private forcedSent = false;
 
@@ -74,6 +91,7 @@ export class WeeklyReportScheduler implements OnApplicationBootstrap, OnModuleDe
     @Inject(ADMIN_DB_TOKEN) private readonly adminDb: Db,
     @Inject(NOTIFICATION_SERVICE_TOKEN) private readonly notifications: NotificationService,
     @Inject(ENV_TOKEN) private readonly env: ApiEnv,
+    @Inject(AI_ADAPTER_TOKEN) private readonly ai: ConfigurableAIProvider,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -107,6 +125,12 @@ export class WeeklyReportScheduler implements OnApplicationBootstrap, OnModuleDe
         const seconds = Number(row.out_seconds ?? 0);
         const rank = index + 1;
         const top = row.out_top_title ? `，最常听《${row.out_top_title}》` : '';
+        const base = `全站第 ${rank} 名（共 ${rows.length} 人参与）· 播放 ${Number(row.out_plays ?? 0)} 次`;
+        // AI 点评按条生成（每人数据不同）；超时失败仅少一句话，不阻断周报
+        const comment = await this.aiComment(
+          `播放 ${formatMinutes(seconds)}，${top.replace('，', '')}，全站第 ${rank} 名`,
+        );
+        const text = comment ? `${base}。${comment}` : base;
         try {
           await this.notifications.create({
             workspaceId: row.out_workspace_id,
@@ -114,7 +138,7 @@ export class WeeklyReportScheduler implements OnApplicationBootstrap, OnModuleDe
             type: 'listening.weekly',
             title: `听歌周报：上周 ${formatMinutes(seconds)}${top}`,
             body: {
-              text: `全站第 ${rank} 名（共 ${rows.length} 人参与）· 播放 ${Number(row.out_plays ?? 0)} 次`,
+              text,
               link: '/m/dashboard/listening?range=lastWeek&download=1',
               weekStart: start,
               weekEnd: end,
