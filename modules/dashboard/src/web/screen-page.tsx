@@ -316,9 +316,26 @@ export function DashboardScreenPage({
     onError: fail,
   });
 
-  const createCountdown = useMutation({
+  const updateCountdown = useMutation({
     mutationFn: (input: {
-      title: string;
+      id: string;
+      title?: string;
+      targetDate?: string;
+      pinned?: boolean;
+      lunar?: boolean;
+      lunarMonth?: number;
+      lunarDay?: number;
+      repeatYearly?: boolean;
+    }) => api(`${base}/updateCountdown`, { method: 'POST', json: input }),
+    onSuccess: () => {
+      invalidate();
+    },
+  });
+
+  const createCountdown = useMutation({
+    // title 实际必填（后端 schema 校验）；handler 的 create 输入类型与 update 共用，故此处放宽
+    mutationFn: (input: {
+      title?: string;
       targetDate?: string;
       pinned?: boolean;
       lunar?: boolean;
@@ -843,9 +860,11 @@ export function DashboardScreenPage({
                 handlers={{
                   canWrite,
                   create: (input) => createCountdown.mutate(input),
+                  update: (input) => updateCountdown.mutate(input),
                   remove: (id) => deleteCountdown.mutate(id),
                   togglePin: (item) => togglePin.mutate(item),
                   creating: createCountdown.isPending,
+                  updating: updateCountdown.isPending,
                 }}
               />
             </div>

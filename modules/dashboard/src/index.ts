@@ -117,6 +117,11 @@ const updateCountdownSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   pinned: z.boolean().optional(),
+  /** 切换农历模式：需带 lunarMonth/lunarDay 重算 targetDate */
+  lunar: z.boolean().optional(),
+  lunarMonth: z.number().int().min(1).max(12).optional(),
+  lunarDay: z.number().int().min(1).max(30).optional(),
+  repeatYearly: z.boolean().optional(),
 });
 
 const refreshSchema = z.object({ sources: z.array(z.string().max(40)).max(10).optional() });
@@ -1227,15 +1232,49 @@ export const definition: ModuleDefinition = {
       handler: async (ctx, input) => {
         const parsed = updateCountdownSchema.safeParse(input ?? {});
         if (!parsed.success) bad(parsed.error.issues.map((i) => i.message).join('; '));
+        const data = parsed.data;
+        const patch: Record<string, unknown> = {
+          ...(data.title !== undefined ? { title: data.title } : {}),
+          ...(data.pinned !== undefined ? { pinned: data.pinned } : {}),
+          ...(data.repeatYearly !== undefined ? { repeatYearly: data.repeatYearly } : {}),
+          updatedAt: new Date(),
+        };
+        // 切到农历：用农历月日重算 targetDate 与 label；切回公历需显式传 targetDate
+        if (data.lunar !== undefined) {
+          if (data.lunar) {
+            const { lunarMonth, lunarDay } = data;
+            if (!lunarMonth || !lunarDay) bad('农历模式需要农历月和日');
+            const currentYear = Solar.fromDate(new Date()).getLunar().getYear();
+            let candidate = lunarToSolar(currentYear, lunarMonth, lunarDay);
+            const today = localDay();
+            if ((!candidate || candidate < today) && (data.repeatYearly ?? true)) {
+              candidate = lunarToSolar(currentYear + 1, lunarMonth, lunarDay);
+            }
+            if (!candidate) bad('农历日期无效');
+            Object.assign(patch, {
+              lunar: true,
+              lunarMonth,
+              lunarDay,
+              lunarLabel: `农历${lunarMonth}月${lunarDayName(lunarDay)}`,
+              targetDate: candidate,
+            });
+          } else {
+            Object.assign(patch, {
+              lunar: false,
+              lunarMonth: null,
+              lunarDay: null,
+              lunarLabel: '',
+            });
+            if (data.targetDate === undefined) bad('切回公历需提供 targetDate');
+          }
+        }
+        if (data.targetDate !== undefined && patch.lunar !== true) {
+          patch.targetDate = data.targetDate;
+        }
         const rows = await ctx.db
           .update(countdown)
-          .set({
-            ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
-            ...(parsed.data.targetDate !== undefined ? { targetDate: parsed.data.targetDate } : {}),
-            ...(parsed.data.pinned !== undefined ? { pinned: parsed.data.pinned } : {}),
-            updatedAt: new Date(),
-          })
-          .where(and(eq(countdown.id, parsed.data.id), eq(countdown.workspaceId, ctx.workspaceId)))
+          .set(patch)
+          .where(and(eq(countdown.id, data.id), eq(countdown.workspaceId, ctx.workspaceId)))
           .returning({ id: countdown.id });
         if (rows.length === 0) throw new ModuleActionError('倒计时不存在');
         await ctx.events.publish('dashboard.countdown.updated', { countdownId: parsed.data.id });

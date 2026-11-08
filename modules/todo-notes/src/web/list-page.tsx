@@ -70,6 +70,12 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
     onSuccess: invalidate,
   });
 
+  const setDue = useMutation({
+    mutationFn: (input: { id: string; dueDate: string | null }) =>
+      api(`${base}/update`, { method: 'POST', json: input }),
+    onSuccess: invalidate,
+  });
+
   const remove = useMutation({
     mutationFn: (id: string) => api(`${base}/remove`, { method: 'POST', json: { id } }),
     onSuccess: () => {
@@ -174,7 +180,8 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
           todos={todos}
           onMove={(id, status) => setStatus.mutate({ id, status })}
           onRemove={(id) => remove.mutate(id)}
-          moving={setStatus.isPending}
+          onSetDue={(d, id) => setDue.mutate({ id, dueDate: d })}
+          moving={setStatus.isPending || setDue.isPending}
         />
       ) : (
         <div className="space-y-2">
@@ -202,11 +209,14 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
                   >
                     {row.title}
                   </p>
-                  {row.dueDate ? (
-                    <p className="text-xs text-muted">
-                      截止 {new Date(row.dueDate).toLocaleDateString('zh-CN')}
-                    </p>
-                  ) : null}
+                  <p className="flex items-center gap-1.5 text-xs text-muted">
+                    {row.dueDate ? (
+                      <>截止 {new Date(row.dueDate).toLocaleDateString('zh-CN')}</>
+                    ) : (
+                      '未设置截止'
+                    )}
+                    <DueQuick onSet={(d) => setDue.mutate({ id: row.id, dueDate: d })} />
+                  </p>
                 </div>
                 <Badge
                   variant={
@@ -232,11 +242,13 @@ function TodoBoard({
   todos,
   onMove,
   onRemove,
+  onSetDue,
   moving,
 }: {
   todos: TodoRow[];
   onMove: (id: string, status: TodoStatus) => void;
   onRemove: (id: string) => void;
+  onSetDue: (dueDate: string | null, id: string) => void;
   moving: boolean;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
@@ -314,8 +326,11 @@ function TodoBoard({
                   </Badge>
                 </div>
                 <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted">
-                  <span>
-                    {row.dueDate ? `截止 ${new Date(row.dueDate).toLocaleDateString('zh-CN')}` : ''}
+                  <span className="flex items-center gap-1">
+                    {row.dueDate
+                      ? `截止 ${new Date(row.dueDate).toLocaleDateString('zh-CN')}`
+                      : '未设置截止'}
+                    <DueQuick onSet={(d) => onSetDue(d, row.id)} />
                   </span>
                   <button
                     type="button"
@@ -332,6 +347,46 @@ function TodoBoard({
         </div>
       ))}
     </div>
+  );
+}
+
+/** 截止日快捷设置：今天 / 明天 / 下周，已设置时可清除 */
+function DueQuick({ onSet }: { onSet: (d: string | null) => void }) {
+  const fmt = (offset: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const items: Array<[string, number]> = [
+    ['今', 0],
+    ['明', 1],
+    ['周', 7],
+  ];
+  return (
+    <span className="inline-flex items-center gap-0.5 opacity-60 transition-opacity hover:opacity-100">
+      {items.map(([label, offset]) => (
+        <button
+          key={label}
+          type="button"
+          title={offset === 0 ? '截止今天' : offset === 1 ? '截止明天' : '截止下周同一天'}
+          onClick={() => onSet(fmt(offset))}
+          className="rounded-xs border border-border px-1 leading-4 transition-colors hover:border-primary/40 hover:text-primary"
+        >
+          {label}
+        </button>
+      ))}
+      <button
+        type="button"
+        title="清除截止日"
+        onClick={() => onSet(null)}
+        className="rounded-xs px-0.5 leading-4 transition-colors hover:text-err"
+      >
+        ✕
+      </button>
+    </span>
   );
 }
 

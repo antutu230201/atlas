@@ -14,6 +14,7 @@ import { createDb, type Db } from './db/client';
 import type { ApiEnv } from './env';
 import { loadEnv } from './env';
 import { buildProbes } from './infra/probes';
+import { DailyReportScheduler } from './infra/daily-report.scheduler';
 import { WeeklyReportScheduler } from './infra/weekly-report.scheduler';
 import { ModuleController } from './modules/kernel/module.controller';
 import { ModuleRegistryService } from './modules/kernel/module-registry';
@@ -174,6 +175,7 @@ import {
         AI_ADAPTER_TOKEN,
       ],
     },
+    DailyReportScheduler,
     WeeklyReportScheduler,
     { provide: MODULE_REGISTRY_SERVICE_TOKEN, useExisting: ModuleRegistryService },
     { provide: MODULE_SERVICE_TOKEN, useExisting: ModuleService },

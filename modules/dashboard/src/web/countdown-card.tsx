@@ -53,20 +53,25 @@ const LUNAR_DAY_NAMES = [
   '三十',
 ];
 
+export interface CountdownUpdateInput {
+  id: string;
+  title?: string;
+  targetDate?: string;
+  pinned?: boolean;
+  lunar?: boolean;
+  lunarMonth?: number;
+  lunarDay?: number;
+  repeatYearly?: boolean;
+}
+
 export interface CountdownHandlers {
   canWrite: boolean;
-  create: (input: {
-    title: string;
-    targetDate?: string;
-    pinned?: boolean;
-    lunar?: boolean;
-    lunarMonth?: number;
-    lunarDay?: number;
-    repeatYearly?: boolean;
-  }) => void;
+  create: (input: Omit<CountdownUpdateInput, 'id'>) => void;
+  update: (input: CountdownUpdateInput) => void;
   remove: (id: string) => void;
   togglePin: (item: CountdownItem) => void;
   creating: boolean;
+  updating: boolean;
 }
 
 /** 倒计时区：卡片网格 + 内联新建表单（支持农历纪念日与每年循环） */
@@ -77,7 +82,7 @@ export function CountdownSection({
   items: CountdownItem[];
   handlers: CountdownHandlers;
 }) {
-  const { canWrite, create, remove, togglePin, creating } = handlers;
+  const { canWrite, create, update, remove, togglePin, creating, updating } = handlers;
   const { toast } = useToast();
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -85,6 +90,48 @@ export function CountdownSection({
   const [lunarMonth, setLunarMonth] = useState(1);
   const [lunarDay, setLunarDay] = useState(1);
   const [repeatYearly, setRepeatYearly] = useState(true);
+  /** 行内编辑：editingId 非空时该卡片切换为编辑表单 */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{
+    title: string;
+    date: string;
+    lunar: boolean;
+    lunarMonth: number;
+    lunarDay: number;
+    repeatYearly: boolean;
+  } | null>(null);
+
+  const startEdit = (item: CountdownItem) => {
+    setEditingId(item.id);
+    setEditDraft({
+      title: item.title,
+      date: item.targetDate,
+      lunar: item.lunar ?? false,
+      lunarMonth: 1,
+      lunarDay: 1,
+      repeatYearly: item.repeatYearly ?? false,
+    });
+  };
+
+  const saveEdit = () => {
+    if (!editingId || !editDraft) return;
+    if (editDraft.title.trim().length === 0) {
+      toast({ title: '标题不能为空', variant: 'err' });
+      return;
+    }
+    update({
+      id: editingId,
+      title: editDraft.title.trim(),
+      lunar: editDraft.lunar,
+      lunarMonth: editDraft.lunar ? editDraft.lunarMonth : undefined,
+      lunarDay: editDraft.lunar ? editDraft.lunarDay : undefined,
+      repeatYearly: editDraft.repeatYearly,
+      // 公历模式必须带 targetDate（后端要求）；农历模式由后端重算
+      targetDate: editDraft.lunar ? undefined : editDraft.date,
+    });
+    setEditingId(null);
+    setEditDraft(null);
+  };
 
   const submit = () => {
     if (title.trim().length === 0) {
@@ -208,6 +255,97 @@ export function CountdownSection({
         }
       >
         {items.map((item) => {
+          if (editingId === item.id && editDraft) {
+            return (
+              <article key={item.id} className="screen-card border-primary/40 p-4">
+                <Input
+                  value={editDraft.title}
+                  onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })}
+                  aria-label="编辑标题"
+                  className="mb-2"
+                />
+                {editDraft.lunar ? (
+                  <div className="mb-2 flex gap-2">
+                    <select
+                      value={editDraft.lunarMonth}
+                      onChange={(e) =>
+                        setEditDraft({ ...editDraft, lunarMonth: Number(e.target.value) })
+                      }
+                      aria-label="编辑农历月"
+                      className="min-w-0 flex-1 rounded-xs border border-border bg-bg px-2 py-1.5 text-sm outline-none focus:border-primary/50"
+                    >
+                      {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                        <option key={month} value={month}>
+                          农历 {month} 月
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={editDraft.lunarDay}
+                      onChange={(e) =>
+                        setEditDraft({ ...editDraft, lunarDay: Number(e.target.value) })
+                      }
+                      aria-label="编辑农历日"
+                      className="min-w-0 flex-1 rounded-xs border border-border bg-bg px-2 py-1.5 text-sm outline-none focus:border-primary/50"
+                    >
+                      {LUNAR_DAYS.map((day) => (
+                        <option key={day} value={day}>
+                          {LUNAR_DAY_NAMES[day - 1]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <Input
+                    type="date"
+                    value={editDraft.date}
+                    onChange={(e) => setEditDraft({ ...editDraft, date: e.target.value })}
+                    aria-label="编辑目标日期"
+                    className="mb-2"
+                  />
+                )}
+                <label className="mb-2 flex items-center gap-3 text-[11px] text-muted">
+                  <span className="inline-flex cursor-pointer items-center gap-1">
+                    <input
+                      type="checkbox"
+                      className="size-3 accent-[var(--primary)]"
+                      checked={editDraft.lunar}
+                      onChange={(event) =>
+                        setEditDraft({ ...editDraft, lunar: event.target.checked })
+                      }
+                    />
+                    农历
+                  </span>
+                  <span className="inline-flex cursor-pointer items-center gap-1">
+                    <input
+                      type="checkbox"
+                      className="size-3 accent-[var(--primary)]"
+                      checked={editDraft.repeatYearly}
+                      onChange={(event) =>
+                        setEditDraft({ ...editDraft, repeatYearly: event.target.checked })
+                      }
+                    />
+                    每年循环
+                  </span>
+                </label>
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1" loading={updating} onClick={saveEdit}>
+                    保存
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setEditingId(null);
+                      setEditDraft(null);
+                    }}
+                  >
+                    取消
+                  </Button>
+                </div>
+              </article>
+            );
+          }
           const days = daysFromToday(item.targetDate);
           const urgent = days !== null && days >= 0 && days <= 7;
           return (
@@ -225,14 +363,24 @@ export function CountdownSection({
                   ) : null}
                 </p>
                 {canWrite ? (
-                  <button
-                    type="button"
-                    aria-label={item.pinned ? '取消置顶' : '置顶'}
-                    onClick={() => togglePin(item)}
-                    className={`rounded-xs p-1 transition-colors hover:bg-primary-soft hover:text-primary ${item.pinned ? 'text-warn' : 'text-muted'}`}
-                  >
-                    <ScreenIcon name="pin" className="size-3.5" />
-                  </button>
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      aria-label={`编辑 ${item.title}`}
+                      onClick={() => startEdit(item)}
+                      className="rounded-xs p-1 text-muted transition-colors opacity-0 hover:bg-primary-soft hover:text-primary group-hover:opacity-100"
+                    >
+                      <ScreenIcon name="settings" className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={item.pinned ? '取消置顶' : '置顶'}
+                      onClick={() => togglePin(item)}
+                      className={`rounded-xs p-1 transition-colors hover:bg-primary-soft hover:text-primary ${item.pinned ? 'text-warn' : 'text-muted'}`}
+                    >
+                      <ScreenIcon name="pin" className="size-3.5" />
+                    </button>
+                  </div>
                 ) : null}
               </div>
               <p className="mt-3 flex items-baseline gap-2">
