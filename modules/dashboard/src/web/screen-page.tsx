@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -391,21 +391,22 @@ export function DashboardScreenPage({
   const later = useLaterReading(HOT_SOURCE_LABELS);
 
   const data = snapshot.data;
-  const enabledSources = data ? Object.entries(data.hot) : [];
+  const enabledSources = useMemo(() => (data ? Object.entries(data.hot) : []), [data?.hot]);
   const watchWords = data?.options.watchWords ?? [];
-  // 关注词命中数：热榜标题里出现任一关注词的条目数，给"今天有没有我关心的事"一个直接答案
-  const watchHits =
-    watchWords.length === 0
-      ? 0
-      : enabledSources.reduce((sum, [, envelope]) => {
-          const items = envelope.payload ?? [];
-          return (
-            sum +
-            items.filter((item) =>
-              watchWords.some((word) => item.title.toLowerCase().includes(word.toLowerCase())),
-            ).length
-          );
-        }, 0);
+  const watchHits = useMemo(() => {
+    if (watchWords.length === 0) return 0;
+    const normalizedWords = watchWords.map((word) => word.toLowerCase());
+    return enabledSources.reduce((sum, [, envelope]) => {
+      const items = envelope.payload ?? [];
+      return (
+        sum +
+        items.filter((item) => {
+          const title = item.title.toLowerCase();
+          return normalizedWords.some((word) => title.includes(word));
+        }).length
+      );
+    }, 0);
+  }, [watchWords, enabledSources]);
   // 无任何热榜数据时不渲染空的热搜条
   const hasTicker = enabledSources.some(([, envelope]) => (envelope.payload?.length ?? 0) > 0);
   const weather = data?.weather;

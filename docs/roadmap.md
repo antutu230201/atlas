@@ -651,3 +651,9 @@
 - 2026-10-31：阶段 0、1 全部完成验收。技术债：无已知高优项；待办：推送远端仓库启用 CI 与视觉门禁。
 - 2026-11-05：个人大屏模块交付验收。技术债：module-events 全量跑偶发排队失败已通过"spec 排空事件队列"修复；AI 小结待真实供应商密钥。
 - 2026-11-05（协同会话）：双 agent 并行开发收尾——玻璃态亮暗体系、@source/transpilePackages/ai_usage 三处环境级修复、打卡热力图 + AI 摘要 + 全屏落地并推送远端；沉淀《开发环境手册》。待办：干净环境复跑全量测试与 e2e。
+
+### Dashboard hot list render optimization (2026-11-08)
+
+- [x] Memoize hot list source enumeration and watch-word matching so unrelated rerenders do not rescan titles.
+- Validation: `pnpm typecheck` passed (16/16 tasks); ESLint and Prettier checks passed for the changed source file.
+- Remaining: Lighthouse, 100k-record stress testing, full accessibility review, and deployed-environment profiling.
