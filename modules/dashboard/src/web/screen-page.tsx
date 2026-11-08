@@ -239,6 +239,26 @@ export function DashboardScreenPage({
   const { toast } = useToast();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // 专注模式：工作时段只留时钟/天气/待办/倒计时，热榜与回顾类收起（设备级偏好）
+  const [focusMode, setFocusMode] = useState(false);
+  useEffect(() => {
+    try {
+      setFocusMode(window.localStorage.getItem('atlas.screen.focus') === '1');
+    } catch {
+      // 隐私模式忽略
+    }
+  }, []);
+  const toggleFocusMode = () => {
+    setFocusMode((enabled) => {
+      const next = !enabled;
+      try {
+        window.localStorage.setItem('atlas.screen.focus', next ? '1' : '0');
+      } catch {
+        // 忽略
+      }
+      return next;
+    });
+  };
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lowPowerMode, setLowPowerMode] = useState(false);
   // 护屏偏好默认开启：挂墙场景下用户往往不会主动去找开关，宁可有微小位移也不烧屏
@@ -523,6 +543,9 @@ export function DashboardScreenPage({
     } else if (key === 'r') {
       event.preventDefault();
       if (!refresh.isPending) refresh.mutate();
+    } else if (key === 'c') {
+      event.preventDefault();
+      toggleFocusMode();
     } else if (key === 'a') {
       event.preventDefault();
       void router.push('/assistant');
@@ -620,6 +643,17 @@ export function DashboardScreenPage({
             <div className="hidden sm:block">
               <ThemeToggle />
             </div>
+            <button
+              type="button"
+              onClick={toggleFocusMode}
+              aria-pressed={focusMode}
+              className={`screen-icon-button ${focusMode ? '!border-primary/40 !text-primary' : ''}`}
+              aria-label="专注模式"
+              title="专注模式（C）：隐藏热榜与回顾，只留时钟/天气/待办/倒计时"
+            >
+              <ScreenIcon name="focus" className="size-3.5" />
+              <span className="hidden sm:inline">专注</span>
+            </button>
             <button
               type="button"
               className={`screen-icon-button hidden md:inline-flex ${lowPowerMode ? '!border-primary/40 !text-primary' : ''}`}
@@ -819,8 +853,8 @@ export function DashboardScreenPage({
               </div>
             </div>
 
-            {/* 实时热榜：紧跟时间/天气，五源横向铺满，放在听歌之后 */}
-            {enabledSources.length > 0 ? (
+            {/* 实时热榜：紧跟时间/天气，五源横向铺满，放在听歌之后；专注模式下隐藏 */}
+            {enabledSources.length > 0 && !focusMode ? (
               <section id="hotlist-section" aria-label="热榜" className="scroll-mt-6 space-y-2">
                 <div
                   className="screen-reveal relative z-30 flex items-end justify-between px-1"
@@ -874,27 +908,29 @@ export function DashboardScreenPage({
               </section>
             ) : null}
 
-            {/* 每日小结 + 打卡 + 一言：第二屏，长期停留时向下浏览 */}
-            <section
-              id="overview-section"
-              aria-label="今日节奏"
-              className="grid items-stretch gap-4 xl:grid-cols-12"
-            >
-              <div className="flex min-w-0 flex-col gap-4 xl:col-span-7">
-                <SummaryCard
-                  envelope={data.summary}
-                  regenerating={refresh.isPending}
-                  onRegenerate={() => refresh.mutate(['summary'])}
-                />
-                {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
-              </div>
-              <div id="activity-section" className="min-w-0 scroll-mt-6 xl:col-span-5">
-                <ActivityCard stats={data.activity} />
-              </div>
-            </section>
+            {/* 每日小结 + 打卡 + 一言：第二屏，长期停留时向下浏览；专注模式下隐藏 */}
+            {!focusMode ? (
+              <section
+                id="overview-section"
+                aria-label="今日节奏"
+                className="grid items-stretch gap-4 xl:grid-cols-12"
+              >
+                <div className="flex min-w-0 flex-col gap-4 xl:col-span-7">
+                  <SummaryCard
+                    envelope={data.summary}
+                    regenerating={refresh.isPending}
+                    onRegenerate={() => refresh.mutate(['summary'])}
+                  />
+                  {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
+                </div>
+                <div id="activity-section" className="min-w-0 scroll-mt-6 xl:col-span-5">
+                  <ActivityCard stats={data.activity} />
+                </div>
+              </section>
+            ) : null}
 
-            {/* 滚动信号流：从首屏移到下方，首屏优先给时钟/天气/热榜/听歌 */}
-            {hasTicker ? (
+            {/* 滚动信号流：从首屏移到下方，首屏优先给时钟/天气/热榜/听歌；专注模式下隐藏 */}
+            {hasTicker && !focusMode ? (
               <div
                 className="screen-card screen-reveal flex items-center gap-4 px-4 py-3"
                 style={{ '--screen-index': 4 } as React.CSSProperties}

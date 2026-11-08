@@ -8,7 +8,15 @@
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": [
+        "PORT",
+        "NEXT_PUBLIC_API_URL",
+        "CORS_ORIGIN",
+        "ATLAS_DASHBOARD_FAKE",
+        "ATLAS_WEEKLY_REPORT_FORCE",
+        "ATLAS_DAILY_REPORT_FORCE"
+      ]
     },
     "start": {
       "dependsOn": ["build"],

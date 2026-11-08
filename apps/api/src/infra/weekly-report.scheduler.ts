@@ -74,12 +74,17 @@ export class WeeklyReportScheduler implements OnApplicationBootstrap, OnModuleDe
     try {
       const result = await this.ai.complete({
         prompt: `以下是用户上周的听歌数据：${summary}。请用一句话（40 字内）温和地点评TA的听歌状态，不要罗列数字。`,
-        maxTokens: 80,
+        // 推理型模型先消耗 token 思考再出正文，预算太小会拿到空文本
+        maxTokens: 512,
         temperature: 0.8,
       });
       const text = result.text.trim();
       return text.length > 0 && text.length <= 120 ? text : null;
-    } catch {
+    } catch (error) {
+      console.warn(
+        '[weekly-report] AI 点评生成失败，跳过:',
+        error instanceof Error ? error.message : error,
+      );
       return null;
     }
   }

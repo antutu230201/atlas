@@ -51,12 +51,16 @@ export class DailyReportScheduler implements OnApplicationBootstrap, OnModuleDes
     try {
       const result = await this.ai.complete({
         prompt: `用户今天：${parts.join('，')}。现在是晚上，请用一句话（30 字内）温和地收尾这一天，像朋友道晚安，不罗列数字。`,
-        maxTokens: 80,
+        maxTokens: 512,
         temperature: 0.8,
       });
       const text = result.text.trim();
       return text.length > 0 && text.length <= 100 ? text : null;
-    } catch {
+    } catch (error) {
+      console.warn(
+        '[daily-report] AI 晚安语生成失败，跳过:',
+        error instanceof Error ? error.message : error,
+      );
       return null;
     }
   }

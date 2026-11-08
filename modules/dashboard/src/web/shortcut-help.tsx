@@ -15,6 +15,7 @@ const SHORTCUTS: Array<{ keys: string; action: string }> = [
   { keys: 'L', action: '切换低功耗' },
   { keys: 'R', action: '刷新全部数据源' },
   { keys: 'S', action: '打开大屏设置' },
+  { keys: 'C', action: '切换专注模式' },
   { keys: 'A', action: '打开 AI 助手' },
   { keys: '空格', action: '播放 / 暂停（播放器聚焦时）' },
   { keys: '?', action: '显示 / 隐藏本列表' },
