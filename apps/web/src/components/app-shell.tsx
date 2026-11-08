@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
   ThemeToggle,
   ToastProvider,
+  SearchIcon,
   cn,
 } from '@atlas/ui';
 import { getModuleOverlay } from '@/lib/module-registry';
@@ -178,6 +179,14 @@ function ShellBody({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                aria-label="搜索页面和待办"
+                className="inline-flex size-8 items-center justify-center rounded-sm border border-border bg-surface text-muted transition-colors hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:hidden"
+              >
+                <SearchIcon />
+              </button>
               <button
                 type="button"
                 onClick={() => setPaletteOpen(true)}

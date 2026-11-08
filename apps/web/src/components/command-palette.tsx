@@ -20,6 +20,8 @@ interface SearchResult {
   href: string;
 }
 
+type SearchStatus = 'idle' | 'loading' | 'success' | 'error' | 'unavailable';
+
 /** 全局命令面板（Ctrl/Cmd + K）：导航 + 模块搜索 */
 export function CommandPalette({
   open,
@@ -33,27 +35,62 @@ export function CommandPalette({
   const router = useRouter();
   const { workspace } = useActiveWorkspace();
   const modules = useEnabledModules(workspace?.slug ?? null);
+  const workspaceSlug = workspace?.slug;
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchStatus, setSearchStatus] = useState<SearchStatus>('idle');
+  const canSearchTodos = modules.data?.some((module) => module.name === 'todo_notes') ?? false;
 
   useEffect(() => {
-    if (!open || query.length < 2 || !workspace) {
+    const normalizedQuery = query.trim();
+    if (!open || normalizedQuery.length < 2 || !workspaceSlug) {
       setSearchResults([]);
+      setSearchStatus('idle');
       return;
     }
+    if (modules.isError) {
+      setSearchResults([]);
+      setSearchStatus('error');
+      return;
+    }
+    if (!modules.data) return;
+    if (!canSearchTodos) {
+      setSearchResults([]);
+      setSearchStatus('unavailable');
+      return;
+    }
+
     const controller = new AbortController();
+    setSearchResults([]);
+    setSearchStatus('loading');
     const timer = setTimeout(() => {
       api<{ results: SearchResult[] }>(
-        `/modules/workspaces/${workspace.slug}/todo_notes/call/search`,
-        { method: 'POST', json: { q: query } },
+        `/modules/workspaces/${workspaceSlug}/todo_notes/call/search`,
+        { method: 'POST', json: { q: normalizedQuery }, signal: controller.signal },
       )
-        .then((res) => setSearchResults(res.results ?? []))
-        .catch(() => setSearchResults([]));
+        .then((res) => {
+          setSearchResults(res.results ?? []);
+          setSearchStatus('success');
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setSearchResults([]);
+          setSearchStatus('error');
+        });
     }, 300);
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, open, workspace]);
+  }, [query, open, workspaceSlug, modules.isError, canSearchTodos]);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery('');
+      setCursor(0);
+      setSearchResults([]);
+      setSearchStatus('idle');
+    }
+  }, [open]);
 
   const commands = useMemo<CommandItem[]>(() => {
     const items: CommandItem[] = [
@@ -65,22 +102,36 @@ export function CommandPalette({
       },
       { label: '通知', keywords: 'notifications 通知', run: () => router.push('/notifications') },
     ];
-    for (const m of modules.data ?? []) {
-      for (const route of m.routes) {
+    for (const module of modules.data ?? []) {
+      for (const route of module.routes) {
         items.push({
-          label: `${m.title} · ${route.title}`,
-          hint: m.name,
-          keywords: `${m.name} ${m.title} ${route.title}`,
-          run: () => router.push(`/m/${m.name}/${route.path}`),
+          label: `${module.title} · ${route.title}`,
+          hint: module.name,
+          keywords: `${module.name} ${module.title} ${route.title}`,
+          run: () => router.push(`/m/${module.name}/${route.path}`),
         });
       }
     }
     return items;
   }, [modules.data, router]);
 
-  const filtered = commands.filter((c) => c.keywords.toLowerCase().includes(query.toLowerCase()));
+  const filtered = commands.filter((command) =>
+    command.keywords.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+  const selectableCount = filtered.length + searchResults.length;
+  const activeIndex = selectableCount === 0 ? -1 : Math.min(cursor, selectableCount - 1);
+  const activeOptionId = activeIndex < 0 ? undefined : `command-option-${activeIndex}`;
 
-  const hasSearchResults = query.length >= 2 && searchResults.length > 0;
+  const runSelection = (index: number) => {
+    if (index < filtered.length) {
+      filtered[index]?.run();
+    } else {
+      const result = searchResults[index - filtered.length];
+      if (!result) return;
+      router.push(result.href);
+    }
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,42 +140,53 @@ export function CommandPalette({
         <input
           autoFocus
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
+          onChange={(event) => {
+            setQuery(event.target.value);
             setCursor(0);
           }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') setCursor((c) => Math.min(c + 1, filtered.length - 1));
-            if (e.key === 'ArrowUp') setCursor((c) => Math.max(c - 1, 0));
-            if (e.key === 'Enter') {
-              if (filtered[cursor]) {
-                filtered[cursor].run();
-                onOpenChange(false);
-              } else if (hasSearchResults && searchResults[0]) {
-                router.push(searchResults[0].href);
-                onOpenChange(false);
-              }
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' && selectableCount > 0) {
+              event.preventDefault();
+              setCursor((current) => Math.min(current + 1, selectableCount - 1));
+            }
+            if (event.key === 'ArrowUp' && selectableCount > 0) {
+              event.preventDefault();
+              setCursor((current) => Math.max(current - 1, 0));
+            }
+            if (event.key === 'Enter' && activeIndex >= 0) {
+              event.preventDefault();
+              runSelection(activeIndex);
             }
           }}
           placeholder="搜索页面、待办…"
           aria-label="命令搜索"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={selectableCount > 0}
+          aria-controls="command-results"
+          aria-activedescendant={activeOptionId}
           className="w-full border-b border-border bg-transparent px-4 py-3 text-sm text-text placeholder:text-muted focus-visible:outline-none"
         />
-        <ul className="max-h-72 overflow-y-auto p-1">
+        <ul
+          id="command-results"
+          role="listbox"
+          aria-label="搜索结果"
+          className="max-h-72 overflow-y-auto p-1"
+        >
           {filtered.map((command, index) => (
             <li key={`nav-${index}`}>
               <button
+                id={`command-option-${index}`}
                 type="button"
+                role="option"
+                aria-selected={index === activeIndex}
                 className={cn(
                   'flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm transition-colors',
-                  index === cursor
+                  index === activeIndex
                     ? 'bg-primary-soft font-medium text-primary'
                     : 'text-text hover:bg-surface-hover',
                 )}
-                onClick={() => {
-                  command.run();
-                  onOpenChange(false);
-                }}
+                onClick={() => runSelection(index)}
                 onMouseEnter={() => setCursor(index)}
               >
                 {command.label}
@@ -132,30 +194,60 @@ export function CommandPalette({
               </button>
             </li>
           ))}
-          {hasSearchResults ? (
+          {searchResults.length > 0 ? (
             <>
-              <li className="px-3 pb-1 pt-3 text-[11px] font-semibold tracking-widest text-muted">
+              <li
+                role="presentation"
+                className="px-3 pb-1 pt-3 text-[11px] font-semibold tracking-widest text-muted"
+              >
                 待办搜索
               </li>
-              {searchResults.map((result, index) => (
-                <li key={`search-${index}`}>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm text-text transition-colors hover:bg-surface-hover"
-                    onClick={() => {
-                      router.push(result.href);
-                      onOpenChange(false);
-                    }}
-                  >
-                    {result.label}
-                    <span className="text-xs text-muted">{result.hint}</span>
-                  </button>
-                </li>
-              ))}
+              {searchResults.map((result, index) => {
+                const optionIndex = filtered.length + index;
+                return (
+                  <li key={`search-${index}`}>
+                    <button
+                      id={`command-option-${optionIndex}`}
+                      type="button"
+                      role="option"
+                      aria-selected={optionIndex === activeIndex}
+                      className={cn(
+                        'flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm transition-colors',
+                        optionIndex === activeIndex
+                          ? 'bg-primary-soft font-medium text-primary'
+                          : 'text-text hover:bg-surface-hover',
+                      )}
+                      onClick={() => runSelection(optionIndex)}
+                      onMouseEnter={() => setCursor(optionIndex)}
+                    >
+                      {result.label}
+                      <span className="text-xs text-muted">{result.hint}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </>
           ) : null}
-          {filtered.length === 0 && !hasSearchResults && query.length > 0 ? (
-            <li className="px-3 py-2 text-sm text-muted">没有匹配结果</li>
+          {searchStatus === 'loading' ? (
+            <li className="px-3 py-2 text-sm text-muted" role="status">
+              正在搜索待办…
+            </li>
+          ) : null}
+          {searchStatus === 'error' ? (
+            <li className="px-3 py-2 text-sm text-err" role="alert">
+              待办搜索暂时不可用，请稍后重试。
+            </li>
+          ) : null}
+          {searchStatus === 'unavailable' ? (
+            <li className="px-3 py-2 text-sm text-muted" role="status">
+              启用「待办与笔记」模块后可搜索待办。
+            </li>
+          ) : null}
+          {searchStatus === 'success' && searchResults.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-muted">没有找到待办</li>
+          ) : null}
+          {filtered.length === 0 && query.trim().length === 1 ? (
+            <li className="px-3 py-2 text-sm text-muted">再输入一个字以搜索页面</li>
           ) : null}
         </ul>
         <p className="border-t border-border px-4 py-2 text-[11px] text-muted">

@@ -4,7 +4,14 @@
  */
 
 export { cn } from './cn';
-export { CheckIcon, XIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
+export {
+  CheckIcon,
+  XIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  SearchIcon,
+} from './icons';
 
 export * from './components/breadcrumb';
 export * from './components/button';

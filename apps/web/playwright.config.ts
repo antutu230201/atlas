@@ -50,6 +50,7 @@ export default defineConfig({
       timeout: 180_000,
       env: {
         PORT: String(webPort),
+        ATLAS_NEXT_DIST_DIR: '.next/e2e',
         NEXT_PUBLIC_API_URL: `http://localhost:${apiPort}`,
       },
     },

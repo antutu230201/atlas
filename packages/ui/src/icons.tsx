@@ -24,6 +24,15 @@ export function CheckIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function SearchIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </svg>
+  );
+}
+
 export function XIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>

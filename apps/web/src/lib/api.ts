@@ -15,13 +15,14 @@ export class ApiError extends Error {
 
 export async function api<T>(
   path: string,
-  init: { method?: string; json?: unknown } = {},
+  init: { method?: string; json?: unknown; signal?: AbortSignal } = {},
 ): Promise<T> {
   const response = await fetch(`${API_URL}/v1${path}`, {
     method: init.method ?? 'GET',
     credentials: 'include',
     headers: init.json === undefined ? {} : { 'content-type': 'application/json' },
     body: init.json === undefined ? undefined : JSON.stringify(init.json),
+    signal: init.signal,
   });
   const raw = await response.text();
   const parsed: unknown = raw.length > 0 ? JSON.parse(raw) : null;

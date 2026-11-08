@@ -21,9 +21,22 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
       .catch(() => undefined);
     await page.keyboard.press('Escape');
 
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: '搜索页面和待办' }).click();
+    await expect(page.getByRole('combobox', { name: '命令搜索' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 1280, height: 900 });
+
     // 启用示例模块（设置 → 模块页签；按 testid 定位，不依赖模块卡片顺序）
     await page.goto('/settings');
-    await page.getByRole('button', { name: '模块', exact: true }).click();
+    const moduleTab = page.getByRole('tab', { name: '模块' });
+    await expect(moduleTab).toHaveAttribute('aria-selected', 'true');
+    await moduleTab.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('tab', { name: '审计日志' })).toBeFocused();
+    await expect(page.getByRole('tabpanel')).toBeVisible();
+    await page.keyboard.press('ArrowLeft');
+    await expect(moduleTab).toBeFocused();
     const sampleCard = page.getByTestId('module-card-sample_note');
     const enableButton = sampleCard.getByRole('button', { name: '启用', exact: true });
     await expect(enableButton).toBeVisible({ timeout: 10_000 });

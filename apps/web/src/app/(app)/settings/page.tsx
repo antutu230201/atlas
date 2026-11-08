@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Badge,
@@ -38,6 +38,23 @@ interface AuditRow {
 export default function SettingsPage() {
   const { workspace } = useActiveWorkspace();
   const [tab, setTab] = useState<Tab>('modules');
+  const tabs: Array<[Tab, string]> = [
+    ['modules', '模块'],
+    ['audit', '审计日志'],
+    ['ai', 'AI 配置'],
+  ];
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = tabs.findIndex(([key]) => key === tab);
+    const direction = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!direction) return;
+    event.preventDefault();
+    const next = (currentIndex + direction + tabs.length) % tabs.length;
+    const nextTab = tabs[next];
+    if (!nextTab) return;
+    setTab(nextTab[0]);
+    document.getElementById(`settings-tab-${nextTab[0]}`)?.focus();
+  };
 
   if (!workspace) {
     return (
@@ -54,16 +71,15 @@ export default function SettingsPage() {
         <p className="mt-1 text-sm text-muted">个人大屏「{workspace.name}」。</p>
       </header>
 
-      <nav aria-label="设置分区" className="flex gap-2">
-        {(
-          [
-            ['modules', '模块'],
-            ['audit', '审计日志'],
-            ['ai', 'AI 配置'],
-          ] as Array<[Tab, string]>
-        ).map(([key, label]) => (
+      <div role="tablist" aria-label="设置分区" onKeyDown={handleTabKeyDown} className="flex gap-2">
+        {tabs.map(([key, label]) => (
           <Button
             key={key}
+            id={`settings-tab-${key}`}
+            role="tab"
+            aria-selected={tab === key}
+            aria-controls={tab === key ? `settings-panel-${key}` : undefined}
+            tabIndex={tab === key ? 0 : -1}
             size="sm"
             variant={tab === key ? 'primary' : 'secondary'}
             onClick={() => setTab(key)}
@@ -71,16 +87,40 @@ export default function SettingsPage() {
             {label}
           </Button>
         ))}
-      </nav>
+      </div>
 
       {tab === 'modules' ? (
-        <>
+        <section
+          id="settings-panel-modules"
+          role="tabpanel"
+          aria-labelledby="settings-tab-modules"
+          tabIndex={0}
+          className="space-y-6"
+        >
           <ModulesTab slug={workspace.slug} />
           <PwaInstall />
-        </>
+        </section>
       ) : null}
-      {tab === 'audit' ? <AuditTab slug={workspace.slug} /> : null}
-      {tab === 'ai' ? <AiConfigTab /> : null}
+      {tab === 'audit' ? (
+        <section
+          id="settings-panel-audit"
+          role="tabpanel"
+          aria-labelledby="settings-tab-audit"
+          tabIndex={0}
+        >
+          <AuditTab slug={workspace.slug} />
+        </section>
+      ) : null}
+      {tab === 'ai' ? (
+        <section
+          id="settings-panel-ai"
+          role="tabpanel"
+          aria-labelledby="settings-tab-ai"
+          tabIndex={0}
+        >
+          <AiConfigTab />
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -95,6 +135,7 @@ interface ModuleStatus {
 }
 
 function ModulesTab({ slug }: { slug: string }) {
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const modules = useQuery({
     queryKey: ['module-status', slug],
@@ -108,7 +149,10 @@ function ModulesTab({ slug }: { slug: string }) {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['module-status', slug] });
+      toast({ title: '模块状态已更新', variant: 'ok' });
     },
+    onError: (error: Error) =>
+      toast({ title: '模块状态更新失败', description: error.message, variant: 'err' }),
   });
 
   const exportData = useMutation({
@@ -124,14 +168,39 @@ function ModulesTab({ slug }: { slug: string }) {
       a.href = url;
       a.download = `todo_notes_export_${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      toast({ title: '待办数据已导出', variant: 'ok' });
     },
+    onError: (error: Error) =>
+      toast({ title: '导出失败', description: error.message, variant: 'err' }),
   });
 
   if (modules.isPending) return <Skeleton className="h-40 w-full" />;
+  if (modules.isError) {
+    return (
+      <Card>
+        <CardContent className="space-y-3 py-5">
+          <p className="text-sm text-err" role="alert">
+            模块列表加载失败：{modules.error instanceof Error ? modules.error.message : '请重试'}
+          </p>
+          <Button size="sm" variant="secondary" onClick={() => void modules.refetch()}>
+            重新加载
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const todoEnabled =
+    modules.data?.some((module) => module.name === 'todo_notes' && module.enabled) ?? false;
 
   return (
     <div className="space-y-3">
+      {(modules.data ?? []).length === 0 ? (
+        <Card>
+          <CardContent className="py-5 text-sm text-muted">当前没有可管理的模块。</CardContent>
+        </Card>
+      ) : null}
       {(modules.data ?? []).map((m) => (
         <Card key={m.name} data-testid={`module-card-${m.name}`}>
           <CardHeader>
@@ -149,6 +218,7 @@ function ModulesTab({ slug }: { slug: string }) {
               variant={m.enabled ? 'secondary' : 'primary'}
               onClick={() => toggle.mutate({ name: m.name, enable: !m.enabled })}
               disabled={toggle.isPending}
+              loading={toggle.isPending && toggle.variables?.name === m.name}
             >
               {m.enabled ? '停用' : '启用'}
             </Button>
@@ -160,10 +230,14 @@ function ModulesTab({ slug }: { slug: string }) {
           size="sm"
           variant="secondary"
           loading={exportData.isPending}
+          disabled={!todoEnabled}
           onClick={() => exportData.mutate()}
         >
           导出待办 JSON
         </Button>
+        {!todoEnabled ? (
+          <span className="self-center text-xs text-muted">启用待办与笔记后可导出数据。</span>
+        ) : null}
       </div>
     </div>
   );

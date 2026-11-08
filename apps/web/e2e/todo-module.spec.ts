@@ -23,6 +23,9 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
     const enable = todoCard.getByRole('button', { name: '启用' });
     await expect(enable).toBeVisible({ timeout: 10_000 });
     await enable.click();
+    await expect(todoCard.getByRole('button', { name: '停用', exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
 
     // 进入待办列表页
     await page.goto('/m/todo_notes/list');
@@ -35,6 +38,18 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
       await expect(page.getByText(title).first()).toBeVisible({ timeout: 10_000 });
       await page.waitForTimeout(500);
     }
+
+    // 命令面板异步搜到待办后，结果也可完整使用方向键与回车选择。
+    await page.keyboard.press('Control+k');
+    const commandSearch = page.getByRole('combobox', { name: '命令搜索' });
+    await commandSearch.fill('晨间跑步');
+    await expect(page.getByRole('status').filter({ hasText: '正在搜索待办' })).toBeVisible();
+    const searchOption = page.getByRole('option', { name: /晨间跑步/ });
+    await expect(searchOption).toBeVisible({ timeout: 10_000 });
+    await commandSearch.press('ArrowDown');
+    await commandSearch.press('Enter');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByText('晨间跑步').first()).toBeVisible();
 
     // 完成第一条（默认排最新在前），确认出现删除线
     const doneButton = page.getByLabel('设为 done').first();
