@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -122,7 +123,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
       {/* 全局氛围背景：大屏同款天空渐变 + 网格（低强度，所有 Shell 页面共享） */}
       <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden>
         {/* 亮色：实心冷白底（米黄只属于大屏自己的暖色氛围）；暗色：深色柔化遮罩 */}
-        <div className="absolute inset-0 bg-[#f5f6fa] dark:hidden" />
+        <div className="absolute inset-0 bg-bg dark:hidden" />
         <div
           className="absolute inset-0 hidden dark:block"
           style={{ background: 'var(--screen-scrim)' }}
@@ -243,11 +244,9 @@ function ShellBody({ children }: { children: React.ReactNode }) {
         ? (modules.data ?? []).map((mod) => {
             const Overlay = getModuleOverlay(mod.name);
             return Overlay ? (
-              <Overlay
-                key={`${mod.name}-overlay`}
-                workspaceSlug={workspace.slug}
-                moduleName={mod.name}
-              />
+              <Suspense key={`${mod.name}-overlay`} fallback={null}>
+                <Overlay workspaceSlug={workspace.slug} moduleName={mod.name} />
+              </Suspense>
             ) : null;
           })
         : null}

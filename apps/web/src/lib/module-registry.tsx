@@ -1,14 +1,6 @@
 'use client';
 
-import type { ComponentType } from 'react';
-import { SampleNoteListPage } from '@atlas/module-sample-note/web';
-import {
-  DashboardScreenPage,
-  FloatingMusicPlayer,
-  ListeningStatsPage,
-} from '@atlas/module-dashboard/web';
-import { TodoListPage, TodoTodayWidget, TodoTrashPage } from '@atlas/module-todo-notes/web';
-import { HabitsTodayPage } from '@atlas/module-habits/web';
+import { lazy, type ComponentType } from 'react';
 
 /**
  * 模块前端注册表（装配点，ADR-0005 §7）：
@@ -24,22 +16,60 @@ export interface ModulePageProps {
 }
 
 export const moduleWebRegistry: Record<string, Record<string, ComponentType<ModulePageProps>>> = {
-  sample_note: { list: SampleNoteListPage },
-  todo_notes: { list: TodoListPage, trash: TodoTrashPage },
-  dashboard: { screen: DashboardScreenPage, listening: ListeningStatsPage },
-  habits: { today: HabitsTodayPage },
+  sample_note: {
+    list: lazy(() =>
+      import('@atlas/module-sample-note/web').then((module) => ({
+        default: module.SampleNoteListPage,
+      })),
+    ),
+  },
+  todo_notes: {
+    list: lazy(() =>
+      import('@atlas/module-todo-notes/web').then((module) => ({ default: module.TodoListPage })),
+    ),
+    trash: lazy(() =>
+      import('@atlas/module-todo-notes/web').then((module) => ({ default: module.TodoTrashPage })),
+    ),
+  },
+  dashboard: {
+    screen: lazy(() =>
+      import('@atlas/module-dashboard/web/screen').then((module) => ({
+        default: module.DashboardScreenPage,
+      })),
+    ),
+    listening: lazy(() =>
+      import('@atlas/module-dashboard/web/listening').then((module) => ({
+        default: module.ListeningStatsPage,
+      })),
+    ),
+  },
+  habits: {
+    today: lazy(() =>
+      import('@atlas/module-habits/web').then((module) => ({ default: module.HabitsTodayPage })),
+    ),
+  },
 };
 
 export const moduleWidgetRegistry: Record<
   string,
   Record<string, ComponentType<ModulePageProps>>
 > = {
-  todo_notes: { TodayWidget: TodoTodayWidget },
+  todo_notes: {
+    TodayWidget: lazy(() =>
+      import('@atlas/module-todo-notes/web').then((module) => ({
+        default: module.TodoTodayWidget,
+      })),
+    ),
+  },
 };
 
 /** 全局悬浮层：模块启用即挂载，跨页面/刷新常驻（播放器等需要"全局存在感"的能力） */
 export const moduleOverlayRegistry: Record<string, ComponentType<ModulePageProps>> = {
-  dashboard: FloatingMusicPlayer,
+  dashboard: lazy(() =>
+    import('@atlas/module-dashboard/web/music-player').then((module) => ({
+      default: module.FloatingMusicPlayer,
+    })),
+  ),
 };
 
 export function getModulePage(

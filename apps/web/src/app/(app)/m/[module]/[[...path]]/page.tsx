@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { EmptyState, Skeleton } from '@atlas/ui';
 import { getModulePage } from '@/lib/module-registry';
@@ -36,5 +37,13 @@ export default function ModulePage() {
     );
   }
 
-  return <Page workspaceSlug={workspace.slug} moduleName={moduleName} />;
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto min-h-[60vh] max-w-5xl animate-pulse rounded-md bg-surface-hover" />
+      }
+    >
+      <Page workspaceSlug={workspace.slug} moduleName={moduleName} />
+    </Suspense>
+  );
 }

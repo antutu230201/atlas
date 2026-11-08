@@ -25,6 +25,7 @@ import { buildListeningReportHtml, downloadFile } from './listening-report';
 import type { ListeningReportInput } from './listening-report';
 import { ListeningStage } from './listening-stage';
 import { ScreenIcon } from './icons';
+import { useScrollActive } from './use-scroll-active';
 
 /**
  * 听歌统计页（大屏延伸子页 /m/dashboard/listening）。
@@ -140,6 +141,7 @@ function bucketFullLabel(label: string): string {
 }
 
 export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string }) {
+  const scrolling = useScrollActive();
   const base = `/modules/workspaces/${workspaceSlug}/dashboard/call`;
   // 周报通知直达：/m/dashboard/listening?range=lastWeek&download=1
   // query 在挂载后读取（SSR 阶段没有 window；Next 客户端导航也可能先渲染后更新 href）
@@ -291,6 +293,7 @@ export function ListeningStatsPage({ workspaceSlug }: { workspaceSlug: string })
     <div
       className="dashboard-screen relative min-h-screen overflow-hidden bg-bg text-text"
       data-testid="listening-stats"
+      data-scrolling={scrolling || undefined}
     >
       {/* 大屏同款氛围背景：天空渐变 + 网格 + 柔化遮罩 */}
       <div className="screen-sky" aria-hidden />

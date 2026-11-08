@@ -1,12 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@atlas/ui';
 import { useActiveWorkspace } from '@/hooks/use-workspace';
 import { useEnabledModules } from '@/lib/queries';
-import { DashboardScreenPage } from '@atlas/module-dashboard/web';
-import { getModuleWidget } from '@/lib/module-registry';
+import { getModulePage, getModuleWidget } from '@/lib/module-registry';
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -34,7 +34,14 @@ export default function TodayPage() {
     !modules.isError &&
     enabled.some((m) => m.name === 'dashboard')
   ) {
-    return <DashboardScreenPage workspaceSlug={workspace.slug} moduleName="dashboard" />;
+    const Dashboard = getModulePage('dashboard', 'screen');
+    return Dashboard ? (
+      <Suspense
+        fallback={<div className="min-h-[70vh] animate-pulse rounded-md bg-surface-hover" />}
+      >
+        <Dashboard workspaceSlug={workspace.slug} moduleName="dashboard" />
+      </Suspense>
+    ) : null;
   }
 
   return (
@@ -106,11 +113,12 @@ export default function TodayPage() {
                   const Widget = getModuleWidget(module.name, widget.component);
                   if (!Widget || !workspace) return null;
                   return (
-                    <Widget
+                    <Suspense
                       key={`${module.name}/${widget.id}`}
-                      workspaceSlug={workspace.slug}
-                      moduleName={module.name}
-                    />
+                      fallback={<div className="h-32 animate-pulse rounded-md bg-surface-hover" />}
+                    >
+                      <Widget workspaceSlug={workspace.slug} moduleName={module.name} />
+                    </Suspense>
                   );
                 }),
               )}

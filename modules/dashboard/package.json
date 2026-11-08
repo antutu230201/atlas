@@ -8,6 +8,9 @@
   "exports": {
     ".": "./dist/index.js",
     "./web": "./src/web/index.tsx",
+    "./web/screen": "./src/web/screen-page.tsx",
+    "./web/music-player": "./src/web/floating-music-player.tsx",
+    "./web/listening": "./src/web/listening-stats-page.tsx",
     "./package.json": "./package.json"
   },
   "files": [

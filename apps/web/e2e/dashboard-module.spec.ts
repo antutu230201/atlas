@@ -599,5 +599,14 @@ test.describe('个人大屏模块（假数据源）', () => {
     expect(report.suggestedFilename()).toMatch(/^atlas_listening_report_lastWeek_/);
     await expect(page).toHaveURL(/\/m\/dashboard\/listening$/);
     await expect(page.getByRole('tab', { name: '上周' })).toHaveAttribute('aria-selected', 'true');
+
+    // 统计页滚动时播放器应淡出避让，停滚后恢复可操作。
+    const floatingPlayer = page.getByTestId('vinyl-player');
+    await page.evaluate(() => window.dispatchEvent(new Event('wheel')));
+    await expect
+      .poll(() => floatingPlayer.evaluate((element) => Number(getComputedStyle(element).opacity)))
+      .toBeLessThan(1);
+    await page.waitForTimeout(500);
+    await expect(floatingPlayer).toHaveCSS('opacity', '1');
   });
 });

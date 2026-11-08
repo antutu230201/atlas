@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -30,7 +30,6 @@ import { useLaterReading, LaterReadingPanel } from './later-reading';
 import { NotificationBell } from './notification-bell';
 import { QuoteCard } from './quote-card';
 import { AssistantBubble } from './assistant-bubble';
-import { SettingsDrawer } from './settings-drawer';
 import { ScreenHeadline } from './screen-headline';
 import { ShortcutHelp } from './shortcut-help';
 import { SummaryCard } from './summary-card';
@@ -38,10 +37,15 @@ import { Ticker } from './ticker';
 import { WeatherCard } from './weather-card';
 import { WeatherAtmosphere } from './weather-atmosphere';
 import { ANTI_BURN_IN_KEY, NIGHT_MODE_KEY, useAntiBurnIn, useNightMode } from './screen-ambient';
+import { useScrollActive } from './use-scroll-active';
 import { HOT_SOURCE_LABELS, type DashboardSnapshot, type CountdownItem } from './types';
 
 /** 每台设备独立记住挂墙模式：同一账号在墙面屏和笔记本上可有不同取舍。 */
 const LOW_POWER_KEY = 'atlas.dashboard.low-power';
+
+const SettingsDrawer = lazy(() =>
+  import('./settings-drawer').then((module) => ({ default: module.SettingsDrawer })),
+);
 
 /**
  * 天气氛围动效（雨雪/云/雾/雷闪）默认关闭：
@@ -93,30 +97,6 @@ function ScreenBackground({
       <div className="absolute inset-0" style={{ background: 'var(--screen-scrim)' }} />
     </div>
   );
-}
-
-/** 滚动中置 true、停止约 350ms 后复位：驱动 data-scrolling 移除装饰动画（globals.css）。
-    同时监听 wheel——滚到边界后同位置滚动不再触发 scroll，若只听 scroll 状态会闪烁，
-    每次闪烁都要销毁/重建动画合成层，比动画本身更贵。setState 相同值跳过渲染，
-    因此滚动过程只在开始/结束各渲染一次。 */
-function useScrollActive() {
-  const [scrolling, setScrolling] = useState(false);
-  useEffect(() => {
-    let timer = 0;
-    const onActive = () => {
-      setScrolling(true);
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => setScrolling(false), 350);
-    };
-    window.addEventListener('scroll', onActive, { passive: true });
-    window.addEventListener('wheel', onActive, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', onActive);
-      window.removeEventListener('wheel', onActive);
-      window.clearTimeout(timer);
-    };
-  }, []);
-  return scrolling;
 }
 
 function HeroMetric({
@@ -238,6 +218,11 @@ export function DashboardScreenPage({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsDrawerMounted, setSettingsDrawerMounted] = useState(false);
+  const openSettings = useCallback(() => {
+    setSettingsDrawerMounted(true);
+    setSettingsOpen(true);
+  }, []);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // 专注模式：工作时段只留时钟/天气/待办/倒计时，热榜与回顾类收起（设备级偏好）
   const [focusMode, setFocusMode] = useState(false);
@@ -267,13 +252,6 @@ export function DashboardScreenPage({
   const night = useNightMode(nightAuto);
   const shiftRef = useAntiBurnIn(antiBurnIn);
   const scrolling = useScrollActive();
-  // 播放器挂在应用外壳层，用 body 标记让全局样式在滚动时把它淡出
-  useEffect(() => {
-    document.body.dataset.screenScrolling = scrolling ? '1' : '';
-    return () => {
-      delete document.body.dataset.screenScrolling;
-    };
-  }, [scrolling]);
   const router = useRouter();
   const chromeHidden = useUiStore((state) => state.chromeHidden);
   const setChromeHidden = useUiStore((state) => state.setChromeHidden);
@@ -393,8 +371,8 @@ export function DashboardScreenPage({
   // 首次使用且未设置城市：自动弹设置抽屉引导（含"定位我"）
   const cityMissing = snapshot.data?.city === undefined ? false : snapshot.data.city === null;
   useEffect(() => {
-    if (cityMissing && canWrite) setSettingsOpen(true);
-  }, [cityMissing, canWrite]);
+    if (cityMissing && canWrite) openSettings();
+  }, [cityMissing, canWrite, openSettings]);
 
   // 待办剩余：聚合视图直接调 todo_notes 的公开接口（模块未启用/无权限时静默回退）
   const todoOpenQuery = useQuery({
@@ -552,7 +530,7 @@ export function DashboardScreenPage({
     } else if (key === 's') {
       if (!canWrite) return;
       event.preventDefault();
-      setSettingsOpen(true);
+      openSettings();
     } else if (event.key === '?') {
       event.preventDefault();
       setShortcutsOpen((open) => !open);
@@ -683,11 +661,7 @@ export function DashboardScreenPage({
                   />
                   <span className="hidden sm:inline">刷新</span>
                 </button>
-                <button
-                  type="button"
-                  className="screen-icon-button"
-                  onClick={() => setSettingsOpen(true)}
-                >
+                <button type="button" className="screen-icon-button" onClick={openSettings}>
                   <ScreenIcon name="settings" className="size-3.5" />
                   <span className="hidden sm:inline">设置</span>
                 </button>
@@ -981,22 +955,40 @@ export function DashboardScreenPage({
 
       <ShortcutHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 
-      {canWrite ? (
-        <SettingsDrawer
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-          workspaceSlug={workspaceSlug}
-          moduleName={moduleName}
-          city={data?.city ?? null}
-          sources={data?.options.sources ?? {}}
-          wallpaper={data?.options.wallpaper ?? true}
-          watchWords={data?.options.watchWords ?? []}
-          antiBurnIn={antiBurnIn}
-          nightAuto={nightAuto}
-          onToggleAntiBurnIn={toggleAntiBurnIn}
-          onToggleNightAuto={toggleNightAuto}
-          onAfterChange={invalidate}
-        />
+      {canWrite && settingsDrawerMounted ? (
+        <Suspense
+          fallback={
+            <div
+              className="fixed inset-0 z-[var(--z-overlay)] flex justify-end bg-text/20"
+              role="status"
+              aria-label="正在加载大屏设置"
+              aria-busy="true"
+            >
+              <div className="h-full w-[min(100vw,420px)] space-y-6 bg-surface p-6 shadow-lg">
+                <Skeleton className="h-6 w-28" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          }
+        >
+          <SettingsDrawer
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            workspaceSlug={workspaceSlug}
+            moduleName={moduleName}
+            city={data?.city ?? null}
+            sources={data?.options.sources ?? {}}
+            wallpaper={data?.options.wallpaper ?? true}
+            watchWords={data?.options.watchWords ?? []}
+            antiBurnIn={antiBurnIn}
+            nightAuto={nightAuto}
+            onToggleAntiBurnIn={toggleAntiBurnIn}
+            onToggleNightAuto={toggleNightAuto}
+            onAfterChange={invalidate}
+          />
+        </Suspense>
       ) : null}
     </div>
   );

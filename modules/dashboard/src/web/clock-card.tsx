@@ -1,9 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Lunar, Solar } from 'lunar-typescript';
+import { useEffect, useState } from 'react';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+interface LunarInfo {
+  lunarDate: string;
+  ganzhi?: string;
+  jieqi?: string;
+  festival?: string;
+}
 
 function greetingOf(hour: number): string {
   if (hour < 5) return '夜深了';
@@ -24,18 +30,32 @@ export function ClockCard({ displayName }: { displayName?: string }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const lunarInfo = useMemo(() => {
-    const solar = Solar.fromDate(now);
-    const lunar = Lunar.fromSolar(solar);
-    const festivals = [...solar.getFestivals(), ...lunar.getFestivals()];
-    const jieqi = lunar.getJieQi();
-    return {
-      lunarDate: `农历${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`,
-      ganzhi: `${lunar.getYearInGanZhi()}年 · ${lunar.getYearShengXiao()}`,
-      jieqi: jieqi.length > 0 ? jieqi : undefined,
-      festival: festivals.length > 0 ? festivals.join(' · ') : undefined,
+  const [lunarInfo, setLunarInfo] = useState<LunarInfo | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    // 农历换算库体积较大，延后到首屏水合后单独加载；时间与公历日期可先显示。
+    void import('lunar-typescript')
+      .then(({ Lunar, Solar }) => {
+        if (cancelled) return;
+        const solar = Solar.fromDate(now);
+        const lunar = Lunar.fromSolar(solar);
+        const festivals = [...solar.getFestivals(), ...lunar.getFestivals()];
+        const jieqi = lunar.getJieQi();
+        setLunarInfo({
+          lunarDate: `农历${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`,
+          ganzhi: `${lunar.getYearInGanZhi()}年 · ${lunar.getYearShengXiao()}`,
+          jieqi: jieqi.length > 0 ? jieqi : undefined,
+          festival: festivals.length > 0 ? festivals.join(' · ') : undefined,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setLunarInfo({ lunarDate: '农历信息暂不可用' });
+      });
+    return () => {
+      cancelled = true;
     };
-    // 农历信息按"日期部分"缓存，避免每秒重算
+    // 农历信息只需在本地日期变化时更新，不随秒级时钟重复换算。
   }, [now.getFullYear(), now.getMonth(), now.getDate()]);
 
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -61,12 +81,14 @@ export function ClockCard({ displayName }: { displayName?: string }) {
             className="underline decoration-border decoration-dotted underline-offset-2 transition-colors hover:text-primary"
             title="查看万年历"
           >
-            {lunarInfo.lunarDate}
+            {lunarInfo?.lunarDate ?? '农历日期加载中'}
           </a>
-          <span className="hidden xl:inline">
-            <span className="mx-2 opacity-40">/</span>
-            {lunarInfo.ganzhi}
-          </span>
+          {lunarInfo?.ganzhi ? (
+            <span className="hidden xl:inline">
+              <span className="mx-2 opacity-40">/</span>
+              {lunarInfo?.ganzhi}
+            </span>
+          ) : null}
         </p>
       </div>
 
@@ -85,12 +107,12 @@ export function ClockCard({ displayName }: { displayName?: string }) {
           {displayName ? `，${displayName}` : ''}
           <span className="ml-2 text-muted">今天也保持自己的节奏。</span>
         </p>
-        {lunarInfo.jieqi ? (
+        {lunarInfo?.jieqi ? (
           <span className="rounded-xs bg-primary-soft px-2 py-1 text-[11px] font-semibold text-primary">
             {lunarInfo.jieqi}
           </span>
         ) : null}
-        {lunarInfo.festival ? (
+        {lunarInfo?.festival ? (
           <span className="rounded-xs bg-info-soft px-2 py-1 text-[11px] font-semibold text-info">
             {lunarInfo.festival}
           </span>

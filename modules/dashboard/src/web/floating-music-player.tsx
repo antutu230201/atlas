@@ -1,13 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@atlas/ui';
 import { api } from '@/lib/api';
 import { DesktopLyrics, type LyricLine } from './desktop-lyrics';
 import { dispatchListeningPulse, onPlaySong } from './listening-pulse';
-import { NeteaseLoginDialog } from './netease-login-dialog';
 import { ScreenIcon } from './icons';
+
+const NeteaseLoginDialog = lazy(() =>
+  import('./netease-login-dialog').then((module) => ({ default: module.NeteaseLoginDialog })),
+);
 
 interface MusicTrack {
   id: number;
@@ -1204,12 +1207,16 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
         />
       ) : null}
 
-      <NeteaseLoginDialog
-        base={base}
-        open={loginOpen}
-        onOpenChange={setLoginOpen}
-        onBound={handleBound}
-      />
+      {loginOpen ? (
+        <Suspense fallback={null}>
+          <NeteaseLoginDialog
+            base={base}
+            open={loginOpen}
+            onOpenChange={setLoginOpen}
+            onBound={handleBound}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
