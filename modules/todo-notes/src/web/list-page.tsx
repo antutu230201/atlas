@@ -23,7 +23,23 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
   const [title, setTitle] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
-  const [view, setView] = useState<'list' | 'board'>('list');
+  // 视图偏好存 localStorage：上次用看板，下次打开还是看板
+  const [view, setView] = useState<'list' | 'board'>(() => {
+    try {
+      return window.localStorage.getItem('atlas.todo.view') === 'board' ? 'board' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+
+  const changeView = (next: 'list' | 'board') => {
+    setView(next);
+    try {
+      window.localStorage.setItem('atlas.todo.view', next);
+    } catch {
+      // 忽略
+    }
+  };
   const [error, setError] = useState<string | null>(null);
 
   const list = useQuery({
@@ -131,7 +147,7 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
               key={option.key}
               type="button"
               aria-pressed={view === option.key}
-              onClick={() => setView(option.key)}
+              onClick={() => changeView(option.key)}
               className={`rounded-xs px-3 py-1 text-xs font-semibold transition-colors ${
                 view === option.key ? 'bg-primary-soft text-primary' : 'text-muted hover:text-text'
               }`}

@@ -33,8 +33,42 @@ function relativeTime(value: string): string {
 export default function NotificationsPage() {
   const notifications = useNotifications();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'listening' | 'system'>('all');
+  // 筛选偏好存 localStorage：刷新后保持，不进 URL（个人页面无分享诉求）
+  const [filter, setFilter] = useState<'all' | 'unread'>(() => {
+    try {
+      const saved = window.localStorage.getItem('atlas.notifications.unreadOnly');
+      return saved === '1' ? 'unread' : 'all';
+    } catch {
+      return 'all';
+    }
+  });
+  const [typeFilter, setTypeFilter] = useState<'all' | 'listening' | 'system'>(() => {
+    try {
+      const saved = window.localStorage.getItem('atlas.notifications.typeFilter');
+      if (saved === 'listening' || saved === 'system') return saved;
+    } catch {
+      // 忽略隐私模式
+    }
+    return 'all';
+  });
+
+  const changeFilter = (next: 'all' | 'unread') => {
+    setFilter(next);
+    try {
+      window.localStorage.setItem('atlas.notifications.unreadOnly', next === 'unread' ? '1' : '0');
+    } catch {
+      // 忽略
+    }
+  };
+
+  const changeTypeFilter = (next: 'all' | 'listening' | 'system') => {
+    setTypeFilter(next);
+    try {
+      window.localStorage.setItem('atlas.notifications.typeFilter', next);
+    } catch {
+      // 忽略
+    }
+  };
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
@@ -98,7 +132,7 @@ export default function NotificationsPage() {
               key={option.key}
               type="button"
               aria-pressed={typeFilter === option.key}
-              onClick={() => setTypeFilter(option.key)}
+              onClick={() => changeTypeFilter(option.key)}
               className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                 typeFilter === option.key
                   ? 'border-primary/40 bg-primary-soft text-primary'
@@ -113,7 +147,7 @@ export default function NotificationsPage() {
               type="checkbox"
               className="size-3.5 accent-[var(--primary)]"
               checked={filter === 'unread'}
-              onChange={(event) => setFilter(event.target.checked ? 'unread' : 'all')}
+              onChange={(event) => changeFilter(event.target.checked ? 'unread' : 'all')}
             />
             只看未读{unread > 0 ? `（${unread}）` : ''}
           </label>

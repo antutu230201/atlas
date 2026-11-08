@@ -201,6 +201,21 @@ describe('个人大屏模块', () => {
     await call(ownerCookie, 'deleteCountdown', { id: stale.body.data.id });
   });
 
+  it('农历闰月纪念日：接受闰月并落在下一个闰年', async () => {
+    const created = await call(ownerCookie, 'createCountdown', {
+      title: '闰月生日',
+      lunar: true,
+      lunarMonth: -6,
+      lunarDay: 5,
+    });
+    expect(created.status).toBe(200);
+    const view = await call(ownerCookie, 'snapshot');
+    const row = view.body.data.countdowns.find((c: { title: string }) => c.title === '闰月生日');
+    expect(row.lunarLabel).toContain('闰6月');
+    expect(row.targetDate >= new Date().toISOString().slice(0, 10)).toBe(true);
+    await call(ownerCookie, 'deleteCountdown', { id: created.body.data.id });
+  });
+
   it('删除事件落 outbox（dashboard.countdown.deleted）', async () => {
     const created = await call(ownerCookie, 'createCountdown', {
       title: '待删',

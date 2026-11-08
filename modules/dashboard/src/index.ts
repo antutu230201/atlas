@@ -23,7 +23,7 @@ import {
   type Wallpaper,
 } from './providers/misc';
 import { isFakeMode } from './providers/http';
-import { Lunar, Solar } from 'lunar-typescript';
+import { Lunar, LunarYear, Solar } from 'lunar-typescript';
 import { fetchNeteaseLyrics } from './providers/lyrics';
 import {
   fetchLikedTracks,
@@ -103,7 +103,14 @@ const createCountdownSchema = z.object({
   pinned: z.boolean().optional(),
   /** 农历纪念日：传农历月/日，后端换算为下一次发生的公历日期 */
   lunar: z.boolean().optional(),
-  lunarMonth: z.number().int().min(1).max(12).optional(),
+  /** 闰月用负数（-6 = 闰六月） */
+  lunarMonth: z
+    .number()
+    .int()
+    .min(-12)
+    .max(12)
+    .refine((v) => v !== 0, '农历月不能为 0')
+    .optional(),
   lunarDay: z.number().int().min(1).max(30).optional(),
   /** 每年循环（生日/纪念日）；农历模式默认开启 */
   repeatYearly: z.boolean().optional(),
@@ -330,13 +337,46 @@ function lunarDayName(day: number): string {
   return names[day - 1] ?? String(day);
 }
 
-/** 农历月日 → 当年公历 YYYY-MM-DD；闰月按平月处理（lunar-typescript 对非法输入返回 null） */
+/** 农历月日 → 当年公历 YYYY-MM-DD；闰月用负数月（lunar-typescript 约定，如 -6 = 闰六月） */
 function lunarToSolar(lunarYear: number, month: number, day: number): string | null {
   try {
     return Lunar.fromYmd(lunarYear, month, day).getSolar().toYmd();
   } catch {
     return null;
   }
+}
+
+/** 该农历年是否存在此闰月（正数月恒存在） */
+function lunarMonthExists(year: number, month: number): boolean {
+  if (month >= 0) return true;
+  return LunarYear.fromYear(year).getLeapMonth() === -month;
+}
+
+/** 农历月日的展示名，如「八月十五」「闰六月初一」 */
+function lunarLabelOf(month: number, day: number): string {
+  const monthName = month < 0 ? `闰${-month}月` : `${month}月`;
+  return `农历${monthName}${lunarDayName(day)}`;
+}
+
+/**
+ * 从 fromYear 起（含）向前找「农历月日的下一次发生」：
+ * 闰月可能隔数年才有，最多向前查 60 年（一个甲子）。
+ * requireFuture=false 时只看 fromYear 当年（首建场景，当年没有就交给调用方顺推）。
+ */
+function nextLunarOccurrence(
+  month: number,
+  day: number,
+  fromYear: number,
+  today: string,
+  requireFuture: boolean,
+): string | null {
+  for (let year = fromYear; year <= fromYear + 60; year += 1) {
+    if (!lunarMonthExists(year, month)) continue;
+    const candidate = lunarToSolar(year, month, day);
+    if (candidate && candidate >= today) return candidate;
+    if (!requireFuture) return candidate;
+  }
+  return null;
 }
 
 /**
@@ -350,13 +390,7 @@ async function advanceRepeatingCountdown(ctx: ModuleContext, row: CountdownRow):
   let nextDate: string | null = null;
   if (row.lunar && row.lunarMonth && row.lunarDay) {
     const currentLunarYear = Solar.fromDate(new Date()).getLunar().getYear();
-    for (let year = currentLunarYear + 1; year <= currentLunarYear + 3; year += 1) {
-      const candidate = lunarToSolar(year, row.lunarMonth, row.lunarDay);
-      if (candidate && candidate >= today) {
-        nextDate = candidate;
-        break;
-      }
-    }
+    nextDate = nextLunarOccurrence(row.lunarMonth, row.lunarDay, currentLunarYear + 1, today, true);
   } else {
     const [y = 0, m = 1, d = 1] = row.targetDate.split('-').map(Number);
     for (let i = 1; i <= 3; i += 1) {
@@ -1191,15 +1225,17 @@ export const definition: ModuleDefinition = {
         if (lunar) {
           const { lunarMonth, lunarDay } = data;
           if (!lunarMonth || !lunarDay) bad('农历模式需要农历月和日');
-          const currentYear = Solar.fromDate(new Date()).getLunar().getYear();
-          let candidate = lunarToSolar(currentYear, lunarMonth, lunarDay);
           const today = localDay();
-          if ((!candidate || candidate < today) && repeatYearly) {
-            candidate = lunarToSolar(currentYear + 1, lunarMonth, lunarDay);
-          }
-          if (!candidate) bad('农历日期无效');
+          const currentYear = Solar.fromDate(new Date()).getLunar().getYear();
+          // 首建：当年有就当年（哪怕已过，交给循环顺推），闰月不存在则向前找
+          const candidate =
+            nextLunarOccurrence(lunarMonth, lunarDay, currentYear, today, !repeatYearly) ??
+            (repeatYearly
+              ? nextLunarOccurrence(lunarMonth, lunarDay, currentYear + 1, today, true)
+              : null);
+          if (!candidate) bad('农历日期无效（闰月可能不存在）');
           targetDate = candidate;
-          lunarLabel = `农历${lunarMonth}月${lunarDayName(lunarDay)}`;
+          lunarLabel = lunarLabelOf(lunarMonth, lunarDay);
         } else if (!targetDate) {
           bad('请填写日期');
         }
@@ -1244,18 +1280,20 @@ export const definition: ModuleDefinition = {
           if (data.lunar) {
             const { lunarMonth, lunarDay } = data;
             if (!lunarMonth || !lunarDay) bad('农历模式需要农历月和日');
-            const currentYear = Solar.fromDate(new Date()).getLunar().getYear();
-            let candidate = lunarToSolar(currentYear, lunarMonth, lunarDay);
             const today = localDay();
-            if ((!candidate || candidate < today) && (data.repeatYearly ?? true)) {
-              candidate = lunarToSolar(currentYear + 1, lunarMonth, lunarDay);
-            }
-            if (!candidate) bad('农历日期无效');
+            const currentYear = Solar.fromDate(new Date()).getLunar().getYear();
+            const repeatYearly = data.repeatYearly ?? true;
+            const candidate =
+              nextLunarOccurrence(lunarMonth, lunarDay, currentYear, today, !repeatYearly) ??
+              (repeatYearly
+                ? nextLunarOccurrence(lunarMonth, lunarDay, currentYear + 1, today, true)
+                : null);
+            if (!candidate) bad('农历日期无效（闰月可能不存在）');
             Object.assign(patch, {
               lunar: true,
               lunarMonth,
               lunarDay,
-              lunarLabel: `农历${lunarMonth}月${lunarDayName(lunarDay)}`,
+              lunarLabel: lunarLabelOf(lunarMonth, lunarDay),
               targetDate: candidate,
             });
           } else {

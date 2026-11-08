@@ -168,11 +168,20 @@ export function CountdownSection({
             aria-label="农历月"
             className="min-w-0 flex-1 rounded-xs border border-border bg-bg px-2 py-1.5 text-sm outline-none focus:border-primary/50"
           >
-            {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
-              <option key={month} value={month}>
-                农历 {month} 月
-              </option>
-            ))}
+            <optgroup label="平月">
+              {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                <option key={month} value={month}>
+                  农历 {month} 月
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="闰月（不是每年都有）">
+              {Array.from({ length: 12 }, (_, index) => -(index + 1)).map((month) => (
+                <option key={month} value={month}>
+                  闰 {-month} 月
+                </option>
+              ))}
+            </optgroup>
           </select>
           <select
             value={lunarDay}
@@ -274,11 +283,20 @@ export function CountdownSection({
                       aria-label="编辑农历月"
                       className="min-w-0 flex-1 rounded-xs border border-border bg-bg px-2 py-1.5 text-sm outline-none focus:border-primary/50"
                     >
-                      {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
-                        <option key={month} value={month}>
-                          农历 {month} 月
-                        </option>
-                      ))}
+                      <optgroup label="平月">
+                        {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                          <option key={month} value={month}>
+                            农历 {month} 月
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="闰月（不是每年都有）">
+                        {Array.from({ length: 12 }, (_, index) => -(index + 1)).map((month) => (
+                          <option key={month} value={month}>
+                            闰 {-month} 月
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                     <select
                       value={editDraft.lunarDay}
