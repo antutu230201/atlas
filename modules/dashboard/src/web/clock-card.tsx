@@ -53,7 +53,16 @@ export function ClockCard({ displayName }: { displayName?: string }) {
         <p className="mt-2 text-[11px] leading-relaxed text-muted">
           {dateText}
           <span className="mx-2 opacity-40">/</span>
-          {lunarInfo.lunarDate}
+          {/* 农历日期可点：查万年历（了解今天对应的具体干支宜忌） */}
+          <a
+            href={`https://www.baidu.com/s?wd=${encodeURIComponent('万年历 农历')}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="underline decoration-border decoration-dotted underline-offset-2 transition-colors hover:text-primary"
+            title="查看万年历"
+          >
+            {lunarInfo.lunarDate}
+          </a>
           <span className="hidden xl:inline">
             <span className="mx-2 opacity-40">/</span>
             {lunarInfo.ganzhi}

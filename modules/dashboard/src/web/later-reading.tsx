@@ -22,11 +22,17 @@ export interface LaterItem {
 export function useLaterReading(sourceLabels: Record<string, string>) {
   const [items, setItems] = useState<LaterItem[]>([]);
 
-  // 首帧后读 localStorage（避免 SSR hydration 不一致）
+  // 首帧后读 localStorage（避免 SSR hydration 不一致）；7 天前的自动过期清理
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setItems(JSON.parse(raw) as LaterItem[]);
+      if (!raw) return;
+      const weekAgo = Date.now() - 7 * 86_400_000;
+      const parsed = (JSON.parse(raw) as LaterItem[]).filter((entry) => entry.addedAt > weekAgo);
+      setItems(parsed);
+      if (parsed.length !== (JSON.parse(raw) as LaterItem[]).length) {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      }
     } catch {
       // 隐私模式等场景忽略
     }
@@ -118,6 +124,7 @@ export function LaterReadingPanel({
   labelOf: (key: string) => string;
 }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   return (
     <div className="relative">
@@ -138,14 +145,44 @@ export function LaterReadingPanel({
         <div className="screen-card absolute right-0 top-9 z-40 w-80 p-0 shadow-soft">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-xs font-semibold">稍后读</span>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded-xs p-0.5 text-muted hover:text-text"
-              aria-label="关闭稍后读"
-            >
-              <ScreenIcon name="close" className="size-3" />
-            </button>
+            <div className="flex items-center gap-1">
+              {items.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = items.map((item) => `${item.title}\n${item.url}\n`).join('\n');
+                    const write = navigator.clipboard?.writeText(text).then(() => undefined);
+                    // writeText 在部分环境不可用（权限/非 secure context）：execCommand 兜底
+                    const fallback = (): Promise<void> => {
+                      const area = document.createElement('textarea');
+                      area.value = text;
+                      area.style.position = 'fixed';
+                      area.style.opacity = '0';
+                      document.body.appendChild(area);
+                      area.select();
+                      const ok = document.execCommand('copy');
+                      area.remove();
+                      return ok ? Promise.resolve() : Promise.reject(new Error('copy failed'));
+                    };
+                    (write ?? Promise.reject(new Error('no clipboard api')))
+                      .catch(fallback)
+                      .then(() => setCopied(true))
+                      .catch(() => setCopied(false));
+                  }}
+                  className="rounded-xs px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:bg-surface-hover hover:text-primary"
+                >
+                  {copied ? '已复制' : '复制全部'}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-xs p-0.5 text-muted hover:text-text"
+                aria-label="关闭稍后读"
+              >
+                <ScreenIcon name="close" className="size-3" />
+              </button>
+            </div>
           </div>
           {items.length === 0 ? (
             <p className="px-3 py-6 text-center text-[11px] text-muted">
