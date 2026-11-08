@@ -255,13 +255,13 @@ function AuditTab({ slug }: { slug: string }) {
 
   const audit = useQuery({
     queryKey: ['audit', slug, days, debounced],
-    queryFn: () => {
+    queryFn: ({ signal }) => {
       const params = new URLSearchParams();
       if (days !== 'all') params.set('days', days);
       if (debounced) params.set('q', debounced);
       params.set('limit', '200');
       const suffix = params.size > 0 ? `?${params.toString()}` : '';
-      return api<AuditRow[]>(`/workspaces/${slug}/audit${suffix}`);
+      return api<AuditRow[]>(`/workspaces/${slug}/audit${suffix}`, { signal });
     },
     retry: false,
   });
@@ -273,6 +273,21 @@ function AuditTab({ slug }: { slug: string }) {
       <Card>
         <CardContent className="text-sm text-muted">
           需要 admin 及以上角色才能查看审计日志。
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (audit.isError && !audit.data) {
+    return (
+      <Card role="alert">
+        <CardContent className="space-y-3 py-5">
+          <p className="text-sm text-err">
+            审计日志加载失败：{audit.error instanceof Error ? audit.error.message : '请重试'}
+          </p>
+          <Button size="sm" variant="secondary" onClick={() => void audit.refetch()}>
+            重新加载
+          </Button>
         </CardContent>
       </Card>
     );
@@ -316,6 +331,20 @@ function AuditTab({ slug }: { slug: string }) {
         />
       </div>
 
+      {audit.isFetching && audit.data ? (
+        <p className="text-xs text-muted" role="status" aria-live="polite">
+          正在更新审计记录…
+        </p>
+      ) : null}
+      {audit.isError && audit.data ? (
+        <p className="text-sm text-err" role="alert">
+          更新失败，当前显示的是上次结果。{' '}
+          <button type="button" className="underline" onClick={() => void audit.refetch()}>
+            重试
+          </button>
+        </p>
+      ) : null}
+
       <p className="text-xs text-muted">
         {filtered.length >= 200 ? '最近 200 条（更早的已省略）' : `${filtered.length} 条记录`}
       </p>
@@ -327,7 +356,7 @@ function AuditTab({ slug }: { slug: string }) {
           </CardContent>
         </Card>
       ) : (
-        <Table>
+        <Table aria-label="审计日志记录">
           <THead>
             <TR>
               <TH>时间</TH>
@@ -392,6 +421,22 @@ function AiConfigTab() {
   const [timeoutMs, setTimeoutMs] = useState('30000');
   const [initialized, setInitialized] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const normalizedBaseUrl = baseUrl.trim();
+  let validBaseUrl = false;
+  try {
+    const parsed = new URL(normalizedBaseUrl);
+    validBaseUrl =
+      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      normalizedBaseUrl.length <= 300;
+  } catch {
+    validBaseUrl = false;
+  }
+  const normalizedModel = model.trim();
+  const validModel = normalizedModel.length > 0 && normalizedModel.length <= 120;
+  const numericTimeout = Number(timeoutMs);
+  const validTimeout =
+    Number.isInteger(numericTimeout) && numericTimeout >= 1000 && numericTimeout <= 120_000;
+  const formValid = validBaseUrl && validModel && validTimeout && apiKey.length <= 400;
 
   // 首次加载后用服务端当前值初始化表单（后续重置不再覆盖用户输入）
   if (config.data && !initialized) {
@@ -406,11 +451,11 @@ function AiConfigTab() {
       api<AiConfigView>('/ai/config', {
         method: 'PUT',
         json: {
-          baseUrl,
-          model,
+          baseUrl: normalizedBaseUrl,
+          model: normalizedModel,
           // 留空 = 保持现有 key 不变（服务端 apiKey undefined 语义）
           apiKey: apiKey.length > 0 ? apiKey : undefined,
-          timeoutMs: Number(timeoutMs) || 30000,
+          timeoutMs: numericTimeout,
         },
       }),
     onSuccess: (data) => {
@@ -427,10 +472,10 @@ function AiConfigTab() {
       api<{ ok: boolean; error?: string; model?: string; sample?: string }>('/ai/config/test', {
         method: 'POST',
         json: {
-          baseUrl,
-          model,
+          baseUrl: normalizedBaseUrl,
+          model: normalizedModel,
           apiKey: apiKey.length > 0 ? apiKey : undefined,
-          timeoutMs: Number(timeoutMs) || 30000,
+          timeoutMs: numericTimeout,
         },
       }),
     onSuccess: (data) => {
@@ -449,7 +494,10 @@ function AiConfigTab() {
   if (config.isError) {
     return (
       <p className="rounded-md border border-err/30 bg-err-soft p-4 text-sm text-err" role="alert">
-        AI 配置加载失败：{config.error instanceof Error ? config.error.message : '请重试'}
+        AI 配置加载失败：{config.error instanceof Error ? config.error.message : '请重试'}{' '}
+        <button type="button" className="underline" onClick={() => void config.refetch()}>
+          重试
+        </button>
       </p>
     );
   }
@@ -479,21 +527,41 @@ function AiConfigTab() {
           <Field id="ai-base-url" label="Base URL" hint="OpenAI 兼容接口根地址，以 /v1 结尾">
             <Input
               value={baseUrl}
-              onChange={(event) => setBaseUrl(event.target.value)}
+              onChange={(event) => {
+                setBaseUrl(event.target.value);
+                setTestResult(null);
+              }}
               placeholder="https://tokenrhythm.studio/v1"
               id="ai-base-url"
               aria-label="Base URL"
+              disabled={save.isPending || test.isPending}
+              aria-invalid={!validBaseUrl}
             />
           </Field>
+          {!validBaseUrl ? (
+            <p className="-mt-3 text-xs text-err" role="alert">
+              请输入合法的 HTTP/HTTPS 地址（最多 300 个字符）。
+            </p>
+          ) : null}
           <Field id="ai-model" label="模型名" hint="以供应商 /v1/models 实际返回为准">
             <Input
               value={model}
-              onChange={(event) => setModel(event.target.value)}
+              onChange={(event) => {
+                setModel(event.target.value);
+                setTestResult(null);
+              }}
               placeholder="deepseek-v4.1-flash-1017"
               id="ai-model"
               aria-label="模型名"
+              disabled={save.isPending || test.isPending}
+              aria-invalid={!validModel}
             />
           </Field>
+          {!validModel ? (
+            <p className="-mt-3 text-xs text-err" role="alert">
+              请输入 1–120 个字符的模型名。
+            </p>
+          ) : null}
           <Field
             id="ai-api-key"
             label="API Key"
@@ -506,29 +574,44 @@ function AiConfigTab() {
             <Input
               type="password"
               value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
+              onChange={(event) => {
+                setApiKey(event.target.value);
+                setTestResult(null);
+              }}
               placeholder={config.data.hasKey ? '••••••••（留空保持不变）' : 'sk_...'}
               id="ai-api-key"
               aria-label="API Key"
               autoComplete="off"
+              maxLength={400}
+              disabled={save.isPending || test.isPending}
             />
           </Field>
           <Field id="ai-timeout" label="超时（毫秒）" hint="单次 AI 请求超时，1000–120000">
             <Input
               type="number"
               value={timeoutMs}
-              onChange={(event) => setTimeoutMs(event.target.value)}
+              onChange={(event) => {
+                setTimeoutMs(event.target.value);
+                setTestResult(null);
+              }}
               id="ai-timeout"
               aria-label="超时毫秒"
               min={1000}
               max={120000}
               className="w-40"
+              disabled={save.isPending || test.isPending}
+              aria-invalid={!validTimeout}
             />
           </Field>
+          {!validTimeout ? (
+            <p className="-mt-3 text-xs text-err" role="alert">
+              超时必须是 1000–120000 的整数。
+            </p>
+          ) : null}
 
           {testResult ? (
             <p
-              role="status"
+              role={testResult.ok ? 'status' : 'alert'}
               className={`rounded-sm border p-3 text-xs ${
                 testResult.ok
                   ? 'border-ok/30 bg-ok-soft text-ok'
@@ -544,7 +627,7 @@ function AiConfigTab() {
               size="sm"
               variant="secondary"
               loading={test.isPending}
-              disabled={!baseUrl || !model}
+              disabled={!formValid || save.isPending}
               onClick={() => test.mutate()}
             >
               测试连接
@@ -552,7 +635,7 @@ function AiConfigTab() {
             <Button
               size="sm"
               loading={save.isPending}
-              disabled={!baseUrl || !model}
+              disabled={!formValid || test.isPending}
               onClick={() => save.mutate()}
             >
               保存

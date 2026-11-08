@@ -54,6 +54,15 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
     await enableButton.click();
     await expect(sampleCard.getByRole('button', { name: '停用', exact: true })).toBeVisible();
 
+    await page.getByRole('tab', { name: 'AI 配置' }).click();
+    const timeoutInput = page.getByLabel('超时毫秒');
+    await expect(timeoutInput).toHaveValue(/\d+/);
+    await timeoutInput.fill('999');
+    await expect(page.getByText('超时必须是 1000–120000 的整数。')).toBeVisible();
+    await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+    await timeoutInput.fill('30000');
+    await expect(page.getByRole('button', { name: '保存', exact: true })).toBeEnabled();
+
     // 动态模块页直达（导航入口会在挂载重取后出现）
     await page.goto('/m/sample_note/list');
     const navLink = page.getByRole('link', { name: '笔记' }).first();
