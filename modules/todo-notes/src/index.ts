@@ -81,11 +81,15 @@ export const definition: ModuleDefinition = {
               ? sql`case ${todo.priority} when 'high' then 0 when 'normal' then 1 else 2 end`
               : todo.createdAt;
         const direction = query.dir === 'asc' ? asc : desc;
+        const primaryOrder = direction(sortColumn);
         const rows = await ctx.db
           .select()
           .from(todo)
           .where(and(...conditions))
-          .orderBy(direction(sortColumn), asc(todo.sortOrder))
+          .orderBy(
+            query.sort === 'due' ? sql`${primaryOrder} nulls last` : primaryOrder,
+            asc(todo.sortOrder),
+          )
           .limit(200);
         return { todos: rows };
       },

@@ -657,3 +657,9 @@
 - [x] Memoize hot list source enumeration and watch-word matching so unrelated rerenders do not rescan titles.
 - Validation: `pnpm typecheck` passed (16/16 tasks); ESLint and Prettier checks passed for the changed source file.
 - Remaining: Lighthouse, 100k-record stress testing, full accessibility review, and deployed-environment profiling.
+
+### Todo list sorting controls (2026-11-08)
+
+- [x] Expose existing API sorting by creation time, due date, and priority, with ascending/descending controls in list view.
+- [x] Keep tasks without due dates at the end for both directions; document the behavior and add API/E2E coverage, including 390px layout.
+- Validation: API todo integration and Playwright todo flow passed; typecheck and lint passed for changed files.

@@ -2,7 +2,21 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Badge, Button, Card, CardContent, EmptyState, Input, Skeleton, useToast } from '@atlas/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  EmptyState,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  useToast,
+} from '@atlas/ui';
 import { api } from '@/lib/api';
 import type { ModulePageProps, TodoRow } from './types';
 
@@ -24,6 +38,8 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sort, setSort] = useState<'created' | 'due' | 'priority'>('created');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
     return () => window.clearTimeout(timer);
@@ -55,6 +71,8 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
       'list',
       view === 'board' ? '' : statusFilter,
       debouncedSearch,
+      view === 'board' ? 'created' : sort,
+      view === 'board' ? 'desc' : sortDirection,
     ],
     queryFn: ({ signal }) =>
       api<{ todos: TodoRow[] }>(`${base}/list`, {
@@ -64,6 +82,8 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
           // 看板需要三列全量，状态由前端分组
           status: view === 'board' ? undefined : statusFilter || undefined,
           q: debouncedSearch || undefined,
+          sort: view === 'board' ? undefined : sort,
+          dir: view === 'board' ? undefined : sortDirection,
         },
       }),
   });
@@ -180,6 +200,30 @@ export function TodoListPage({ workspaceSlug, moduleName }: ModulePageProps) {
               </Button>
             ))
           : null}
+        {view === 'list' ? (
+          <div className="flex items-center gap-2">
+            <Select value={sort} onValueChange={(value) => setSort(value as typeof sort)}>
+              <SelectTrigger aria-label="排序方式" className="h-9 min-w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created">创建时间</SelectItem>
+                <SelectItem value="due">截止日期</SelectItem>
+                <SelectItem value="priority">优先级</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="secondary"
+              aria-label={sortDirection === 'desc' ? '切换为升序' : '切换为降序'}
+              onClick={() =>
+                setSortDirection((direction) => (direction === 'desc' ? 'asc' : 'desc'))
+              }
+            >
+              {sortDirection === 'desc' ? '↓ 降序' : '↑ 升序'}
+            </Button>
+          </div>
+        ) : null}
         <div className="ml-auto w-full sm:w-56">
           <Input
             value={search}

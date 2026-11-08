@@ -78,6 +78,36 @@ describe('待办与笔记模块（阶段 3b）', () => {
     expect(doneOnly.body.data.todos[0].status).toBe('done');
   });
 
+  it('list 支持优先级升序与降序', async () => {
+    await call(ownerCookie, 'update', { id: createdIds[0], priority: 'high' });
+    await call(ownerCookie, 'update', { id: createdIds[1], priority: 'normal' });
+    await call(ownerCookie, 'update', { id: createdIds[2], priority: 'low' });
+
+    const ascending = await call(ownerCookie, 'list', { sort: 'priority', dir: 'asc' });
+    expect(ascending.body.data.todos.map((row: { id: string }) => row.id)).toEqual(createdIds);
+
+    const descending = await call(ownerCookie, 'list', { sort: 'priority', dir: 'desc' });
+    expect(descending.body.data.todos.map((row: { id: string }) => row.id)).toEqual(
+      [...createdIds].reverse(),
+    );
+
+    await call(ownerCookie, 'update', { id: createdIds[0], dueDate: '2026-05-03' });
+    await call(ownerCookie, 'update', { id: createdIds[1], dueDate: null });
+    await call(ownerCookie, 'update', { id: createdIds[2], dueDate: '2026-05-01' });
+    const dueAscending = await call(ownerCookie, 'list', { sort: 'due', dir: 'asc' });
+    expect(dueAscending.body.data.todos.map((row: { id: string }) => row.id)).toEqual([
+      createdIds[2],
+      createdIds[0],
+      createdIds[1],
+    ]);
+    const dueDescending = await call(ownerCookie, 'list', { sort: 'due', dir: 'desc' });
+    expect(dueDescending.body.data.todos.map((row: { id: string }) => row.id)).toEqual([
+      createdIds[0],
+      createdIds[2],
+      createdIds[1],
+    ]);
+  });
+
   it('update 修改字段；reorder 重排 sortOrder', async () => {
     const updated = await call(ownerCookie, 'update', {
       id: createdIds[0],

@@ -39,6 +39,24 @@ test.describe('阶段 3b · 待办与笔记模块', () => {
       await page.waitForTimeout(500);
     }
 
+    let latestListInput: { sort?: string; dir?: string } | null = null;
+    const trackSortRequest = (request: Request) => {
+      if (!request.url().includes('/todo_notes/call/list')) return;
+      latestListInput = JSON.parse(request.postData() ?? '{}') as { sort?: string; dir?: string };
+    };
+    page.on('request', trackSortRequest);
+    await page.getByRole('combobox', { name: '排序方式' }).click();
+    await page.getByRole('option', { name: '优先级' }).click();
+    await expect.poll(() => latestListInput?.sort).toBe('priority');
+    await page.getByRole('button', { name: '切换为升序' }).click();
+    await expect.poll(() => latestListInput?.dir).toBe('asc');
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    page.off('request', trackSortRequest);
+
     // 命令面板异步搜到待办后，结果也可完整使用方向键与回车选择。
     await page.keyboard.press('Control+k');
     const commandSearch = page.getByRole('combobox', { name: '命令搜索' });
