@@ -78,6 +78,13 @@
       "when": 1794307200000,
       "tag": "0010_countdown_lunar",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794307201000,
+      "tag": "0011_listening_weekly_report",
+      "breakpoints": true
     }
   ]
 }

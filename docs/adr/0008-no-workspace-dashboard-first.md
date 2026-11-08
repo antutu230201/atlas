@@ -36,3 +36,9 @@ dashboard 模块；前端移除工作空间切换器/创建/邀请等一切工�
 - 首启引导抽屉（未设城市）以模态拦截全页点击 —— 它在根路径加载约 1s 后弹出，
   自动化测试与真实用户都需先关抽屉再点顶栏（e2e 已统一处理）。
 - 全站排名展示全部注册用户的昵称与听歌总时长；如后续需要隐私开关（匿名/退出榜）另立 ADR。
+
+## 4. 迁移依赖边界（2026-11-08）
+
+`platform.listening_weekly_report` 虽位于 `platform` schema，但只服务 dashboard 模块，且依赖模块表 `modules.dashboard.listening_daily`。因此函数与其授权应由 dashboard 模块迁移创建，排在该表迁移之后；内核迁移不得静态引用尚未安装的模块表。函数仍以 `SECURITY DEFINER` 绕过租户 RLS，只返回汇总字段，执行权限仅授予 `atlas_app`。
+
+现有数据库已执行的内核迁移不会重跑；新的 dashboard 迁移会为已安装模块创建函数。回滚时先执行对应 `.down.sql` 删除函数，再卸载模块数据表。

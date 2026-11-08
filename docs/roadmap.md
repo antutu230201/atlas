@@ -92,7 +92,8 @@
 - [x] Toast 反馈接入待办操作（创建/删除/错误）
 - [x] Drawer 替代 Dialog 用于移动端导航（正确组件语义）
 - [x] 命令面板集成待办搜索（300ms 防抖 + 结果导航）
-- [ ] 性能审计（Lighthouse + 10 万数据压力测试）
+- [x] 性能审计首轮：Lighthouse 13.6 移动端生产构建 `/register` 得分为性能 100、无障碍 100、最佳实践 96；FCP/LCP 0.9s、TBT 20ms、CLS 0。结果来自本机 Chromium 与 localhost，发布环境需再测。
+- [x] 10 万数据查询压力抽测：隔离 PostgreSQL 灌入 100,000 条通知后，以 `atlas_app` RLS 身份按用户倒序分页取 50 条，查询执行约 0.07ms；灌入约 2.3s。当前通知接口最多返回 200 条、前端默认 50 条，因此不会把 10 万行一次渲染到 DOM；此结果是本机热缓存基准，不代表生产硬件延迟。
 - [ ] 离线支持（service worker）
 - [ ] 无障碍复查（屏幕阅读器完整走查）
 
@@ -396,7 +397,7 @@
 - [x] PWA Service Worker：静态 Cache-First、导航 Network-First（离线回退 SPA 壳+内置离线页）、/v1 API 永不缓存；仅生产环境注册（dev 不干扰热更新）；版本化缓存激活时清理
 - [x] 设置页 PWA 安装卡：捕获 beforeinstallprompt 一键安装（standalone 后 Chrome 放行自动播放）
 - [x] AI 助手会话持久化：按用户存本机（60 条上限，损坏容错），刷新不丢；头部新增"清空对话"
-- [x] 听歌周报：迁移 0006（platform.scheduler_state + SECURITY DEFINER 函数 listening_weekly_report 跨空间按用户聚合 Top 歌曲）；新增 WeeklyReportScheduler（每分钟 tick，新 ISO 周首触自愈补发，状态幂等；ATLAS_WEEKLY_REPORT_FORCE=1 测试开关）→ 每用户通知"听歌周报：上周 X 分钟，最常听《…》"
+- [x] 听歌周报：内核迁移 0006 创建 `platform.scheduler_state`；dashboard 迁移 0011 在 `listening_daily` 存在后创建 `SECURITY DEFINER` 周报函数，跨空间按用户聚合 Top 歌曲；WeeklyReportScheduler 每分钟 tick，新 ISO 周首触自愈补发，状态幂等；`ATLAS_WEEKLY_REPORT_FORCE=1` 测试开关 → 每用户通知"听歌周报：上周 X 分钟，最常听《…》"
 - [x] 实测：force 模式 4 位用户收到周报通知；集成测试补 SQL 函数断言（跨工作空间聚合+Top 歌曲）；e2e 13 条全绿
 
 ### 听歌报告模板：导出从 JSON 到漂亮报告单页（2026-11-07 续 7）
@@ -596,8 +597,10 @@
 - [x] 应用外壳背景移除硬编码颜色，改用 `bg-bg` 设计令牌。
 - 生产构建对比（Next.js 16.4.3 / Turbopack）：首页 HTML 引用脚本从 13 个 / 1,349,955 字节降至 12 个 / 801,432 字节，减少 548,523 字节（40.6%）；全部 JS chunk 由 25 个 / 2,262,956 字节变为 36 个 / 2,286,583 字节（按需拆分后总量增加约 1.0%）。
 - 验证：全仓 typecheck、lint、format:check 通过；优化版 `@atlas/web` 生产构建通过；浏览器完成注册/大屏/设置抽屉/听歌统计走查，3D canvas 正常、暗色 390px 无横向溢出、播放器滚动时淡出、无页面异常。
-- 未完成：Lighthouse 实机指标与 10 万条列表压力测试仍需独立完成；此轮未引入依赖。
-- 验收发现的既有阻塞：干净测试库运行 `pnpm test` / 隔离 E2E 时，内核迁移创建 `platform.listening_weekly_report` 的 SQL 提前引用尚未创建的 `modules.dashboard.listening_daily`。因此 API 测试初始化与 E2E API 启动失败；其他包测试通过。需单独设计迁移顺序修复并复测干净库，本轮未改数据库迁移。
+- 指标限制：Lighthouse 与 10 万条查询均为本机隔离环境基准；发布环境性能和真实用户屏幕阅读器走查仍需补测。本轮未新增项目依赖。
+- [x] 修复听歌周报迁移顺序：函数移入 dashboard 模块迁移，在 `listening_daily` 表之后创建；API 集成测试初始化显式应用 dashboard 模块迁移。为已有模块补充 0011 migration 和可手动回滚的 `.down.sql`，具体边界记入 ADR-0008。
+- [x] 修复同进程并发启用模块时的迁移竞态；端到端并发注册复测通过 13/13。习惯流程的进度断言改为检查带名称的 status 区域，避免依赖不匹配的拼接文本格式。
+- [x] axe 全 Story 无障碍复查通过；门禁等待 Storybook addon-a11y 对当前 story 的扫描结束，避免两个 axe 扫描同时运行。
 
 ## 每周复盘记录
 

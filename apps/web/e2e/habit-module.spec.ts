@@ -28,12 +28,15 @@ test.describe('习惯打卡模块', () => {
     await page.getByLabel('习惯名称').fill('读书 10 分钟');
     await page.getByRole('button', { name: '添加', exact: true }).click();
     await expect(page.getByText('读书 10 分钟', { exact: true })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('0/1')).toBeVisible();
+    const progress = page.getByRole('status', { name: '今日进度' });
+    await expect(progress).toContainText('0');
+    await expect(progress).toContainText('/ 1');
 
     // 打卡 → 已打卡 ✓ + 进度 1/1 + 连续 1 天
     await page.getByRole('button', { name: '打卡', exact: true }).click();
     await expect(page.getByText('已打卡 ✓')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('1/1')).toBeVisible();
+    await expect(progress).toContainText('1');
+    await expect(progress).toContainText('/ 1');
     await expect(page.getByText(/连续 1 天/)).toBeVisible();
 
     // 取消打卡 → 回到未打卡
@@ -41,7 +44,8 @@ test.describe('习惯打卡模块', () => {
     await expect(page.getByRole('button', { name: '打卡', exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText('0/1')).toBeVisible();
+    await expect(progress).toContainText('0');
+    await expect(progress).toContainText('/ 1');
 
     // 归档 → 空态 + 归档区出现 → 恢复
     await page.getByRole('button', { name: '归档习惯 读书 10 分钟' }).click();

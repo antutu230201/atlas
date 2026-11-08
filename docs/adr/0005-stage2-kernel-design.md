@@ -278,6 +278,7 @@ GET  /v1/settings / PUT /v1/settings         （用户级）
 其余要点：
 
 - 每模块独立迁移 journal 表（module_<name>_migrations），避免共享 drizzle 迁移日志互串。
+- 同一模块在同一 API 进程内并发启用时共享一次进行中的迁移 Promise，避免并发创建模块 journal 表；多进程部署仍需在迁移发布阶段统一协调。
 - **模块模板必须自带**：GRANT atlas_app + 该 schema 的 RLS 策略（示例模块 migrations/0001_rls.sql 是模板）。
 - 启用 = 依赖深度优先自动启用 + 迁移 + module_install upsert + 事件订阅登记；停用数据保留，有启用中的依赖方时 409。
 - 前端动态挂载移入阶段 3（应用外壳 + 登录态就绪后才有意义），本阶段动作为 API 全链路验证。

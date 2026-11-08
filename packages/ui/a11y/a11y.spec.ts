@@ -46,9 +46,18 @@ test('全部故事通过 axe 无障碍检查（serious / critical 为零）', as
       const results = await page.evaluate(async (): Promise<AxeResults> => {
         const axe = (
           window as unknown as {
-            axe: { run: (context: Document, options: object) => Promise<AxeResults> };
+            axe: {
+              run: (context: Document, options: object) => Promise<AxeResults>;
+              _running?: boolean;
+            };
           }
         ).axe;
+        // Storybook's addon-a11y also runs axe on story navigation. Wait for that
+        // audit to finish so this gate doesn't race it on the shared iframe.
+        for (let attempt = 0; axe._running && attempt < 100; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (axe._running) throw new Error('Storybook axe audit did not finish in time');
         return await axe.run(document, { resultTypes: ['violations'] });
       });
       for (const violation of results.violations) {

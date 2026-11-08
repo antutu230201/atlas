@@ -58,6 +58,10 @@ export default async function (): Promise<() => Promise<void>> {
 
   const admin = createManagedDb(ADMIN_URL);
   await migrate(admin.db, { migrationsFolder: path.resolve(process.cwd(), 'drizzle') });
+  await migrate(admin.db, {
+    migrationsFolder: path.resolve(process.cwd(), '../../modules/dashboard/migrations'),
+    migrationsTable: 'module_dashboard_migrations',
+  });
   // 测试库跨运行持久化：迁移后清空业务数据，保证测试幂等（结构保留）
   await admin.db.execute(sql`
     truncate table

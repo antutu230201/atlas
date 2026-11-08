@@ -42,6 +42,8 @@ export interface ModuleCallContextParams {
 /** 模块系统（ADR-0005 §7）：目录 / 启停 / 依赖解析 / 调用分发 */
 @Injectable()
 export class ModuleService {
+  private readonly migrationsInFlight = new Map<string, Promise<void>>();
+
   constructor(
     @Inject(DB_TOKEN) private readonly db: Db,
     @Inject(ADMIN_DB_TOKEN) private readonly adminDb: Db,
@@ -128,10 +130,7 @@ export class ModuleService {
         return;
       }
       // 1) 模块迁移（管理员连接执行；每模块独立 journal 表避免互串）
-      await migrate(this.adminDb, {
-        migrationsFolder: mod.migrationsPath,
-        migrationsTable: `module_${moduleName}_migrations`,
-      });
+      await this.migrateModule(mod, moduleName);
       // 2) 安装/启用记录 + 3) 事件订阅登记（2c 派发器消费）
       await withUser(this.db, userId, async (tx) => {
         await tx
@@ -177,6 +176,25 @@ export class ModuleService {
 
     await enableDeep(name);
     return enabledOrder;
+  }
+
+  /** 同一 API 进程内，同模块的并发启用共享一次迁移，避免 journal 表初始化竞态。 */
+  private async migrateModule(mod: LoadedModule, moduleName: string): Promise<void> {
+    const existing = this.migrationsInFlight.get(moduleName);
+    if (existing) return existing;
+
+    const migration = migrate(this.adminDb, {
+      migrationsFolder: mod.migrationsPath,
+      migrationsTable: `module_${moduleName}_migrations`,
+    });
+    this.migrationsInFlight.set(moduleName, migration);
+    try {
+      await migration;
+    } finally {
+      if (this.migrationsInFlight.get(moduleName) === migration) {
+        this.migrationsInFlight.delete(moduleName);
+      }
+    }
   }
 
   /** 停用（数据保留）。存在启用的依赖方时拒绝 */
