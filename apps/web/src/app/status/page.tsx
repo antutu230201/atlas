@@ -3,6 +3,8 @@ import type { HealthReport } from '@atlas/sdk';
 import { Badge, Skeleton, ThemeToggle } from '@atlas/ui';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+// 服务端探测用绝对地址（Node fetch 不支持相对 URL）；ZCode Sites 形态由 start.sh 注入
+const SERVER_API_URL = process.env.ATLAS_INTERNAL_API_URL ?? API_URL;
 
 const SERVICE_LABELS: Record<string, string> = {
   api: 'API 服务',
@@ -16,7 +18,7 @@ const SERVICE_LABELS: Record<string, string> = {
 export const dynamic = 'force-dynamic';
 
 async function fetchHealth(): Promise<HealthReport> {
-  const response = await fetch(`${API_URL}/v1/health`, { cache: 'no-store' });
+  const response = await fetch(`${SERVER_API_URL}/v1/health`, { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(`健康检查返回 ${response.status}`);
   }

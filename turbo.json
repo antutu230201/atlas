@@ -3,7 +3,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": ["ATLAS_SITE_DEPLOY", "ATLAS_SITE_API_ORIGIN", "NEXT_PUBLIC_API_URL"]
     },
     "dev": {
       "dependsOn": ["^build"],

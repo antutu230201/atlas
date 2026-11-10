@@ -9,6 +9,9 @@ storybook-static/
 # 本地数据（内嵌 PostgreSQL 数据目录、本地磁盘存储，见 ADR-0002）
 .local/
 
+# ZCode Sites 部署组装目录（scripts/build-site-stage.mjs 产物）
+.zcode-site/
+
 # 环境变量（仓库只提交 .env.example）
 .env
 .env.local

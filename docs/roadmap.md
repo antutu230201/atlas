@@ -698,3 +698,10 @@
 - Dependency: `axe-core` 4.14.0 added as a devDependency of `@atlas/web` only (same engine behind `pnpm a11y`); injected at test time, not shipped in the app bundle.
 - Validation: `apps/web/e2e/a11y.spec.ts` passes 44/44 scans in ~50s when reusing local servers; typecheck (16/16), lint and format checks pass. Findings and remaining manual items are recorded in `docs/plans/accessibility-audit-2026-11-08.md`.
 - Remaining: screen-reader walkthrough, 200% zoom/reflow, full keyboard path per page, and dynamic status announcements are not yet verified.
+
+### ZCode Sites 公网站点部署（2026-11-11）
+
+- [x] 单容器多进程部署形态：Next.js standalone（前台 3000，`/v1/*` 同源反代）+ NestJS API（后台 3001）+ 内嵌 PostgreSQL（`$DATA_DIR`），由 `scripts/build-site-stage.mjs` 一键组装 stage 并交叉安装 linux-x64 依赖。
+- [x] 仓库改动全部环境变量门控（`ATLAS_SITE_DEPLOY`）：本地 `pnpm dev` / `next start` 行为不变；`/status` 服务端探测改读 `ATLAS_INTERNAL_API_URL`（Node fetch 不支持相对 URL）。
+- 平台限制（预览定位，非正式交付形态）：数据随实例回收清空、1 vCPU / 1 GB 内存、无密钥注入（AI 走 Mock、网易云密钥实例内随机生成）、公网开放注册。详见 docs/deploy/zcode-site.md。
+- Validation: 本机同拓扑实跑（隔离 PG 5433 + stage Web 3012）注册/登录全流程；`zcode-site check` live；云端部署后 `/v1/health` 与浏览器注册登录验收。
