@@ -22,7 +22,8 @@
     "@atlas/module-sample-note": "workspace:*",
     "@atlas/module-todo-notes": "workspace:*",
     "@atlas/module-dashboard": "workspace:*",
-    "@atlas/module-habits": "workspace:*"
+    "@atlas/module-habits": "workspace:*",
+    "@atlas/module-goals": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

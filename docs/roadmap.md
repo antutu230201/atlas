@@ -1,6 +1,6 @@
 # Atlas · Roadmap
 
-更新：2026-11-08（持续进行全站体验优化；本轮补强命令搜索、待办、通知、笔记、AI 助手与回收站）
+更新：2026-11-11（目标与年度计划模块交付；此前持续进行全站体验优化）
 
 > **新机器 / 新 AI 会话开工先读**：[docs/guide/开发环境手册.md](./guide/开发环境手册.md)（冷启动三命令、端口与 CORS、踩坑清单）+ [AGENTS.md](../AGENTS.md)（宪法）+ 本文。
 
@@ -644,6 +644,19 @@
 - [x] 笔记回收站永久删除加入二次确认；列表提供长正文折叠，减少最多 100 条笔记同时渲染的正文量；表单可用 Enter 提交并限制标题/正文长度。
 - [x] E2E 覆盖 AI 失败重试、刷新后会话恢复、清空对话、笔记长正文展开和回收站恢复；API 集成覆盖跨工作空间删除隔离、恢复与永久删除。
 - 验证：全仓 `pnpm test`（10/10 任务）、`pnpm typecheck`、`pnpm build`（8/8 任务）、lint、format:check 通过；`module-events` 的新软删除/跨工作空间隔离用例通过；浏览器 E2E 验证助手错误重试/刷新恢复/清空和笔记正文展开/回收站恢复。
+
+## 目标与年度计划模块交付记录（2026-11-11，modules/goals）
+
+第四个业务模块，个人成长闭环的"方向感"拼图（待办管每天做什么、习惯管每天坚持什么，目标回答指向哪里）。完全按《如何开发一个模块》流程交付，零内核改动。
+
+- [x] 数据模型：`modules.goals` 下 objective（period: year/quarter/month/custom + 起止日自动计算，软删除归档）+ key_result（number 数值型 / boolean 达成型，软删除）；目标达成态不落库、由 KR 进度动态推导（KR 回退自动撤销达成标记，不粉饰太平）；迁移 0000 + 0001_rls（GRANT + RLS 租户隔离模板）
+- [x] 数值型支持反向目标（体重 75→70）：进度双向夹取 0–1；达成/回落自动维护 completedAt
+- [x] 动作 10 个：snapshot / createObjective / updateObjective / archiveObjective / restoreObjective / createKeyResult / updateKeyResult / updateKeyResultProgress / deleteKeyResult，全部返回新快照省一次往返
+- [x] 事件 8 个：goal.created/updated/archived/restored + goal.key_result.*，落 outbox 供大屏「今日焦点」等后续订阅
+- [x] 前端单页（/m/goals/list，nav order 3）：概览卡（平均进度大数字 + 三格指标）→ 目标卡（图标/周期徽章/总进度条/KR 行内编辑）→ 归档区 → 新建表单（周期四选一 + emoji + 说明）；数值型 ± 步进（区间/10）与直接输入双通道；亮暗三态与手机宽浏览器实测
+- [x] 接线：api/web 依赖注册、next.config transpilePackages、module-registry 页面登记（既有模式三处）
+- [x] 测试：集成 9 个（含反向目标进度、达成态推导、软删语义、guest 只读、越权隔离、周期校验）+ e2e 1 条（启用→建目标→双类型 KR→进度更新→归档恢复）；a11y 扫描路由加入 /m/goals/list（12 路由 × 亮暗 × 双视口 48 次扫描 0 严重问题）
+- V1 明确不做（记后续）：进展时间线日志、待办/习惯跨模块自动关联、目标详情独立页、AI 点评
 
 ## 每周复盘记录
 

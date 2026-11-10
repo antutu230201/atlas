@@ -208,6 +208,9 @@ importers:
       '@atlas/module-dashboard':
         specifier: workspace:*
         version: link:../../modules/dashboard
+      '@atlas/module-goals':
+        specifier: workspace:*
+        version: link:../../modules/goals
       '@atlas/module-habits':
         specifier: workspace:*
         version: link:../../modules/habits
@@ -278,6 +281,9 @@ importers:
       '@atlas/module-dashboard':
         specifier: workspace:*
         version: link:../../modules/dashboard
+      '@atlas/module-goals':
+        specifier: workspace:*
+        version: link:../../modules/goals
       '@atlas/module-habits':
         specifier: workspace:*
         version: link:../../modules/habits
@@ -379,6 +385,46 @@ importers:
       '@types/three':
         specifier: ^0.187.0
         version: 0.187.0
+      drizzle-kit:
+        specifier: ^0.31.0
+        version: 0.31.11
+      react:
+        specifier: ^19.3.0
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.1(react@19.3.1)
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
+  modules/goals:
+    dependencies:
+      '@atlas/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@atlas/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@tanstack/react-query':
+        specifier: ^5.0.0
+        version: 5.105.0(@types/react@19.3.0)(react@19.3.1)
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
+      next:
+        specifier: ^16.0.0
+        version: 16.4.3(@babel/core@7.29.7(supports-color@7.2.0))(@playwright/test@1.64.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      zod:
+        specifier: ^4.1.0
+        version: 4.6.7
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
       drizzle-kit:
         specifier: ^0.31.0
         version: 0.31.11

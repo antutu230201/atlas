@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     '@atlas/module-todo-notes',
     '@atlas/module-dashboard',
     '@atlas/module-habits',
+    '@atlas/module-goals',
   ],
 };
 
