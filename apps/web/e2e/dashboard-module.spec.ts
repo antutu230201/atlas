@@ -609,4 +609,76 @@ test.describe('个人大屏模块（假数据源）', () => {
     await page.waitForTimeout(500);
     await expect(floatingPlayer).toHaveCSS('opacity', '1');
   });
+
+  test('今日焦点：跨模块聚合今日要务与目标推进', async ({ page }) => {
+    test.setTimeout(90_000);
+    const email = `dash-e2e-focus-${Date.now()}@example.com`;
+    await page.goto('/register');
+    await page.getByLabel('昵称').fill('焦点验收');
+    await page.getByLabel('邮箱').fill(email);
+    await page.getByLabel('密码').fill(password);
+    await page.getByRole('button', { name: '创建账号' }).click();
+    await page.waitForURL('/');
+
+    // 未启用 todo/goals：焦点卡静默降级为引导空态
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: '个人大屏' })).toBeVisible({ timeout: 15_000 });
+    await page
+      .getByRole('dialog')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => undefined);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('heading', { name: '今日焦点', exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText('今天还没有重点')).toBeVisible();
+
+    // 启用待办与目标模块
+    await page.goto('/settings');
+    await page.getByRole('tab', { name: '模块', exact: true }).click();
+    for (const moduleName of ['todo_notes', 'goals']) {
+      const card = page.getByTestId(`module-card-${moduleName}`);
+      await card.getByRole('button', { name: '启用', exact: true }).click({ timeout: 10_000 });
+    }
+
+    // 造数据：今天到期的待办（快速添加 + 行内「今」快捷键）
+    await page.goto('/m/todo_notes/list');
+    await page.getByLabel('新待办标题').fill('写年度复盘');
+    await page.getByRole('button', { name: '添加', exact: true }).click();
+    await expect(page.getByText('写年度复盘').first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: '今', exact: true }).first().click();
+    // 行内显示「截止 当天日期」（zh-CN 本地格式，无前导零）
+    const dueToday = new Date();
+    const dueText = `截止 ${dueToday.getFullYear()}/${dueToday.getMonth() + 1}/${dueToday.getDate()}`;
+    await expect(page.getByText(dueText).first()).toBeVisible({ timeout: 10_000 });
+
+    // 造数据：一个进行中的目标
+    await page.goto('/m/goals/list');
+    await page.getByLabel('目标标题').fill('2026 精读 12 本书');
+    await page.getByRole('button', { name: '创建目标' }).click();
+    await expect(page.getByRole('heading', { name: '2026 精读 12 本书', exact: true })).toBeVisible(
+      { timeout: 10_000 },
+    );
+
+    // 回大屏：今日要务与目标推进都聚合进焦点卡，链接指向对应模块页
+    await page.goto('/');
+    // 城市仍未设置 → 首启引导抽屉会再次弹出，先关掉再断言
+    await page
+      .getByRole('dialog')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => undefined);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    await expect(page.getByText('写年度复盘').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('2026 精读 12 本书').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('1 要务')).toBeVisible();
+    await expect(page.getByRole('link', { name: /写年度复盘/ })).toHaveAttribute(
+      'href',
+      '/m/todo_notes/list',
+    );
+    await expect(page.getByRole('link', { name: /2026 精读 12 本书/ })).toHaveAttribute(
+      'href',
+      '/m/goals/list',
+    );
+  });
 });

@@ -23,6 +23,7 @@ import { useUiStore } from '@/lib/store';
 import { ActivityCard } from './activity-card';
 import { ClockCard, TimeOrbit } from './clock-card';
 import { CountdownSection } from './countdown-card';
+import { FocusCard, dueDay, type FocusGoalItem, type FocusTodoItem } from './focus-card';
 import { AtlasMark, HealthDot, ScreenIcon, WeatherIcon } from './icons';
 import { HotlistCard } from './hotlist-card';
 import { ListeningMiniCard } from './listening-mini-card';
@@ -374,19 +375,57 @@ export function DashboardScreenPage({
     if (cityMissing && canWrite) openSettings();
   }, [cityMissing, canWrite, openSettings]);
 
-  // 待办剩余：聚合视图直接调 todo_notes 的公开接口（模块未启用/无权限时静默回退）
+  // 待办剩余 + 今日焦点：聚合视图直接调 todo_notes / goals 的公开接口
+  // （模块未启用/无权限时静默回退，不跨模块引代码——ADR-0005 模块边界）
   const todoOpenQuery = useQuery({
     queryKey: ['todo-open', workspaceSlug],
     queryFn: () =>
-      api<{ todos: Array<{ id: string }> }>(
-        `/modules/workspaces/${workspaceSlug}/todo_notes/call/list`,
-        { method: 'POST', json: { status: 'open' } },
-      ),
+      api<{ todos: FocusTodoItem[] }>(`/modules/workspaces/${workspaceSlug}/todo_notes/call/list`, {
+        method: 'POST',
+        json: { status: 'open' },
+      }),
     refetchInterval: 60_000,
     staleTime: 30_000,
     retry: false,
   });
   const todoOpenCount = todoOpenQuery.data?.todos.length ?? null;
+  const goalsQuery = useQuery({
+    queryKey: ['goals-focus', workspaceSlug],
+    queryFn: () =>
+      api<{ objectives: FocusGoalItem[] }>(
+        `/modules/workspaces/${workspaceSlug}/goals/call/snapshot`,
+        { method: 'POST', json: {} },
+      ),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    retry: false,
+  });
+  // 今日焦点：高优或今/明到期的待办 top3（"今天该做的事"）+ 未达成目标 top2
+  // 待办 dueDate 为 timestamp 列（JSON 返回 ISO 字符串），统一归一化为本地日再比较
+  const [focusToday, focusTomorrow] = useMemo(() => {
+    const fmt = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return [fmt(new Date()), fmt(new Date(Date.now() + 86_400_000))];
+  }, []);
+  const focusTodos = (todoOpenQuery.data?.todos ?? [])
+    .map((item) => ({ ...item, dueDay: item.dueDate ? dueDay(item.dueDate) : '' }))
+    .filter(
+      (item) =>
+        item.priority === 'high' ||
+        (item.dueDay !== '' && (item.dueDay === focusToday || item.dueDay === focusTomorrow)),
+    )
+    .map((item) => ({
+      item,
+      rank:
+        (item.priority === 'high' ? 0 : 2) +
+        (item.dueDay !== '' && item.dueDay <= focusToday ? 0 : 1),
+    }))
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, 3)
+    .map(({ item }) => item);
+  const focusGoals = (goalsQuery.data?.objectives ?? [])
+    .filter((goal) => goal.progress < 1)
+    .slice(0, 2);
   // 稍后读：热榜条目的设备级收藏
   const later = useLaterReading(HOT_SOURCE_LABELS);
 
@@ -586,6 +625,7 @@ export function DashboardScreenPage({
             aria-label="大屏区块导航"
           >
             {[
+              { id: 'focus-section', label: '今日焦点' },
               { id: 'overview-section', label: '今日节奏' },
               { id: 'hotlist-section', label: '实时热榜' },
               { id: 'countdown-section', label: '纪念日' },
@@ -890,6 +930,15 @@ export function DashboardScreenPage({
                 </div>
               </section>
             ) : null}
+
+            {/* 今日焦点：跨模块聚合（高优待办 + 目标推进），专注模式下也保留——它就是"该做的事" */}
+            <section id="focus-section" aria-label="今日焦点" className="scroll-mt-6">
+              <FocusCard
+                todos={focusTodos}
+                goals={focusGoals}
+                loading={todoOpenQuery.isPending || goalsQuery.isPending}
+              />
+            </section>
 
             {/* 每日小结 + 打卡 + 一言：第二屏，长期停留时向下浏览；专注模式下隐藏 */}
             {!focusMode ? (
