@@ -7,6 +7,8 @@ export default tseslint.config(
   {
     ignores: [
       '**/.local/**',
+      // ZCode Sites 部署组装产物（含生成的 server.js），见 docs/deploy/zcode-site.md
+      '**/.zcode-site/**',
       '**/atlas-seed.mjs',
       '**/atlas-shot.mjs',
       '**/atlas-visual.mjs',

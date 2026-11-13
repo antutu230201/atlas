@@ -104,11 +104,20 @@ fi
 
 # ---- API：内嵌 PostgreSQL + NestJS，后台运行（linux 二进制；本机 check 时跳过） ----
 if [ "$(uname -s)" = "Linux" ]; then
+  # libicudata 超包单文件上限，以分片打包：启动时合并还原（运行期只需要 .so.60）
+  ICU_LIB="api/node_modules/@embedded-postgres/linux-x64/native/lib"
+  if [ -f "$ICU_LIB/icudata.part-aa" ] && [ ! -f "$ICU_LIB/libicudata.so.60.2" ]; then
+    cat "$ICU_LIB/icudata.part-aa" "$ICU_LIB/icudata.part-ab" > "$ICU_LIB/libicudata.so.60.2"
+    ln -sf libicudata.so.60.2 "$ICU_LIB/libicudata.so.60"
+    rm -f "$ICU_LIB/icudata.part-aa" "$ICU_LIB/icudata.part-ab"
+  fi
   (
     cd api
     export PORT=${apiOrigin.replace(/^https?:\/\/[^:]+:(\d+).*$/, '$1') || '3001'}
     export EMBEDDED_PG=true
     export PG_DATA_DIR="$DATA_DIR/pgdata"
+    # 1GB 内存容器：PG shared_buffers 降档，给两个 Node 进程留出堆空间
+    export ATLAS_PG_SHARED_BUFFERS=48MB
     export STORAGE_DIR="$DATA_DIR/storage"
     export NODE_OPTIONS="--max-old-space-size=384"
     while true; do
@@ -127,7 +136,7 @@ export HOSTNAME=0.0.0.0
 # /status 页服务端探测走内部绝对地址（Node fetch 不支持相对 URL）
 export ATLAS_INTERNAL_API_URL="${apiOrigin}"
 export NODE_OPTIONS="--max-old-space-size=384"
-exec node ${webEntry}
+exec node server.js
 `;
 
 function step(name) {
@@ -238,8 +247,22 @@ function workspaceSourceDir(pkgName) {
 
 // ---------------------------------------------------------------------------
 step('清理并重建 stage / snapshot 目录');
-rmSync(stageDir, { recursive: true, force: true });
-rmSync(snapshotDir, { recursive: true, force: true });
+// Windows 下若有进程（如残留 shell）cwd 停在目录内，删除会短暂 EPERM：重试兜底
+function rmRfRetry(dir, attempts = 5) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (attempt >= attempts) throw error;
+      console.log(`   ${path.relative(root, dir)} 暂被占用（第 ${attempt} 次），3 秒后重试…`);
+      sleepSync(3000);
+    }
+  }
+}
+rmRfRetry(stageDir);
+rmRfRetry(snapshotDir);
+rmRfRetry(path.join(root, '.zcode-site', 'deploy-web'));
 mkdirSync(stageDir, { recursive: true });
 mkdirSync(snapshotDir, { recursive: true });
 
@@ -282,17 +305,76 @@ snapshotTree(
   path.join(snapshotDir, 'web', path.dirname(webEntry), '.next', 'static'),
   [],
 );
-cpSync(
-  path.join(webAppDir, 'public'),
-  path.join(snapshotDir, 'web', path.dirname(webEntry), 'public'),
-  {
-    recursive: true,
-  },
-);
 
 // ---------------------------------------------------------------------------
-step('组装 stage/web（自快照）');
-cpSync(path.join(snapshotDir, 'web'), path.join(stageDir, 'web'), { recursive: true });
+step('物化 Web 依赖树（pnpm deploy --prod，真实文件）');
+// Turbopack 的 standalone 依赖追踪在 Windows + pnpm junctions 下会漏掉几乎全部
+// node_modules（react/@next/env 等运行时依赖缺失）。改用 pnpm deploy 物化完整
+// 真实文件依赖树，再把 standalone 构建产物叠加到其根（单项目 standalone 布局）。
+const deployDir = path.join(root, '.zcode-site', 'deploy-web');
+rmSync(deployDir, { recursive: true, force: true });
+run(
+  'pnpm',
+  [
+    '--filter',
+    '@atlas/web',
+    'deploy',
+    '--prod',
+    '--legacy',
+    '--config.node-linker=hoisted',
+    '.zcode-site/deploy-web',
+  ],
+  { cwd: root },
+);
+// deploy 树里没有运行期需要的东西要清：源码/E2E/配置只参与构建；Windows 原生二进制
+// 会被包检查拒绝；以下 npm 包已被 Turbopack 打进 chunk（或纯属构建期），node_modules
+// 里的副本不再被引用——剔除它们把文件数压回包契约红线（≤ 20000）内
+for (const rel of [
+  'src',
+  'e2e',
+  'test-results',
+  '.next',
+  'AGENTS.md',
+  'playwright.config.ts',
+  'tsconfig.json',
+  'tsconfig.tsbuildinfo',
+  'next-env.d.ts',
+  'postcss.config.mjs',
+  'node_modules/.bin',
+  'node_modules/@next/swc-win32-x64-msvc',
+  'node_modules/@img',
+  // 以下为已打包进 chunk / 纯构建期的依赖
+  'node_modules/three',
+  'node_modules/drizzle-orm',
+  'node_modules/lunar-typescript',
+  'node_modules/qrcode',
+  'node_modules/pngjs',
+  'node_modules/dijkstrajs',
+  'node_modules/sharp',
+  'node_modules/@types',
+  'node_modules/@babel',
+  'node_modules/caniuse-lite',
+  'node_modules/browserslist',
+  'node_modules/electron-to-chromium',
+  'node_modules/baseline-browser-mapping',
+  'node_modules/@floating-ui',
+  'node_modules/@jridgewell',
+  'node_modules/json5',
+  // next 自带的构建期目录：文档 / bundle 分析 / ESM 变体（运行时走 CJS）
+  'node_modules/next/dist/docs',
+  'node_modules/next/dist/bundle-analyzer',
+  'node_modules/next/dist/esm',
+]) {
+  rmSync(path.join(deployDir, rel), { recursive: true, force: true });
+}
+
+// ---------------------------------------------------------------------------
+step('组装 stage/web（deploy 依赖树 + standalone 产物叠加）');
+const webStageDir = path.join(stageDir, 'web');
+cpSync(deployDir, webStageDir, { recursive: true });
+const webSnapApp = path.join(snapshotDir, 'web', path.dirname(webEntry));
+cpSync(path.join(webSnapApp, '.next'), path.join(webStageDir, '.next'), { recursive: true });
+cpSync(path.join(webSnapApp, 'server.js'), path.join(webStageDir, 'server.js'));
 
 // ---------------------------------------------------------------------------
 step('组装 stage/api：dist + 内核迁移 + linux-x64 生产依赖');
@@ -326,15 +408,37 @@ const linuxPgDir = path.join(apiStageDir, 'node_modules', '@embedded-postgres', 
 if (!existsSync(linuxPgDir)) {
   throw new Error('交叉安装后缺少 @embedded-postgres/linux-x64——云端将无法启动内嵌 PG');
 }
+// PG 运行时用不到的部分：扩展定义目录（~350 个扩展的 control/sql，全量近千文件）
+// 与静态库归档（*.a，仅链接期需要）；时区数据与共享字典等核心运行文件保留
+const pgNativeDir = path.join(linuxPgDir, 'native');
+rmSync(path.join(pgNativeDir, 'share', 'extension'), { recursive: true, force: true });
+for (const entry of readdirSync(path.join(pgNativeDir, 'lib'))) {
+  if (entry.endsWith('.a')) {
+    rmSync(path.join(pgNativeDir, 'lib', entry), { force: true });
+  }
+}
 // 其 postinstall（hydrate-symlinks）在 Windows 上建不了符号链接：postgres 运行依赖
-// 这些无版本号库链接（如 libicui18n.so.60），按 pg-symlinks.json 补齐；建链失败则复制文件
+// 这些无版本号库链接（如 libicui18n.so.60），按 pg-symlinks.json 补齐；建链失败则复制文件。
+// 例外：libicudata（~26MB）超过包契约单文件 25MB 上限——先拆成两个分片，
+// 由 start.sh 在云端启动时合并还原（源文件随后删除，水合循环跳过缺失源）。
+const pgLibDir = path.join(linuxPgDir, 'native', 'lib');
+const icuDataPath = path.join(pgLibDir, 'libicudata.so.60.2');
+if (existsSync(icuDataPath)) {
+  const buf = readFileSync(icuDataPath);
+  const half = Math.ceil(buf.length / 2);
+  writeFileSync(path.join(pgLibDir, 'icudata.part-aa'), buf.subarray(0, half));
+  writeFileSync(path.join(pgLibDir, 'icudata.part-ab'), buf.subarray(half));
+  rmSync(icuDataPath);
+  console.log('   libicudata 已拆分为 2 个分片（start.sh 启动时合并还原）');
+}
 const symlinkMapPath = path.join(linuxPgDir, 'native', 'pg-symlinks.json');
 if (existsSync(symlinkMapPath)) {
   let hydrated = 0;
   for (const { source, target } of JSON.parse(readFileSync(symlinkMapPath, 'utf8'))) {
+    const sourceAbs = path.join(linuxPgDir, source);
+    if (!existsSync(sourceAbs)) continue;
     const targetAbs = path.join(linuxPgDir, target);
     if (existsSync(targetAbs)) continue;
-    const sourceAbs = path.join(linuxPgDir, source);
     try {
       symlinkSync(path.relative(path.dirname(targetAbs), sourceAbs), targetAbs);
     } catch {

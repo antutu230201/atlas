@@ -24,6 +24,13 @@ Atlas 以"单容器多进程"形态部署到 ZCode Sites：一个包里同时装
 - `turbo.json`：上述变量纳入 build 缓存键。
 - `scripts/build-site-stage.mjs`：一键构建并组装 `.zcode-site/stage/`（含 start.sh 生成）。
 
+## stage/web 的组装方式（为什么不是纯 standalone）
+
+Turbopack 的 standalone 依赖追踪在 Windows + pnpm junctions 下会漏掉几乎全部 `node_modules`（react、@next/env 等运行时依赖缺失，启动即崩）。因此脚本分两步组装 web：
+
+1. `pnpm --filter @atlas/web deploy --prod --legacy --config.node-linker=hoisted` 物化完整真实文件依赖树，随后裁剪源码/E2E/构建期原生二进制（`@next/swc-win32-*`、`@img`）与已被打进客户端 chunk 的 `three`；
+2. 把 standalone 构建产物（`server.js`、`.next/`）叠加到该树根——最终 `stage/web` 是单项目 standalone 布局（server.js 与 node_modules 同级）。
+
 ## 部署步骤
 
 ```bash
