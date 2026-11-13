@@ -119,12 +119,19 @@ export async function startEmbeddedPostgres(env: ApiEnv): Promise<EmbeddedPostgr
 
   // embedded-postgres 是 ESM 包，从 CommonJS 侧动态加载
   const { default: EmbeddedPostgres } = await import('embedded-postgres');
+  // 容器以 root 运行时（如 ZCode Sites），PG 二进制拒绝 root 执行：让库自动
+  // 创建 postgres 用户并以该身份运行（Windows 无 getuid，走 false 分支）
+  const runningAsRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+  // 1GB 内存容器的护栏：显式降低 shared_buffers（本地开发保持 PG 默认）
+  const sharedBuffers = process.env.ATLAS_PG_SHARED_BUFFERS;
   const pg = new EmbeddedPostgres({
     databaseDir: dataDir,
     user,
     password,
     port,
     persistent: true,
+    createPostgresUser: runningAsRoot,
+    postgresFlags: sharedBuffers ? ['-c', `shared_buffers=${sharedBuffers}`] : [],
     // 中文 Windows 上该二进制在 post-bootstrap 会写入 GBK 字节的系统串，
     // UTF8 编码校验会拒绝（0xb8 FATAL）。开发库改用 C locale + SQL_ASCII
     // （字节透传，客户端以 UTF8 存取不受影响）；详见 ADR-0002。
