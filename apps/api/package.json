@@ -16,6 +16,7 @@
     "@atlas/core": "workspace:*",
     "@atlas/module-dashboard": "workspace:*",
     "@atlas/module-goals": "workspace:*",
+    "@atlas/module-journal": "workspace:*",
     "@atlas/module-sample-note": "workspace:*",
     "@atlas/module-todo-notes": "workspace:*",
     "@atlas/sdk": "workspace:*",

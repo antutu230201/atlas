@@ -42,6 +42,11 @@ const ROUTES: RouteCase[] = [
     ready: (page) => page.getByRole('heading', { name: '目标', exact: true }).waitFor(),
   },
   {
+    name: '复盘',
+    path: '/m/journal/review',
+    ready: (page) => page.getByRole('heading', { name: '复盘', exact: true }).waitFor(),
+  },
+  {
     name: '待办',
     path: '/m/todo_notes/list',
     ready: (page) => page.getByRole('heading', { name: '待办', exact: true }).waitFor(),
@@ -190,7 +195,7 @@ test.describe('应用页面无障碍审计', () => {
 
     await page.goto('/settings');
     await page.getByRole('tab', { name: '模块', exact: true }).click();
-    for (const moduleName of ['todo_notes', 'sample_note', 'habits', 'goals']) {
+    for (const moduleName of ['todo_notes', 'sample_note', 'habits', 'goals', 'journal']) {
       const card = page.getByTestId(`module-card-${moduleName}`);
       const enable = card.getByRole('button', { name: '启用', exact: true });
       if (await enable.isVisible().catch(() => false)) {

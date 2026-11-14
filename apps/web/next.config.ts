@@ -35,6 +35,7 @@ const nextConfig: NextConfig = {
     '@atlas/module-dashboard',
     '@atlas/module-habits',
     '@atlas/module-goals',
+    '@atlas/module-journal',
   ],
 };
 

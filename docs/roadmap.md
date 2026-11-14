@@ -731,3 +731,15 @@
 - [x] 测试基建修复：global-setup 的 truncate 清单补 `platform.app_setting`（AI 配置此前跨运行残留，会让 ai-config「初始视图」用例在第二轮全量时假失败）；本 spec afterAll 显式 `PUT { apiKey: null }` 回落 mock。
 - 排障记录：验收时发现 3001 仍跑旧逻辑——根因是 `nest start --watch` wrapper 在子进程被杀后自动重启子进程并继续占端口，`taskkill` 监听 PID 杀不死 wrapper 本体；正确做法是把所有 `nest.js start --watch` wrapper 一并 kill //T 再重启。
 - 验证：真实 429 限流下快照返回 `source=local`（curl 实证）+ 浏览器实测小结卡 DATA BRIEF 徽章与真实数据文案（纪念日 47 天 / 实时天气）。
+
+## 复盘日记模块交付记录（2026-11-14，modules/journal）
+
+第五个业务模块，ideas.md 三个候选全部交付完毕——个人成长闭环成型：待办（执行）→ 习惯（坚持）→ 目标（方向）→ 复盘（回顾）。延续本轮降本主题：本地模板与数据聚合零 AI，AI 仅显式单次调用。
+
+- [x] 数据模型：`modules.journal.entry`（kind daily/weekly + day 周期锚点 + mood 1–5 + content + aiText 润色稿 + 软删除）；**部分唯一索引** (workspace,kind,day) WHERE deleted_at IS NULL → 保存即 upsert（一天一篇日记/一周一篇周报）；迁移 0000 + 0001_rls
+- [x] 动作 5 个：snapshot（月参数 + 归档区 + 连续复盘天数）/ saveEntry（upsert，正文变化自动清过期润色稿）/ deleteEntry / restoreEntry（占位冲突拒绝）/ polishEntry（**唯一 AI 消耗点**：显式触发、一次调用入库存档、Mock 未配置明确拒绝不烧配额）
+- [x] 事件 4 个：journal.saved/polished/deleted/restored 落 outbox
+- [x] 前端（/m/journal/review，nav order 4）：日/周双页签（Radix Tabs 键盘可达）+ 心情五档 + 模板提示写作；周复盘「生成本地草稿」前端聚合待办/习惯/目标公开接口（沿用焦点卡模式，零 AI，模块未启用优雅降级）；月列表点击载入编辑器 + ← → 切月 + 归档恢复
+- [x] 接线：api/web 依赖 + transpilePackages + module-registry + a11y 扫描路由（13 路由 × 52 扫描）
+- [x] 测试：集成 10 个（upsert/周报限周一/月过滤/归档恢复/占位冲突/guest/越权/Mock 拒绝/润色一次调用）+ e2e 1 条（日记保存编辑删除恢复 + 周草稿 + 390px）+ 全仓 API 143 测试 + a11y 52 扫描全绿
+- V1 不做：复盘统计图表（如心情趋势线）、模板自定义、导出——按需迭代

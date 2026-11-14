@@ -58,6 +58,11 @@ export const moduleWebRegistry: Record<string, Record<string, ComponentType<Modu
       import('@atlas/module-goals/web').then((module) => ({ default: module.GoalsListPage })),
     ),
   },
+  journal: {
+    review: lazy(() =>
+      import('@atlas/module-journal/web').then((module) => ({ default: module.JournalReviewPage })),
+    ),
+  },
 };
 
 export const moduleWidgetRegistry: Record<

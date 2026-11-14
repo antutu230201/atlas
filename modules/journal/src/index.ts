@@ -1,0 +1,357 @@
+import { and, desc, eq, gte, isNotNull, isNull, lte } from 'drizzle-orm';
+import { z } from 'zod';
+import {
+  ModuleActionError,
+  moduleManifestSchema,
+  type ModuleContext,
+  type ModuleDefinition,
+} from '@atlas/sdk';
+import { entry } from './db/schema';
+
+/**
+ * 复盘日记（journal）：每日/每周模板复盘、心情五档、月度列表与归档恢复。
+ * 降本约定（2026-11-14）：本地模板与数据聚合零 AI；polishEntry 是唯一的 AI 消耗点，
+ * 仅显式触发（一次调用、结果入库存档），Mock 未配置时明确拒绝。
+ * 数据模型：entry（(workspace, kind, day) 部分唯一 = 保存即 upsert；软删除可恢复）。
+ */
+
+const manifest = moduleManifestSchema.parse({
+  name: 'journal',
+  version: '0.1.0',
+  title: '复盘',
+  description: '每日与每周复盘：心情、模板写作、月度回顾；AI 润色可选。',
+  permissions: ['journal:read', 'journal:write'],
+  dependsOn: [],
+  routes: [{ path: 'review', title: '复盘', nav: { order: 4, icon: '📝' } }],
+  settings: [],
+  events: {
+    publishes: ['journal.saved', 'journal.polished', 'journal.deleted', 'journal.restored'],
+    subscribes: [],
+  },
+  migrations: 'migrations',
+});
+
+/* ---------------- 输入校验与工具 ---------------- */
+
+const KINDS = ['daily', 'weekly'] as const;
+type Kind = (typeof KINDS)[number];
+
+const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD');
+const monthStr = z.string().regex(/^\d{4}-\d{2}$/, '月份格式应为 YYYY-MM');
+const idSchema = z.object({ entryId: z.string().uuid() });
+
+const saveSchema = z
+  .object({
+    kind: z.enum(KINDS),
+    day: dateStr,
+    mood: z.number().int().min(1).max(5).nullable().optional(),
+    content: z.string().max(5000, '内容最长 5000 字').default(''),
+  })
+  .refine((data) => data.kind !== 'weekly' || isMonday(data.day), {
+    message: '周复盘的日期必须是周一',
+  });
+
+function isMonday(day: string): boolean {
+  const d = new Date(`${day}T00:00:00`);
+  return d.getDay() === 1;
+}
+
+function bad(message: string): never {
+  throw new ModuleActionError(`输入不合法：${message}`);
+}
+
+function localDay(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** 本地时区当前周的周一 */
+function currentMonday(): string {
+  const now = new Date();
+  const offset = (now.getDay() + 6) % 7;
+  return localDay(new Date(now.getTime() - offset * 86_400_000));
+}
+
+/** 校验条目归属当前工作区（含软删），返回行 */
+async function ownedEntry(ctx: ModuleContext, entryId: string) {
+  const rows = await ctx.db
+    .select()
+    .from(entry)
+    .where(and(eq(entry.id, entryId), eq(entry.workspaceId, ctx.workspaceId)))
+    .limit(1);
+  const row = rows[0];
+  if (!row) bad('复盘条目不存在或已被删除');
+  return row;
+}
+
+/* ---------------- 快照组装 ---------------- */
+
+export interface EntryView {
+  id: string;
+  kind: Kind;
+  day: string;
+  mood: number | null;
+  content: string;
+  aiText: string | null;
+  aiPolishedAt: string | null;
+  updatedAt: string;
+}
+
+export interface JournalSnapshot {
+  month: string;
+  entries: EntryView[];
+  archived: { id: string; kind: Kind; day: string; title: string }[];
+  summary: {
+    /** 本月日记篇数 */
+    monthDaily: number;
+    /** 本月周报篇数 */
+    monthWeekly: number;
+    /** 连续复盘天数（今天未写不断签，从昨天起算） */
+    streak: number;
+    currentMonday: string;
+  };
+}
+
+function toView(row: typeof entry.$inferSelect): EntryView {
+  return {
+    id: row.id,
+    kind: row.kind === 'weekly' ? 'weekly' : 'daily',
+    day: row.day,
+    mood: row.mood,
+    content: row.content,
+    aiText: row.aiText,
+    aiPolishedAt: row.aiPolishedAt?.toISOString() ?? null,
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** 复盘卡标题：截取内容首行/前 24 字 */
+function titleOf(content: string): string {
+  const firstLine = content.split('\n').find((line) => line.trim().length > 0) ?? '';
+  const trimmed = firstLine.trim();
+  return trimmed.length > 0
+    ? trimmed.length > 24
+      ? `${trimmed.slice(0, 24)}…`
+      : trimmed
+    : '（无正文）';
+}
+
+async function buildSnapshot(ctx: ModuleContext, month: string): Promise<JournalSnapshot> {
+  const monthStart = `${month}-01`;
+  const [y, m] = month.split('-').map(Number);
+  const monthEnd = localDay(new Date(y!, m!, 0)); // 当月最后一天
+
+  const [activeRows, archivedRows] = await Promise.all([
+    ctx.db
+      .select()
+      .from(entry)
+      .where(
+        and(
+          eq(entry.workspaceId, ctx.workspaceId),
+          isNull(entry.deletedAt),
+          gte(entry.day, monthStart),
+          lte(entry.day, monthEnd),
+        ),
+      )
+      .orderBy(desc(entry.day)),
+    ctx.db
+      .select()
+      .from(entry)
+      .where(and(eq(entry.workspaceId, ctx.workspaceId), isNotNull(entry.deletedAt)))
+      .orderBy(desc(entry.deletedAt))
+      .limit(20),
+  ]);
+
+  // 连续复盘天数：今天未写不断签，从昨天起算（简单连续，无宽免）
+  const dailyDays = new Set(activeRows.filter((row) => row.kind === 'daily').map((row) => row.day));
+  let streak = 0;
+  const cursor = new Date();
+  if (!dailyDays.has(localDay(cursor))) cursor.setDate(cursor.getDate() - 1);
+  while (dailyDays.has(localDay(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return {
+    month,
+    entries: activeRows.map(toView),
+    archived: archivedRows.map((row) => ({
+      id: row.id,
+      kind: row.kind === 'weekly' ? 'weekly' : 'daily',
+      day: row.day,
+      title: titleOf(row.content),
+    })),
+    summary: {
+      monthDaily: activeRows.filter((row) => row.kind === 'daily').length,
+      monthWeekly: activeRows.filter((row) => row.kind === 'weekly').length,
+      streak,
+      currentMonday: currentMonday(),
+    },
+  };
+}
+
+/* ---------------- 模块定义 ---------------- */
+
+export const definition: ModuleDefinition = {
+  manifest,
+  actions: {
+    /** 月度快照：本月条目（日+周）+ 归档区 + 汇总指标 */
+    snapshot: {
+      permission: 'journal:read',
+      handler: async (ctx, input) => {
+        const parsed = z.object({ month: monthStr.optional() }).safeParse(input ?? {});
+        if (!parsed.success) bad('月份格式应为 YYYY-MM');
+        const month = parsed.data.month ?? localDay().slice(0, 7);
+        return buildSnapshot(ctx, month);
+      },
+    },
+
+    /** 保存（upsert）：同 kind+day 已有活跃条目则更新；正文变化时清除过期润色稿 */
+    saveEntry: {
+      permission: 'journal:write',
+      handler: async (ctx, input) => {
+        const parsed = saveSchema.safeParse(input ?? {});
+        if (!parsed.success) bad(parsed.error.issues[0]?.message ?? '参数错误');
+        const data = parsed.data;
+
+        const existing = await ctx.db
+          .select()
+          .from(entry)
+          .where(
+            and(
+              eq(entry.workspaceId, ctx.workspaceId),
+              eq(entry.kind, data.kind),
+              eq(entry.day, data.day),
+              isNull(entry.deletedAt),
+            ),
+          )
+          .limit(1);
+
+        let entryId: string;
+        const current = existing[0];
+        if (current) {
+          const contentChanged = current.content !== data.content;
+          await ctx.db
+            .update(entry)
+            .set({
+              mood: data.mood ?? null,
+              content: data.content,
+              // 润色稿对应旧原文：正文变化即清除，避免误导
+              aiText: contentChanged ? null : current.aiText,
+              aiPolishedAt: contentChanged ? null : current.aiPolishedAt,
+              updatedAt: new Date(),
+            })
+            .where(eq(entry.id, current.id));
+          entryId = current.id;
+        } else {
+          const inserted = await ctx.db
+            .insert(entry)
+            .values({
+              workspaceId: ctx.workspaceId,
+              kind: data.kind,
+              day: data.day,
+              mood: data.mood ?? null,
+              content: data.content,
+            })
+            .returning({ id: entry.id });
+          entryId = inserted[0]?.id ?? '';
+          if (!entryId) bad('保存失败，请重试');
+        }
+        await ctx.events.publish('journal.saved', { entryId, kind: data.kind, day: data.day });
+        return { entryId };
+      },
+    },
+
+    /** 软删除：进入归档区，可恢复 */
+    deleteEntry: {
+      permission: 'journal:write',
+      handler: async (ctx, input) => {
+        const parsed = idSchema.safeParse(input ?? {});
+        if (!parsed.success) bad('条目 ID 不合法');
+        const row = await ownedEntry(ctx, parsed.data.entryId);
+        if (!row.deletedAt) {
+          await ctx.db
+            .update(entry)
+            .set({ deletedAt: new Date(), updatedAt: new Date() })
+            .where(eq(entry.id, row.id));
+          await ctx.events.publish('journal.deleted', { entryId: row.id });
+        }
+        return { ok: true };
+      },
+    },
+
+    restoreEntry: {
+      permission: 'journal:write',
+      handler: async (ctx, input) => {
+        const parsed = idSchema.safeParse(input ?? {});
+        if (!parsed.success) bad('条目 ID 不合法');
+        const row = await ownedEntry(ctx, parsed.data.entryId);
+        if (row.deletedAt) {
+          // 同周期可能已有新条目占位（部分唯一索引）：冲突时拒绝并提示
+          const clash = await ctx.db
+            .select({ id: entry.id })
+            .from(entry)
+            .where(
+              and(
+                eq(entry.workspaceId, ctx.workspaceId),
+                eq(entry.kind, row.kind),
+                eq(entry.day, row.day),
+                isNull(entry.deletedAt),
+              ),
+            )
+            .limit(1);
+          if (clash[0]) bad('该日期已有一条复盘，先删除它再恢复这条');
+          await ctx.db
+            .update(entry)
+            .set({ deletedAt: null, updatedAt: new Date() })
+            .where(eq(entry.id, row.id));
+          await ctx.events.publish('journal.restored', { entryId: row.id });
+        }
+        return { ok: true };
+      },
+    },
+
+    /** AI 润色（唯一 AI 消耗点）：显式触发、一次调用、结果入库存档；Mock 未配置时拒绝 */
+    polishEntry: {
+      permission: 'journal:write',
+      handler: async (ctx, input) => {
+        const parsed = idSchema.safeParse(input ?? {});
+        if (!parsed.success) bad('条目 ID 不合法');
+        const row = await ownedEntry(ctx, parsed.data.entryId);
+        if (row.deletedAt) bad('归档条目不能润色');
+        if (row.content.trim().length === 0) bad('先写点内容再润色');
+
+        const polished = await ctx.ai
+          .complete(
+            [
+              `这是我的${row.kind === 'weekly' ? '本周' : '今天'}复盘原文：`,
+              row.content,
+              '',
+              '请在不添加不存在的事实、保持第一人称的前提下，把这段复盘整理得更通顺有条理（100 字以内）。只输出润色后的文本。',
+            ].join('\n'),
+            '你是 Atlas 个人成长助手：忠实、克制、温暖。只输出润色后的文本本身。',
+          )
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new ModuleActionError(`AI 润色失败：${message}`);
+          });
+
+        if (polished.startsWith('[MockAI]')) {
+          throw new ModuleActionError('AI 供应商未配置（当前为本地预览），润色需要真实供应商');
+        }
+
+        await ctx.db
+          .update(entry)
+          .set({ aiText: polished, aiPolishedAt: new Date(), updatedAt: new Date() })
+          .where(eq(entry.id, row.id));
+        await ctx.events.publish('journal.polished', { entryId: row.id });
+        return { aiText: polished };
+      },
+    },
+  },
+};
+
+/** 供测试与快照使用的辅助导出（不属于模块协议表面） */
+export { buildSnapshot, isMonday };
