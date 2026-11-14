@@ -851,3 +851,12 @@
 - [x] 测试：module-events 集成补导出用例（count 与列表一致、含 member.invited、未登录 401）；app-shell e2e 补下载文件名断言
 - 说明：至此宪法 §4「所有数据可导出」全量落实——6 个模块 + 内核通知，全部含软删除数据、全部有测试
 - 验证：全仓 API 156/156、app-shell e2e 2/2（含通知导出下载）、typecheck/lint/format/build 全绿；浏览器实测按钮可用、toast 正常
+
+### 通知免打扰时段（2026-11-15 续 8）
+
+- [x] 内核：偏好存 `user.settings.notificationQuietHours`（jsonb 列已有，**零迁移**）；`GET/PUT /v1/notifications/quiet-hours`（AuthGuard + zod 校验 HH:mm、起止不同）；纯函数 `quiet-hours.ts`（跨午夜窗口判断、normalize 逐字段回落旧数据），服务端返回 quietNow 判定
+- [x] 前端：通知页免打扰设置卡（启用 + 起止时间 + 保存，touched 才可保存）；免打扰中显示横幅「新通知照常收取，铃铛角标静默展示」；顶栏铃铛免打扰期间红色未读角标换月亮静音标记（未读数保留在 aria-label 与 title）；客户端每分钟重估窗口
+- [x] 测试：纯函数单测 9/9（同日/跨午夜边界、normalize 兼容、schema 拒绝）；集成 4/4（默认值、覆盖当前时刻的窗口 quietNow=true + 持久化、校验拒绝 ×3、401）；app-shell e2e 补免打扰流程（保存 → 横幅 → 刷新持久化）
+- [x] 修复潜伏竞态：dashboard-summary-cost 导出用例原来依赖注册自动个人空间的 slug 'ws'（中文显示名被 slugify 清空 → 全部回落 'ws'），新增注册类 spec 后并行套件里撞 slug——改用本 spec 自建的 sum-team
+- 说明：免打扰 = 展示层静默（不打扰），通知数据照常入库、随时可查可导出（宪法 §4 不打扰 ≠ 丢数据）
+- 验证：全仓 API **169/169**、app-shell e2e 2/2、typecheck/lint/format/build 全绿；浏览器实测设置卡、横幅、刷新持久化

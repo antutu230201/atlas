@@ -64,6 +64,24 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
     await expect(page.getByText('暂无通知')).toBeVisible();
     await page.getByRole('checkbox', { name: '只看未读' }).check();
     await expect(page.getByText('没有未读通知')).toBeVisible();
+
+    // 免打扰时段：开启覆盖当前时刻的窗口（前后各 1h，跨午夜安全）→ 横幅出现；刷新后持久化
+    await page.getByLabel('启用免打扰时段').check();
+    const nowDate = new Date();
+    const fmtHm = (d: Date) =>
+      `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    await page
+      .getByLabel('免打扰开始时间')
+      .fill(fmtHm(new Date(nowDate.getTime() - 60 * 60 * 1000)));
+    await page
+      .getByLabel('免打扰结束时间')
+      .fill(fmtHm(new Date(nowDate.getTime() + 60 * 60 * 1000)));
+    await page.getByRole('button', { name: '保存免打扰设置' }).click();
+    await expect(page.getByText('免打扰时段已开启').first()).toBeVisible();
+    await expect(page.getByTestId('quiet-active-banner')).toBeVisible();
+    await page.reload();
+    await expect(page.getByTestId('quiet-active-banner')).toBeVisible({ timeout: 10_000 });
+
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

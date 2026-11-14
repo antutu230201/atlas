@@ -14,7 +14,13 @@ import {
   useToast,
 } from '@atlas/ui';
 import { api } from '@/lib/api';
-import { useUnreadNotificationCount, type NotificationItem } from '@/lib/queries';
+import {
+  useQuietHours,
+  useSetQuietHours,
+  useUnreadNotificationCount,
+  type NotificationItem,
+} from '@/lib/queries';
+import { isQuietNow, type QuietHours } from '@/lib/quiet-hours';
 
 /** 通知正文与跳转目标由服务端写入 body（如周报的 text / link），这里只做类型守卫后渲染 */
 function readBodyText(body: Record<string, unknown>): string | null {
@@ -152,6 +158,8 @@ export default function NotificationsPage() {
         ) : null}
       </header>
 
+      <QuietHoursCard />
+
       <Reveal index={0}>
         <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="通知筛选">
           {(
@@ -281,6 +289,111 @@ export default function NotificationsPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * 免打扰时段设置：偏好存内核 user.settings（PUT /v1/notifications/quiet-hours）。
+ * 生效期间铃铛角标静默为月亮标记，通知数据照常收取（宪法 §4：不打扰 ≠ 丢数据）。
+ */
+function QuietHoursCard() {
+  const { toast } = useToast();
+  const quietQuery = useQuietHours();
+  const save = useSetQuietHours();
+  const pref = quietQuery.data;
+
+  const [form, setForm] = useState<QuietHours>({ enabled: false, start: '22:00', end: '08:00' });
+  const [touched, setTouched] = useState(false);
+  useEffect(() => {
+    if (pref && !touched) {
+      setForm({ enabled: pref.enabled, start: pref.start, end: pref.end });
+    }
+  }, [pref, touched]);
+
+  const active = pref ? Boolean(pref.enabled) && isQuietNow(pref) : false;
+
+  const change = (patch: Partial<QuietHours>) => {
+    setTouched(true);
+    setForm((current) => ({ ...current, ...patch }));
+  };
+
+  const onSave = () => {
+    save.mutate(form, {
+      onSuccess: (data) => {
+        setTouched(false);
+        toast({
+          title: data.enabled ? '免打扰时段已开启' : '免打扰时段已关闭',
+          variant: 'ok',
+        });
+      },
+      onError: (error: Error) =>
+        toast({ title: '免打扰设置保存失败', description: error.message, variant: 'err' }),
+    });
+  };
+
+  return (
+    <Reveal index={0}>
+      <Card>
+        <CardContent className="space-y-3 py-4">
+          {active ? (
+            <p
+              className="flex items-center gap-2 rounded-sm bg-primary-soft px-3 py-2 text-xs text-text/90"
+              data-testid="quiet-active-banner"
+            >
+              <span aria-hidden>🌙</span>
+              免打扰中（{form.start} – {form.end}）：新通知照常收取，铃铛角标静默展示。
+            </p>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                className="size-4 accent-[var(--primary)]"
+                aria-label="启用免打扰时段"
+                checked={form.enabled}
+                onChange={(event) => change({ enabled: event.target.checked })}
+              />
+              免打扰时段
+            </label>
+            <div className="inline-flex items-center gap-2 text-sm text-muted">
+              <input
+                type="time"
+                aria-label="免打扰开始时间"
+                className="rounded-sm border border-border bg-surface px-2 py-1 text-sm text-text"
+                value={form.start}
+                onChange={(event) => change({ start: event.target.value })}
+              />
+              <span aria-hidden>–</span>
+              <input
+                type="time"
+                aria-label="免打扰结束时间"
+                className="rounded-sm border border-border bg-surface px-2 py-1 text-sm text-text"
+                value={form.end}
+                onChange={(event) => change({ end: event.target.value })}
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={save.isPending}
+              disabled={!touched}
+              onClick={onSave}
+            >
+              保存免打扰设置
+            </Button>
+          </div>
+          {quietQuery.isError ? (
+            <p className="text-xs text-err" role="alert">
+              免打扰设置加载失败，可稍后重试。
+            </p>
+          ) : (
+            <p className="text-xs text-muted">
+              允许跨午夜（如 22:00 – 08:00）；生效期间新通知不打扰，历史通知随时可查。
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </Reveal>
   );
 }
 

@@ -1,10 +1,13 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   HttpCode,
   Inject,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -13,6 +16,7 @@ import type { Request } from 'express';
 import { NOTIFICATION_SERVICE_TOKEN } from '../tokens';
 import { AuthGuard, type RequestUser } from '../auth/guards';
 import type { NotificationService } from '../events/notification.service';
+import { isQuietNow, quietHoursSchema } from './quiet-hours';
 
 @Controller('notifications')
 @UseGuards(AuthGuard)
@@ -57,6 +61,26 @@ export class NotificationController {
   async exportAll(@Req() request: Request) {
     const user = request.user as RequestUser;
     return { data: await this.notificationService.exportAll(user.id) };
+  }
+
+  /** 免打扰时段偏好（含服务端 quietNow 判定，纯函数复用） */
+  @Get('quiet-hours')
+  async getQuietHours(@Req() request: Request) {
+    const user = request.user as RequestUser;
+    const { quietNow, pref } = await this.notificationService.quietNow(user.id);
+    return { data: { ...pref, quietNow } };
+  }
+
+  @Put('quiet-hours')
+  async putQuietHours(@Req() request: Request, @Body() body: unknown) {
+    const user = request.user as RequestUser;
+    const parsed = quietHoursSchema.safeParse(body);
+    if (!parsed.success) {
+      const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+      throw new BadRequestException(`输入不合法：${detail}`);
+    }
+    await this.notificationService.setQuietHours(user.id, parsed.data);
+    return { data: { quietNow: isQuietNow(parsed.data), ...parsed.data } };
   }
 
   @Post(':id/read')

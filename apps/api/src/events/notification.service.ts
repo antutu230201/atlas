@@ -5,6 +5,7 @@ import { withUser } from '../db/tenant';
 import type { Db } from '../db/client';
 import { DB_TOKEN, MAIL_ADAPTER_TOKEN } from '../tokens';
 import type { MailAdapter } from '@atlas/core';
+import { QUIET_HOURS_KEY, isQuietNow, normalizeQuietHours, type QuietHours } from './quiet-hours';
 
 export interface CreateNotificationInput {
   workspaceId: string;
@@ -154,5 +155,48 @@ export class NotificationService {
         .set({ readAt: new Date() })
         .where(and(eq(notification.userId, userId), isNull(notification.readAt))),
     );
+  }
+
+  /** 免打扰时段偏好：存 user.settings（jsonb），缺省关闭 */
+  async getQuietHours(userId: string): Promise<QuietHours> {
+    const rows = await withUser(this.db, userId, (tx) =>
+      tx.select({ settings: user.settings }).from(user).where(eq(user.id, userId)).limit(1),
+    );
+    const settings = rows[0]?.settings;
+    return normalizeQuietHours(
+      settings && typeof settings === 'object'
+        ? (settings as Record<string, unknown>)[QUIET_HOURS_KEY]
+        : undefined,
+    );
+  }
+
+  /** 免打扰时段偏好：合并写回 user.settings（不覆盖其他偏好键） */
+  async setQuietHours(userId: string, pref: QuietHours): Promise<void> {
+    await withUser(this.db, userId, async (tx) => {
+      const rows = await tx
+        .select({ settings: user.settings })
+        .from(user)
+        .where(eq(user.id, userId))
+        .limit(1);
+      const current =
+        rows[0]?.settings && typeof rows[0].settings === 'object'
+          ? (rows[0].settings as Record<string, unknown>)
+          : {};
+      await tx
+        .update(user)
+        .set({
+          settings: { ...current, [QUIET_HOURS_KEY]: pref },
+          updatedAt: new Date(),
+        })
+        .where(eq(user.id, userId));
+    });
+  }
+
+  /** 当前是否在免打扰窗口内（供前端轮询端点复用同一纯函数） */
+  quietNow(
+    userId: string,
+    now: Date = new Date(),
+  ): Promise<{ quietNow: boolean; pref: QuietHours }> {
+    return this.getQuietHours(userId).then((pref) => ({ quietNow: isQuietNow(pref, now), pref }));
   }
 }

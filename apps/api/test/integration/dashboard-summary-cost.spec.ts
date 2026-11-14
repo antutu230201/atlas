@@ -132,15 +132,18 @@ describe('AI 每日小结降本', () => {
   });
 
   it('导出：倒计时全量 JSON——宪法 §4 数据可导出', async () => {
-    await apiFetch(app.url, '/modules/workspaces/ws/dashboard/call/createCountdown', {
+    // 用本 spec 自建的 sum-team：注册自动个人空间固定抢 slug 'ws'（中文显示名被 slugify 清空），
+    // 并行跑套件时会与其他 spec 的注册竞态——显式 slug 才是并行安全的
+    await apiFetch(app.url, '/modules/workspaces/sum-team/dashboard/call/createCountdown', {
       method: 'POST',
       cookie,
       body: { title: '导出测试纪念日', targetDate: '2026-12-01' },
     });
-    const exported = await apiFetch(app.url, '/modules/workspaces/ws/dashboard/call/exportData', {
-      method: 'POST',
-      cookie,
-    });
+    const exported = await apiFetch(
+      app.url,
+      '/modules/workspaces/sum-team/dashboard/call/exportData',
+      { method: 'POST', cookie },
+    );
     const data = exported.body.data as {
       moduleName: string;
       count: number;

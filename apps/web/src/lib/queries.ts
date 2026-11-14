@@ -92,6 +92,31 @@ export function useUnreadNotificationCount(enabled = true) {
   });
 }
 
+export interface QuietHoursPref {
+  enabled: boolean;
+  start: string;
+  end: string;
+  /** 服务端判定：当前时刻是否处于免打扰窗口（前端另有本地判定兜底） */
+  quietNow?: boolean;
+}
+
+export function useQuietHours(enabled = true) {
+  return useQuery({
+    queryKey: ['notifications', 'quiet-hours'],
+    queryFn: () => api<QuietHoursPref>('/notifications/quiet-hours'),
+    enabled,
+  });
+}
+
+export function useSetQuietHours() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { enabled: boolean; start: string; end: string }) =>
+      api<QuietHoursPref>('/notifications/quiet-hours', { method: 'PUT', json: input }),
+    onSuccess: (data) => queryClient.setQueryData(['notifications', 'quiet-hours'], data),
+  });
+}
+
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({
