@@ -80,6 +80,11 @@ test.describe('复盘日记模块', () => {
     await page.getByRole('tab', { name: '日记' }).click();
     await page.getByRole('button', { name: '写今天' }).click();
     await expect(page.getByLabel('日记内容')).toHaveValue(/自定义模板：第一步：/);
+    // 年视图：切年 → 12 柱状图渲染
+    await page.getByRole('button', { name: '年', exact: true }).click();
+    await expect(page.getByText('年视图')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('img', { name: /年心情柱状图/ })).toBeVisible({ timeout: 10_000 });
+
     // 390px 无横向溢出
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(400);

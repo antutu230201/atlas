@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNotNull, isNull, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   ModuleActionError,
@@ -14,6 +14,10 @@ import { entry } from './db/schema';
  * 仅显式触发（一次调用、结果入库存档），Mock 未配置时明确拒绝。
  * 数据模型：entry（(workspace, kind, day) 部分唯一 = 保存即 upsert；软删除可恢复）。
  */
+
+/** 写作模板默认值（manifest 声明与快照回落共用） */
+export const DEFAULT_DAILY_TEMPLATE = '今天的三件好事：\n卡住的地方：\n明天最重要的一件事：';
+export const DEFAULT_WEEKLY_TEMPLATE = '本周做得好的：\n可以更好的：\n下周专注的一件事：';
 
 const manifest = moduleManifestSchema.parse({
   name: 'journal',
@@ -43,10 +47,7 @@ const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY
 const monthStr = z.string().regex(/^\d{4}-\d{2}$/, '月份格式应为 YYYY-MM');
 const idSchema = z.object({ entryId: z.string().uuid() });
 
-/* 写作模板（工作空间级设置）：空值回落默认；上限与内容一致 */
-export const DEFAULT_DAILY_TEMPLATE = '今天的三件好事：\n卡住的地方：\n明天最重要的一件事：';
-export const DEFAULT_WEEKLY_TEMPLATE = '本周做得好的：\n可以更好的：\n下周专注的一件事：';
-
+/* 写作模板设置（工作空间级）：空值回落默认；上限与内容一致 */
 const settingsSchema = z.object({
   dailyTemplate: z.string().max(500).optional(),
   weeklyTemplate: z.string().max(500).optional(),
@@ -150,6 +151,12 @@ export interface JournalSnapshot {
   };
 }
 
+export interface YearStats {
+  year: number;
+  months: Array<{ month: string; days: number; avgMood: number | null; weeklies: number }>;
+  total: { days: number; avgMood: number | null };
+}
+
 function toView(row: typeof entry.$inferSelect): EntryView {
   return {
     id: row.id,
@@ -247,6 +254,64 @@ export const definition: ModuleDefinition = {
         if (!parsed.success) bad('月份格式应为 YYYY-MM');
         const month = parsed.data.month ?? localDay().slice(0, 7);
         return buildSnapshot(ctx, month);
+      },
+    },
+
+    /** 年视图统计：12 个月的记录天数 / 平均心情 / 周报篇数（纯聚合，零 AI） */
+    yearSnapshot: {
+      permission: 'journal:read',
+      handler: async (ctx, input) => {
+        const parsed = z
+          .object({ year: z.number().int().min(2000).max(2100).optional() })
+          .safeParse(input ?? {});
+        if (!parsed.success) bad('年份不合法');
+        const year = parsed.data.year ?? new Date().getFullYear();
+        const yearStart = `${year}-01-01`;
+        const yearEnd = `${year}-12-31`;
+
+        const rows = await ctx.db
+          .select({
+            month: sql<string>`substr(${entry.day}::text, 1, 7)`,
+            days: sql<number>`count(distinct case when ${entry.kind} = 'daily' then ${entry.day} end)::int`,
+            avgMood: sql<
+              number | null
+            >`avg(case when ${entry.kind} = 'daily' and ${entry.mood} is not null then ${entry.mood} end)`,
+            weeklies: sql<number>`count(case when ${entry.kind} = 'weekly' then 1 end)::int`,
+          })
+          .from(entry)
+          .where(
+            and(
+              eq(entry.workspaceId, ctx.workspaceId),
+              isNull(entry.deletedAt),
+              gte(entry.day, yearStart),
+              lte(entry.day, yearEnd),
+            ),
+          )
+          .groupBy(sql`substr(${entry.day}::text, 1, 7)`);
+
+        const byMonth = new Map(rows.map((row) => [row.month, row]));
+        const months = Array.from({ length: 12 }, (_, index) => {
+          const key = `${year}-${String(index + 1).padStart(2, '0')}`;
+          const row = byMonth.get(key);
+          return {
+            month: key,
+            days: row?.days ?? 0,
+            avgMood: row?.avgMood != null ? Math.round(row.avgMood * 10) / 10 : null,
+            weeklies: row?.weeklies ?? 0,
+          };
+        });
+        const yearDays = months.reduce((sum, month) => sum + month.days, 0);
+        const moodMonths = months.filter((month) => month.avgMood !== null);
+        const yearAvgMood =
+          moodMonths.length > 0
+            ? Math.round(
+                (moodMonths.reduce((sum, month) => sum + (month.avgMood ?? 0), 0) /
+                  moodMonths.length) *
+                  10,
+              ) / 10
+            : null;
+
+        return { year, months, total: { days: yearDays, avgMood: yearAvgMood } };
       },
     },
 

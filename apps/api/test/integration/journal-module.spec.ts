@@ -54,6 +54,7 @@ interface SnapshotShape {
   }>;
   archived: Array<{ id: string; day: string; title: string }>;
   summary: { monthDaily: number; monthWeekly: number; streak: number; currentMonday: string };
+  options: { dailyTemplate: string; weeklyTemplate: string };
 }
 
 beforeAll(async () => {
@@ -251,6 +252,34 @@ describe('复盘日记模块', () => {
     const tooLong = await call(ownerCookie, 'saveTemplate', { dailyTemplate: 'x'.repeat(501) });
     expect(tooLong.status).toBe(400);
   });
+  it('年视图统计：12 个月聚合、平均心情、跨月汇总', async () => {
+    // 此前用例的 upsert 把 11-14 的 mood 清掉了；补一条带心情的日记再断言
+    await call(ownerCookie, 'saveEntry', {
+      kind: 'daily',
+      day: '2026-11-10',
+      mood: 4,
+      content: '带心情的一天。',
+    });
+    const year = (await call(ownerCookie, 'yearSnapshot', { year: 2026 })).body.data as {
+      year: number;
+      months: Array<{ month: string; days: number; avgMood: number | null; weeklies: number }>;
+      total: { days: number; avgMood: number | null };
+    };
+    expect(year.year).toBe(2026);
+    expect(year.months).toHaveLength(12);
+    const nov = year.months[10]!;
+    expect(nov.month).toBe('2026-11');
+    expect(nov.days).toBe(2);
+    expect(nov.avgMood).toBe(4);
+    expect(nov.weeklies).toBeGreaterThanOrEqual(1);
+    // 2026-01（日记 2020-01 不算 2026）→ 0 天
+    const jan = year.months[0]!;
+    expect(jan.month).toBe('2026-01');
+    expect(jan.days).toBe(0);
+    expect(jan.avgMood).toBeNull();
+    expect(year.total.days).toBeGreaterThanOrEqual(nov.days);
+  });
+
   it('guest 只读：写操作 403，snapshot 可读', async () => {
     const snap = (await call(guestCookie, 'snapshot', {})).body.data as SnapshotShape;
     expect(snap.entries.length).toBeGreaterThanOrEqual(0);

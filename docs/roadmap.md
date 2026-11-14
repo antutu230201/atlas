@@ -829,3 +829,9 @@
 - [x] 用户手动滚动不打断轮播（下一跳仍按序推进）——TV 场景预期行为
 - 验证：dashboard e2e 补挂墙轮播用例（全屏 → V → 立即跳转 + 12s 后 scrollY 变化 + V 复位）8/8；typecheck/lint/format/build 全绿
 - 说明：大屏优化清单（Bento 化/365 热力图/AI 能力/widget 化/性能项）至此全部交付或已有等价实现
+
+### 复盘年视图统计（2026-11-15 续 5）
+
+- [x] journal 新增 `yearSnapshot` 动作（纯 SQL 聚合，零 AI）：12 个月的记录天数 / 平均心情（带心情日记均值）/ 周报篇数 + 年汇总；PG 的 substr 不接受 date 参数——聚合 SQL 里 `day::text` cast 修复
+- [x] 趋势卡升级双视图：月连线 / 年柱状切换（年懒加载 yearSnapshot，年份 ← → 导航，未来年份禁用）；Reveal 同步覆盖两视图
+- 验证：journal 集成 12/12（年聚合/跨月/空月）、全仓 148 测试、journal e2e 补年视图断言通过；浏览器实测年柱状图渲染正确

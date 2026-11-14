@@ -13,7 +13,7 @@ import {
   useToast,
 } from '@atlas/ui';
 import { api } from '@/lib/api';
-import type { EntryView, JournalSnapshot } from '../index';
+import type { EntryView, JournalSnapshot, YearStats } from '../index';
 
 /**
  * 复盘 · 日记/周复盘双页签：心情五档 + 模板提示写作 + 周复盘本地草稿（前端聚合
@@ -55,6 +55,95 @@ function monthOf(day: string): string {
 function weekRange(monday: string): string {
   const fmt = (day: string) => `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`;
   return `${fmt(monday)} – ${fmt(addDays(monday, 6))}`;
+}
+
+/** 年视图柱状图：12 个月平均心情柱（无记录月为灰点），数据来自 yearSnapshot 聚合 */
+function YearMoodChart({ stats }: { stats: YearStats }) {
+  const W = 320;
+  const H = 96;
+  const PAD_X = 14;
+  const TOP = 10;
+  const BOTTOM = 72;
+  const barW = 12;
+  const yOf = (mood: number) => BOTTOM - ((mood - 1) / 4) * (BOTTOM - TOP);
+  const hasData = stats.total.days > 0 || stats.total.avgMood !== null;
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="mt-2 h-28 w-full"
+      role="img"
+      aria-label={`${stats.year} 年心情柱状图，${stats.total.days} 天记录${
+        stats.total.avgMood !== null ? `，平均 ${stats.total.avgMood}` : ''
+      }`}
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {[1, 3, 5].map((level) => (
+        <line
+          key={level}
+          x1={PAD_X}
+          x2={W - PAD_X}
+          y1={yOf(level)}
+          y2={yOf(level)}
+          className="stroke-border"
+          strokeDasharray="2 4"
+          strokeWidth="1"
+          opacity="0.5"
+        />
+      ))}
+      {stats.months.map((month, index) => {
+        const x = PAD_X + index * ((W - PAD_X * 2) / 12) + ((W - PAD_X * 2) / 12 - barW) / 2;
+        const label = `${month.month} · ${month.days} 天${month.avgMood !== null ? ` · 平均 ${month.avgMood}` : ''}`;
+        if (month.avgMood === null) {
+          return (
+            <g key={month.month}>
+              <circle cx={x + barW / 2} cy={BOTTOM} r="2" className="fill-border">
+                <title>{label}</title>
+              </circle>
+              <text
+                x={x + barW / 2}
+                y={H - 2}
+                textAnchor="middle"
+                fontSize="7"
+                className="fill-muted"
+              >
+                {index + 1}
+              </text>
+            </g>
+          );
+        }
+        const barTop = yOf(month.avgMood);
+        return (
+          <g key={month.month}>
+            <rect
+              x={x}
+              y={barTop}
+              width={barW}
+              height={Math.max(BOTTOM - barTop, 2)}
+              rx="2"
+              fill="var(--color-primary)"
+              opacity="0.85"
+            >
+              <title>{label}</title>
+            </rect>
+            <text
+              x={x + barW / 2}
+              y={H - 2}
+              textAnchor="middle"
+              fontSize="7"
+              className="fill-muted"
+            >
+              {index + 1}
+            </text>
+          </g>
+        );
+      })}
+      {!hasData ? (
+        <text x={W / 2} y={TOP + 24} textAnchor="middle" fontSize="9" className="fill-muted">
+          {stats.year} 年还没有复盘记录
+        </text>
+      ) : null}
+    </svg>
+  );
 }
 
 /**
@@ -433,6 +522,19 @@ export function JournalReviewPage({
     onError: (e: Error) => toast({ title: '操作失败', description: e.message, variant: 'err' }),
   });
 
+  // 年视图：切到"年"时才拉取（懒加载）
+  const [trendView, setTrendView] = useState<'month' | 'year'>('month');
+  const [trendYear, setTrendYear] = useState(() => new Date().getFullYear());
+  const yearStats = useQuery({
+    queryKey: ['module', moduleName, workspaceSlug, 'yearSnapshot', trendYear],
+    queryFn: () =>
+      api<YearStats>(`/modules/workspaces/${workspaceSlug}/${moduleName}/call/yearSnapshot`, {
+        method: 'POST',
+        json: { year: trendYear },
+      }),
+    enabled: trendView === 'year',
+  });
+
   const data = snapshot.data;
   const busy = mutate.isPending;
 
@@ -547,9 +649,73 @@ export function JournalReviewPage({
               </div>
             </section>
 
-            {/* 心情趋势：本月带心情的复盘连线（数据来自快照，零 AI）；Reveal 滚动显现 */}
+            {/* 心情趋势：月连线 / 年柱状双视图（数据均来自快照聚合，零 AI）；Reveal 滚动显现 */}
             <Reveal index={1}>
-              <MoodTrendCard entries={data.entries} month={data.month} />
+              {trendView === 'month' ? (
+                <MoodTrendCard entries={data.entries} month={data.month} />
+              ) : (
+                <section className="screen-card p-4" aria-label="心情趋势">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="screen-label !text-[10px]">Mood trend · 年视图</p>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="上一年"
+                        onClick={() => setTrendYear((y) => y - 1)}
+                      >
+                        ←
+                      </Button>
+                      <span className="font-mono text-sm tabular-nums text-muted">{trendYear}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={trendYear >= new Date().getFullYear()}
+                        aria-label="下一年"
+                        onClick={() =>
+                          setTrendYear((y) => Math.min(new Date().getFullYear(), y + 1))
+                        }
+                      >
+                        →
+                      </Button>
+                    </div>
+                  </div>
+                  {yearStats.isPending ? (
+                    <Skeleton className="mt-2 h-28 w-full rounded-sm" />
+                  ) : yearStats.isError ? (
+                    <p className="mt-2 text-xs text-err" role="alert">
+                      年视图加载失败：
+                      {yearStats.error instanceof Error ? yearStats.error.message : '请重试'}
+                    </p>
+                  ) : yearStats.data ? (
+                    <>
+                      <p className="mt-2 font-mono text-xs tabular-nums text-muted">
+                        {yearStats.data.total.days} 天记录 ·{' '}
+                        {yearStats.data.total.avgMood !== null
+                          ? `平均心情 ${yearStats.data.total.avgMood} / 5`
+                          : '还没有心情记录'}
+                      </p>
+                      <YearMoodChart stats={yearStats.data} />
+                    </>
+                  ) : null}
+                </section>
+              )}
+              <div className="mt-2 flex justify-end" role="group" aria-label="趋势视图切换">
+                <Button
+                  size="sm"
+                  variant={trendView === 'month' ? 'secondary' : 'ghost'}
+                  onClick={() => setTrendView('month')}
+                >
+                  月
+                </Button>
+                <Button
+                  size="sm"
+                  variant={trendView === 'year' ? 'secondary' : 'ghost'}
+                  onClick={() => setTrendView('year')}
+                >
+                  年
+                </Button>
+              </div>
             </Reveal>
 
             {/* 模板设置：占位提示与「写今天/写本周」预填都来自这里（工作空间级设置） */}
