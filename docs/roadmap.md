@@ -821,3 +821,11 @@
 - [x] 服务端：`bingThumbUrl` 纯函数把必应 OHR 图 URL 的分辨率段改写 1920x1080 → 1366x768（半透明遮罩下的氛围层，视觉差异可忽略）；fetchWallpaper 产出即改写；纯函数随包导出 + 单测 2 个（改写/非标准 URL 原样）
 - [x] 前端：壁纸延迟 600ms 挂载（不与首屏 LCP 抢带宽）+ fetchPriority high→low + 加载完成淡入（opacity 过渡走 --duration-slow 令牌；reduced-motion 全局门即时呈现）
 - 验证：同图精确对比 323KB → 167KB（**-48%** 带宽）；浏览器实测 img src 为 1366 版、opacity 走令牌淡入；dashboard-adapters 11/11、typecheck/lint/format/build 全绿
+
+### 挂墙轮播布局（2026-11-15 续 5）——大屏优化清单收官
+
+- [x] 沉浸模式（全屏/挂墙）+ 轮播开启时，每 12 秒自动轮换到下一个区块（焦点 → 今日节奏 → 热榜 → 纪念日，cyclic）；每次触发按 DOM 现状筛区块（专注模式下隐藏的区块自动跳过）；reduced-motion 下即时跳转（scrollTo behavior auto）
+- [x] 三处开关：顶栏按钮（轮播/轮播中，aria-pressed）、设置抽屉「显示与护屏」开关、快捷键 V（帮助弹窗同步）；设备级 localStorage（atlas.dashboard.carousel），同低功耗/防烧屏模式
+- [x] 用户手动滚动不打断轮播（下一跳仍按序推进）——TV 场景预期行为
+- 验证：dashboard e2e 补挂墙轮播用例（全屏 → V → 立即跳转 + 12s 后 scrollY 变化 + V 复位）8/8；typecheck/lint/format/build 全绿
+- 说明：大屏优化清单（Bento 化/365 热力图/AI 能力/widget 化/性能项）至此全部交付或已有等价实现

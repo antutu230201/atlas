@@ -143,6 +143,51 @@ test.describe('个人大屏模块（假数据源）', () => {
     await expect(page.locator('.dashboard-screen')).toHaveAttribute('data-low-power', 'true');
   });
 
+  test('挂墙轮播：沉浸模式 + V 开启后区块自动轮换', async ({ page }) => {
+    test.setTimeout(120_000);
+    const email = `dash-e2e-carousel-${Date.now()}@example.com`;
+    await page.goto('/register');
+    await page.getByLabel('昵称').fill('轮播验收');
+    await page.getByLabel('邮箱').fill(email);
+    await page.getByLabel('密码').fill(password);
+    await page.getByRole('button', { name: '创建账号' }).click();
+    await page.waitForURL('/');
+
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: '个人大屏' })).toBeVisible({ timeout: 15_000 });
+    await page
+      .getByRole('dialog')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => undefined);
+    await page.keyboard.press('Escape');
+
+    // 进全屏（沉浸态）→ V 开启轮播
+    await page.getByRole('button', { name: '全屏', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true);
+    await page.keyboard.press('v');
+    await expect(page.getByRole('button', { name: '挂墙轮播' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    // 立即跳到第一个区块（focus-section 在首屏下方）
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    const y1 = await page.evaluate(() => window.scrollY);
+
+    // 12 秒后下一跳（scrollY 变化）
+    await page.waitForTimeout(13_500);
+    const y2 = await page.evaluate(() => window.scrollY);
+    expect(y2).not.toBe(y1);
+
+    // V 关闭 → 状态复位；退出全屏
+    await page.keyboard.press('v');
+    await expect(page.getByRole('button', { name: '挂墙轮播' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    await page.getByRole('button', { name: /退出全屏|退出沉浸/ }).click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+  });
   test('倒计时增删 + 数据源开关立即生效', async ({ page }) => {
     test.setTimeout(60_000);
     const email = `dash-e2e-b-${Date.now()}@example.com`;

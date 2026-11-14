@@ -36,8 +36,11 @@ interface SettingsDrawerProps {
   /** 护屏偏好（设备级，存 localStorage） */
   antiBurnIn: boolean;
   nightAuto: boolean;
+  /** 挂墙轮播（设备级，存 localStorage） */
+  carouselMode: boolean;
   onToggleAntiBurnIn: () => void;
   onToggleNightAuto: () => void;
+  onToggleCarouselMode: () => void;
   /** 任一设置变更后回调（父级失效 snapshot 查询） */
   onAfterChange: () => void;
 }
@@ -54,8 +57,10 @@ export function SettingsDrawer({
   watchWords,
   antiBurnIn,
   nightAuto,
+  carouselMode,
   onToggleAntiBurnIn,
   onToggleNightAuto,
+  onToggleCarouselMode,
   onAfterChange,
 }: SettingsDrawerProps) {
   const { toast } = useToast();
@@ -315,6 +320,19 @@ export function SettingsDrawer({
                   checked={nightAuto}
                   onCheckedChange={() => onToggleNightAuto()}
                   aria-label="夜间自动压暗"
+                />
+              </li>
+              <li className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm">挂墙轮播</p>
+                  <p className="mt-0.5 text-[11px] text-muted">
+                    沉浸模式下每 12 秒轮换区块（快捷键 V）
+                  </p>
+                </div>
+                <Switch
+                  checked={carouselMode}
+                  onCheckedChange={() => onToggleCarouselMode()}
+                  aria-label="挂墙轮播"
                 />
               </li>
             </ul>

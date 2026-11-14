@@ -45,6 +45,7 @@ import { HOT_SOURCE_LABELS, type DashboardSnapshot, type CountdownItem } from '.
 
 /** 每台设备独立记住挂墙模式：同一账号在墙面屏和笔记本上可有不同取舍。 */
 const LOW_POWER_KEY = 'atlas.dashboard.low-power';
+const CAROUSEL_KEY = 'atlas.dashboard.carousel';
 
 const SettingsDrawer = lazy(() =>
   import('./settings-drawer').then((module) => ({ default: module.SettingsDrawer })),
@@ -265,6 +266,8 @@ export function DashboardScreenPage({
   };
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lowPowerMode, setLowPowerMode] = useState(false);
+  // 挂墙轮播：沉浸模式下每隔一段时间自动轮换到下一区块（TV/平板挂墙不用滚动）
+  const [carouselMode, setCarouselMode] = useState(false);
   // 护屏偏好默认开启：挂墙场景下用户往往不会主动去找开关，宁可有微小位移也不烧屏
   const [antiBurnIn, setAntiBurnIn] = useState(true);
   const [nightAuto, setNightAuto] = useState(true);
@@ -291,6 +294,7 @@ export function DashboardScreenPage({
   useEffect(() => {
     try {
       setLowPowerMode(window.localStorage.getItem(LOW_POWER_KEY) === '1');
+      setCarouselMode(window.localStorage.getItem(CAROUSEL_KEY) === '1');
       setAntiBurnIn(window.localStorage.getItem(ANTI_BURN_IN_KEY) !== '0');
       setNightAuto(window.localStorage.getItem(NIGHT_MODE_KEY) !== '0');
     } catch {
@@ -521,6 +525,39 @@ export function DashboardScreenPage({
       return next;
     });
   };
+  const toggleCarouselMode = () => {
+    setCarouselMode((enabled) => {
+      const next = !enabled;
+      try {
+        window.localStorage.setItem(CAROUSEL_KEY, next ? '1' : '0');
+      } catch {
+        // 同上：写不进去只影响下次打开。
+      }
+      return next;
+    });
+  };
+
+  // 挂墙轮播：沉浸 + 轮播开启时，每 12 秒轮换到下一个存在的区块（cyclic）。
+  // 每次触发前按 DOM 现状筛区块（专注模式下热榜/回顾不存在则跳过）；用户手动滚动不打断，下一跳仍按序推进。
+  useEffect(() => {
+    if (!carouselMode || !(isFullscreen || chromeHidden)) return;
+    const ids = ['focus-section', 'overview-section', 'hotlist-section', 'countdown-section'];
+    let step = 0;
+    const jump = () => {
+      const existing = ids.filter((id) => document.getElementById(id));
+      if (existing.length === 0) return;
+      const target = existing[step % existing.length]!;
+      step += 1;
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById(target)?.scrollIntoView({
+        behavior: reducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    };
+    jump();
+    const timer = window.setInterval(jump, 12_000);
+    return () => window.clearInterval(timer);
+  }, [carouselMode, isFullscreen, chromeHidden]);
 
   /** 护屏开关只落本机：同一账号在墙面屏与笔记本上应各自决定 */
   const toggleAntiBurnIn = () => {
@@ -582,6 +619,9 @@ export function DashboardScreenPage({
     } else if (key === 'c') {
       event.preventDefault();
       toggleFocusMode();
+    } else if (key === 'v') {
+      event.preventDefault();
+      toggleCarouselMode();
     } else if (key === 'a') {
       event.preventDefault();
       void router.push('/assistant');
@@ -708,6 +748,23 @@ export function DashboardScreenPage({
               >
                 <ScreenIcon name="power" className="size-3.5" />
                 <span className="hidden sm:inline">{lowPowerMode ? '省电中' : '低功耗'}</span>
+              </button>
+            </MagneticButton>
+            <MagneticButton>
+              <button
+                type="button"
+                className={`screen-icon-button hidden md:inline-flex ${carouselMode ? '!border-primary/40 !text-primary' : ''}`}
+                onClick={toggleCarouselMode}
+                aria-pressed={carouselMode}
+                aria-label="挂墙轮播"
+                title={
+                  carouselMode
+                    ? '轮播已开启：沉浸模式下每 12 秒轮换区块（V）'
+                    : '挂墙轮播（V）：沉浸模式下自动轮换区块，适合 TV/平板挂墙'
+                }
+              >
+                <ScreenIcon name="play" className="size-3.5" />
+                <span className="hidden sm:inline">{carouselMode ? '轮播中' : '轮播'}</span>
               </button>
             </MagneticButton>
             {canWrite ? (
@@ -1067,8 +1124,10 @@ export function DashboardScreenPage({
             watchWords={data?.options.watchWords ?? []}
             antiBurnIn={antiBurnIn}
             nightAuto={nightAuto}
+            carouselMode={carouselMode}
             onToggleAntiBurnIn={toggleAntiBurnIn}
             onToggleNightAuto={toggleNightAuto}
+            onToggleCarouselMode={toggleCarouselMode}
             onAfterChange={invalidate}
           />
         </Suspense>
