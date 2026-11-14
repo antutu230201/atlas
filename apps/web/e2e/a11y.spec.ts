@@ -82,6 +82,16 @@ const ROUTES: RouteCase[] = [
     tab: '审计日志',
     ready: (page) => page.getByRole('heading', { name: '设置' }).waitFor(),
   },
+  {
+    name: '设计系统',
+    path: '/design',
+    ready: (page) => page.getByRole('heading', { name: '设计系统 · 晨白 Dawn' }).waitFor(),
+  },
+  {
+    name: '动效系统',
+    path: '/design/motion',
+    ready: (page) => page.getByRole('heading', { name: '动效系统' }).waitFor(),
+  },
 ];
 
 interface Finding {

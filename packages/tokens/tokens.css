@@ -358,3 +358,246 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================
+   动效系统（Motion System）
+   三原则：
+   ① 控制时长——微交互 ≤300ms（--duration-fast/base），入场 ≤600ms（--motion-duration-reveal），
+     氛围/循环动画用长周期令牌；全部经令牌引用，禁止散落魔法数字
+   ② 高性能属性——只动 transform / opacity（合成器通道），不动布局属性；
+     will-change 仅用于长驻动画元素
+   ③ 尊重系统设置——prefers-reduced-motion 下全部动效降级：循环动画停止、
+     过渡即时完成、内容永不因动画而不可见（armed 态强制可见）
+   消费方式：packages/ui 的 motion 组件/hooks + 本文件的 .atlas-m-* 工具类
+   ============================================================ */
+
+:root {
+  --motion-duration-reveal: 500ms;
+  --motion-duration-sweep: 1.6s;
+  --motion-duration-marquee: 26s;
+  --motion-duration-glow: 7s;
+  --motion-stagger: 60ms;
+  --motion-lift: -4px;
+  --motion-ease-standard: var(--ease-out-soft);
+  --motion-ease-spring: var(--ease-spring);
+  --motion-ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes atlas-sweep {
+  from {
+    transform: translateX(-140%) skewX(-12deg);
+  }
+  to {
+    transform: translateX(240%) skewX(-12deg);
+  }
+}
+
+@keyframes atlas-glow-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes atlas-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes atlas-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes atlas-ease-travel {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--motion-travel, 240px));
+  }
+}
+
+@keyframes atlas-bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 02 滚动显现 / 13 错峰动画：JS armed 后隐藏，进入视口加 in 播放入场；
+   无 JS / reduced-motion 下强制可见（内容永不可丢） */
+.atlas-m-reveal {
+  transition:
+    opacity var(--motion-duration-reveal) var(--motion-ease-standard),
+    transform var(--motion-duration-reveal) var(--motion-ease-standard);
+  transition-delay: calc(var(--motion-index, 0) * var(--motion-stagger));
+}
+
+.atlas-m-armed.atlas-m-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.atlas-m-armed.atlas-m-reveal.atlas-m-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* 08 流光扫过：高光带扫过一次（hover 触发）；.atlas-m-shimmer-auto 常驻循环 */
+.atlas-m-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.atlas-m-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -40%;
+  width: 34%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.16) 45%,
+    rgba(255, 255, 255, 0.34) 50%,
+    rgba(255, 255, 255, 0.16) 55%,
+    transparent 100%
+  );
+  transform: translateX(-140%);
+}
+
+.atlas-m-shimmer:hover::after {
+  animation: atlas-sweep var(--motion-duration-sweep) var(--motion-ease-inout);
+}
+
+.atlas-m-shimmer-auto::after {
+  animation: atlas-sweep var(--motion-duration-sweep) var(--motion-ease-inout) infinite;
+}
+
+/* 03 边缘流光：超大锥形渐变层在圆角容器内旋转，只有边缘露出光弧 */
+.atlas-m-glow-border {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.atlas-m-glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -130%;
+  z-index: -1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 285deg,
+    var(--color-primary) 325deg,
+    rgba(255, 255, 255, 0.85) 340deg,
+    transparent 360deg
+  );
+  opacity: 0.65;
+  animation: atlas-glow-spin var(--motion-duration-glow) linear infinite;
+}
+
+.atlas-m-glow-border > * {
+  position: relative;
+}
+
+/* 11 悬停上浮：只动 transform，阴影随令牌过渡 */
+.atlas-m-lift {
+  transition:
+    transform var(--duration-base) var(--motion-ease-standard),
+    box-shadow var(--duration-base) var(--motion-ease-standard);
+}
+
+.atlas-m-lift:hover {
+  transform: translateY(var(--motion-lift));
+  box-shadow: var(--shadow-glow);
+}
+
+/* 14 跑马灯：内容复制两份无缝循环；hover 暂停 */
+.atlas-m-marquee {
+  overflow: hidden;
+}
+
+.atlas-m-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 2.5rem;
+  animation: atlas-marquee var(--motion-duration-marquee) linear infinite;
+}
+
+.atlas-m-marquee:hover .atlas-m-marquee-track,
+.atlas-m-marquee:focus-within .atlas-m-marquee-track {
+  animation-play-state: paused;
+}
+
+/* 12 打字机光标 */
+.atlas-m-caret::after {
+  content: '▍';
+  margin-left: 1px;
+  color: var(--color-primary);
+  animation: atlas-blink 900ms steps(1) infinite;
+}
+
+/* 15 弹性动画：spring 曲线缩放入场（加类触发，可重播） */
+.atlas-m-bounce {
+  animation: atlas-bounce-in var(--duration-slow) var(--motion-ease-spring);
+}
+
+/* 01 鼠标聚光灯：高光层跟随指针（--mx/--my 由 hook 写入） */
+.atlas-m-spotlight {
+  position: relative;
+  overflow: hidden;
+}
+
+.atlas-m-spotlight::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--motion-ease-standard);
+  background: radial-gradient(
+    220px circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in srgb, var(--color-primary) 14%, transparent),
+    transparent 70%
+  );
+}
+
+.atlas-m-spotlight:hover::after {
+  opacity: 1;
+}
+
+/* reduced-motion：armed 内容强制立即可见，循环动画由全局 0.01ms 门停住 */
+@media (prefers-reduced-motion: reduce) {
+  .atlas-m-armed.atlas-m-reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .atlas-m-shimmer-auto::after,
+  .atlas-m-glow-border::before,
+  .atlas-m-marquee-track {
+    animation: none;
+  }
+}

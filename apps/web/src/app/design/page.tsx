@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   Badge,
   Breadcrumb,
@@ -87,6 +88,9 @@ export default function DesignPage() {
             <h1 className="text-2xl font-semibold">设计系统 · 晨白 Dawn</h1>
             <p className="mt-1 text-sm text-muted">
               全部组件与状态。用右上角切换器检查亮色、暗色与跟随系统；全程可键盘操作。
+              <Link href="/design/motion" className="ml-1.5 text-primary hover:underline">
+                动效系统（16 种）→
+              </Link>
             </p>
           </div>
           <ThemeToggle />

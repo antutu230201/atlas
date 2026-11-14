@@ -1140,7 +1140,7 @@ export function FloatingMusicPlayer({ workspaceSlug }: { workspaceSlug: string }
               onClick={() => setExpanded(true)}
             >
               <span className="block truncate text-xs font-medium">{track.title}</span>
-              <span className="mt-0.5 block truncate text-[11px] text-text/75">
+              <span className="mt-0.5 block truncate text-[11px] text-text/90">
                 {resumeHint
                   ? '已恢复上次进度，点击页面任意处继续播放'
                   : isBuffering

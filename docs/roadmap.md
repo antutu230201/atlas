@@ -743,3 +743,16 @@
 - [x] 接线：api/web 依赖 + transpilePackages + module-registry + a11y 扫描路由（13 路由 × 52 扫描）
 - [x] 测试：集成 10 个（upsert/周报限周一/月过滤/归档恢复/占位冲突/guest/越权/Mock 拒绝/润色一次调用）+ e2e 1 条（日记保存编辑删除恢复 + 周草稿 + 390px）+ 全仓 API 143 测试 + a11y 52 扫描全绿
 - V1 不做：复盘统计图表（如心情趋势线）、模板自定义、导出——按需迭代
+
+## 动效系统交付记录（2026-11-14）
+
+16 种常用 UI 动效沉淀为设计系统能力（tokens + ui 包 + 示例页），业务页直接复用；三条设计原则贯穿全部实现。
+
+- [x] **令牌层**（packages/tokens）：动效令牌补齐（--motion-duration-reveal/sweep/marquee/glow、--motion-stagger、--motion-lift、--motion-ease-standard/spring/inout）+ 6 组共享 keyframes + `.atlas-m-*` 工具类（reveal/armed/in 三态、shimmer、glow-border、lift、marquee、caret、bounce、spotlight）；纯 CSS 零 tailwind 指令依赖，任何消费方可用
+- [x] **组件层**（packages/ui/motion）：9 个 hooks（prefers-reduced-motion 探测、scrollReveal、spotlight、tilt、magnetic、parallax、countUp、typewriter、scrollStory）+ 8 个包装组件（Reveal/SpotlightCard/TiltCard/MagneticButton/CountUp/Typewriter/Marquee/ScrollStory），全部 "use client"；**只用 transform/opacity**，时长全走令牌，reduced-motion 下 hooks 直接跳过（CountUp/Typewriter 呈现终态、Tilt/Magnetic/Spotlight/Parallax 失活）
+- [x] **内容安全**：.atlas-m-armed 在无 JS / reduced-motion 下强制可见（内容永不因动画丢失）
+- [x] **示例页** `/design/motion`：3 原则面板 + 16 动效逐一演示（01 聚光灯 02 滚动显现 03 边缘流光 04 磁吸按钮 05 滚动叙事 06 3D倾斜 07 文字解码 08 流光扫过 09 视差滚动 10 数字递增 11 悬停上浮 12 打字机 13 错峰动画 14 跑马灯 15 弹性动画 16 缓动对比）；基础设计页加入口
+- [x] 测试：motion e2e 2 条（16 区块渲染 + reducedMotion='reduce' 下打字机/计数直显终态）；a11y 扫描扩到 14 路由 56 次
+- [x] 顺手修复扫描暴露的两处既有可访问性缺陷：动效页原则卡亮色对比度（text-muted → text-text/80）与悬浮播放器歌曲标签对比度（text-text/75 → text-text/90，3.22:1 → 达标）
+- 排障：390px 横向溢出根因为缓动对比 demo 的行最小内容宽（96px 标签 + 256px 固定轨道 + 按钮 ≈ 567px）撑破网格——轨道改 w-40 + 行内声明 --motion-travel=144px + 网格项 min-w-0
+- 验证：web build、typecheck 20/20、lint、format 全绿；motion e2e 2/2、a11y 56/56（0 严重项、无横向溢出）；浏览器实测暗色主题（滚动叙事激活态、视差两层、流光边框均正常工作）

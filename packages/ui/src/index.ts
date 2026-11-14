@@ -4,6 +4,29 @@
  */
 
 export { cn } from './cn';
+
+/* 动效系统：hooks + 包装组件（tokens.css 提供 .atlas-m-* 工具类与 keyframes） */
+export {
+  usePrefersReducedMotion,
+  useScrollReveal,
+  useSpotlight,
+  useTilt,
+  useMagnetic,
+  useParallax,
+  useCountUp,
+  useTypewriter,
+  useScrollStory,
+} from './motion/hooks';
+export {
+  Reveal,
+  SpotlightCard,
+  TiltCard,
+  MagneticButton,
+  CountUp,
+  Typewriter,
+  Marquee,
+  ScrollStory,
+} from './motion/components';
 export {
   CheckIcon,
   XIcon,
