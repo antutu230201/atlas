@@ -165,6 +165,15 @@ function ModulesTab({ slug }: { slug: string }) {
     'dashboard',
   ] as const;
   const [exporting, setExporting] = useState<string | null>(null);
+  const downloadJson = (name: string, data: unknown) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  };
   const exportModule = async (moduleName: (typeof EXPORTABLE)[number]) => {
     setExporting(moduleName);
     try {
@@ -172,14 +181,25 @@ function ModulesTab({ slug }: { slug: string }) {
         `/modules/workspaces/${slug}/${moduleName}/call/exportData`,
         { method: 'POST' },
       );
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${moduleName}_export_${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      downloadJson(`${moduleName}_export`, data);
       toast({ title: `${moduleName} 数据已导出`, variant: 'ok' });
+    } catch (error) {
+      toast({
+        title: '导出失败',
+        description: error instanceof Error ? error.message : '请重试',
+        variant: 'err',
+      });
+    } finally {
+      setExporting(null);
+    }
+  };
+  // 内核数据导出：通知历史不属于任何模块，随时可导出
+  const exportNotifications = async () => {
+    setExporting('notifications');
+    try {
+      const data = await api<Record<string, unknown>>('/notifications/export');
+      downloadJson('notifications_export', data);
+      toast({ title: '通知数据已导出', variant: 'ok' });
     } catch (error) {
       toast({
         title: '导出失败',
@@ -241,6 +261,14 @@ function ModulesTab({ slug }: { slug: string }) {
       <div className="space-y-2 pt-2">
         <p className="text-xs font-medium text-muted">数据导出（JSON，含已删除数据）</p>
         <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={exporting === 'notifications'}
+            onClick={() => void exportNotifications()}
+          >
+            导出通知
+          </Button>
           {EXPORTABLE.map((moduleName) => {
             const enabled =
               modules.data?.some((module) => module.name === moduleName && module.enabled) ?? false;
@@ -259,7 +287,7 @@ function ModulesTab({ slug }: { slug: string }) {
           })}
         </div>
         <span className="text-xs text-muted">
-          仅可导出已启用的模块；数据含软删除条目，适合备份或迁移。
+          通知历史等内核数据随时可导出；模块数据含软删除条目，仅限已启用的模块，适合备份或迁移。
         </span>
       </div>
     </div>

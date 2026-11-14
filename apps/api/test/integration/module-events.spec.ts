@@ -197,6 +197,25 @@ describe('事件总线与通知（2c，ADR-0005 §8）', () => {
     expect(seen).toEqual(allIds);
   });
 
+  it('通知导出：全量 JSON（宪法 §4 内核数据可导出）', async () => {
+    const list = await apiFetch(app.url, '/notifications?limit=50', { cookie: memberCookie });
+    const exported = await apiFetch(app.url, '/notifications/export', { cookie: memberCookie });
+    expect(exported.status).toBe(200);
+    const data = exported.body.data as {
+      source: string;
+      count: number;
+      notifications: Array<{ id: string; type: string }>;
+    };
+    expect(data.source).toBe('platform');
+    expect(data.count).toBe(list.body.data.items.length);
+    expect(data.count).toBeGreaterThan(0);
+    expect(data.notifications.some((n) => n.type === 'member.invited')).toBe(true);
+
+    // 未登录不可导出（AuthGuard）
+    const anon = await apiFetch(app.url, '/notifications/export');
+    expect(anon.status).toBe(401);
+  });
+
   it('通知 read-all', async () => {
     const all = await apiFetch(app.url, '/notifications/read-all', {
       method: 'POST',

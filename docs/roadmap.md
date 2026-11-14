@@ -843,3 +843,11 @@
 - [x] e2e：app-shell 补下载断言（文件名 todo/sample_note 格式）；集成测试覆盖 dashboard（倒计时）/journal（含软删条目）/goals（目标+关键结果计数）/habits（习惯+打卡）
 - 说明：通知中心数据属 platform 内核（非模块），本轮不含——列为后续（内核通知导出需内核侧只读端点）
 - 验证：全仓 API 155/155、app-shell e2e（含下载断言）通过、typecheck/lint/format/build 全绿；浏览器实测按钮禁用态与模块启用状态一致
+
+### 内核通知数据导出（2026-11-15 续 7）——宪法 §4 最后一块
+
+- [x] 内核：`NotificationService.exportAll(userId)` 全量导出该用户通知历史（含已读/未读，按时间降序）；`GET /v1/notifications/export`（AuthGuard，未登录 401）；返回 `{exportedAt, source:'platform', count, notifications}`——通知属 platform 内核数据，不受任何模块启停限制
+- [x] 设置页：导出区首位新增「导出通知」按钮（始终可用），下载 `notifications_export_<日期>.json`；抽出 downloadJson 公共函数，模块导出共用；说明文案改为区分内核数据与模块数据
+- [x] 测试：module-events 集成补导出用例（count 与列表一致、含 member.invited、未登录 401）；app-shell e2e 补下载文件名断言
+- 说明：至此宪法 §4「所有数据可导出」全量落实——6 个模块 + 内核通知，全部含软删除数据、全部有测试
+- 验证：全仓 API 156/156、app-shell e2e 2/2（含通知导出下载）、typecheck/lint/format/build 全绿；浏览器实测按钮可用、toast 正常

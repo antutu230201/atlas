@@ -106,6 +106,28 @@ export class NotificationService {
     );
   }
 
+  /** 全量导出该用户全部通知（宪法 §4：通知属于平台内核数据，也必须可导出） */
+  async exportAll(userId: string): Promise<{
+    exportedAt: string;
+    source: 'platform';
+    count: number;
+    notifications: Array<typeof notification.$inferSelect>;
+  }> {
+    const rows = await withUser(this.db, userId, (tx) =>
+      tx
+        .select()
+        .from(notification)
+        .where(eq(notification.userId, userId))
+        .orderBy(desc(notification.createdAt), desc(notification.id)),
+    );
+    return {
+      exportedAt: new Date().toISOString(),
+      source: 'platform',
+      count: rows.length,
+      notifications: rows,
+    };
+  }
+
   async unreadCount(userId: string): Promise<number> {
     const rows = await withUser(this.db, userId, (tx) =>
       tx

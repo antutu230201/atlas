@@ -52,6 +52,13 @@ export class NotificationController {
     return { data: { count } };
   }
 
+  /** 宪法 §4 数据可导出：通知历史全量 JSON（内核数据，不受模块启停限制） */
+  @Get('export')
+  async exportAll(@Req() request: Request) {
+    const user = request.user as RequestUser;
+    return { data: await this.notificationService.exportAll(user.id) };
+  }
+
   @Post(':id/read')
   @HttpCode(200)
   async markRead(@Param('id') id: string, @Req() request: Request) {

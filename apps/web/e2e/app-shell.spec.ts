@@ -93,6 +93,16 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/^sample_note_export_\d{4}-\d{2}-\d{2}\.json$/);
 
+    // 内核通知导出（宪法 §4）：不属于模块，不受启停限制，随时可下载
+    const notifExport = page.getByRole('button', { name: '导出通知' });
+    await expect(notifExport).toBeVisible();
+    const notifDownloadPromise = page.waitForEvent('download');
+    await notifExport.click();
+    const notifDownload = await notifDownloadPromise;
+    expect(notifDownload.suggestedFilename()).toMatch(
+      /^notifications_export_\d{4}-\d{2}-\d{2}\.json$/,
+    );
+
     await page.getByRole('tab', { name: 'AI 配置' }).click();
     const timeoutInput = page.getByLabel('超时毫秒');
     await expect(timeoutInput).toHaveValue(/\d+/);
