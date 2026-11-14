@@ -34,6 +34,14 @@ interface BingResponse {
   images?: Array<{ url?: string; copyright?: string; startdate?: string }>;
 }
 
+/**
+ * 必应 th 缩略服务支持按尺寸取图：把 OHR 图 URL 的分辨率段改写为指定尺寸。
+ * 壁纸是半透明遮罩下的氛围层，1366x768 比 1920x1080 省约一半带宽，视觉差异可忽略。
+ */
+export function bingThumbUrl(url: string, size = '1366x768'): string {
+  return url.replace(/(_)(\d{3,4}x\d{3,4})(\.jpg)/, `$1${size}$3`);
+}
+
 export async function fetchWallpaper(): Promise<Wallpaper> {
   const raw = await fetchJson<BingResponse>(
     'https://cn.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1',
@@ -41,7 +49,7 @@ export async function fetchWallpaper(): Promise<Wallpaper> {
   const image = raw.images?.[0];
   if (!image?.url) throw new Error('必应壁纸接口返回缺字段');
   return {
-    url: `https://cn.bing.com${image.url}`,
+    url: bingThumbUrl(`https://cn.bing.com${image.url}`),
     copyright: image.copyright,
     date: image.startdate,
   };

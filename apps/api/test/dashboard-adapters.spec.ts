@@ -7,9 +7,22 @@ import {
   normalizeToutiao,
   normalizeWeibo,
   parseLrc,
+  bingThumbUrl,
 } from '@atlas/module-dashboard';
 
 /** 大屏适配器归一化：各源真实响应形状的子集 → HotItem[]（缺字段跳过、不抛错） */
+
+describe('必应壁纸缩略改写', () => {
+  it('1920x1080 → 1366x768（省约一半带宽）', () => {
+    expect(bingThumbUrl('https://cn.bing.com/th?id=OHR.Demo_ZH-CN1234_1920x1080.jpg&rf=')).toBe(
+      'https://cn.bing.com/th?id=OHR.Demo_ZH-CN1234_1366x768.jpg&rf=',
+    );
+  });
+  it('非标准 URL 原样返回', () => {
+    const raw = 'https://cn.bing.com/th?id=OHR.Demo.jpg';
+    expect(bingThumbUrl(raw)).toBe(raw);
+  });
+});
 
 describe('dashboard 适配器归一化', () => {
   it('微博：word/realpos/num/icon_desc → rank/title/heat/tag，链接用 word_scheme', () => {

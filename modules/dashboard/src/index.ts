@@ -1431,6 +1431,7 @@ export {
   normalizeWeibo,
 } from './providers/hotlists';
 export { describeWeatherCode } from './providers/weather';
+export { bingThumbUrl } from './providers/misc';
 export { parseLrc } from './providers/lyrics';
 export { computeStreakStats } from './activity-streak';
 export { seal as sealSecret, open as openSecret } from './providers/secret-box';

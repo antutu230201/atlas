@@ -68,7 +68,17 @@ function ScreenBackground({
   enabled?: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const showImage = wallpaperUrl !== undefined && wallpaperUrl.length > 0 && !imageFailed;
+  // 懒挂载：壁纸是氛围层，不与首屏内容抢带宽——等页面渲染稳定后再挂载 img，
+  // 挂载后低优先级解码 + 淡入（opacity 过渡，reduced-motion 下全局门即时呈现）
+  const [imageMounted, setImageMounted] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = window.setTimeout(() => setImageMounted(true), 600);
+    return () => window.clearTimeout(timer);
+  }, [enabled]);
+  const showImage =
+    wallpaperUrl !== undefined && wallpaperUrl.length > 0 && !imageFailed && imageMounted;
   // 低功耗模式不挂载壁纸与极光层，既省 GPU 合成也避免继续下载每日壁纸。
   if (!enabled) return <div aria-hidden className="pointer-events-none absolute inset-0 bg-bg" />;
   return (
@@ -79,13 +89,16 @@ function ScreenBackground({
     >
       {showImage ? (
         <>
-          {/* 外部每日壁纸直接用 img：域名每日变化，Next Image 域名白名单不可预知 */}
+          {/* 外部每日壁纸直接用 img：域名每日变化，Next Image 域名白名单不可预知。
+              1366x768 版本（服务端改写）+ low 优先级 + 淡入，不给首屏 LCP 抢带宽 */}
           <img
             src={wallpaperUrl}
             alt=""
-            fetchPriority="high"
+            fetchPriority="low"
             decoding="async"
-            className="absolute inset-0 h-full w-full scale-105 object-cover opacity-[var(--screen-wallpaper-opacity)]"
+            onLoad={() => setImageLoaded(true)}
+            className="absolute inset-0 h-full w-full scale-105 object-cover transition-opacity duration-[var(--duration-slow)]"
+            style={{ opacity: imageLoaded ? 'var(--screen-wallpaper-opacity)' : 0 }}
             onError={() => setImageFailed(true)}
           />
           {copyright ? (

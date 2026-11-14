@@ -815,3 +815,9 @@
 
 - [x] `GET /v1/ai/usage` 增 `byModule`（按 moduleName 分组的调用次数与 tokens，次数降序）；设置页用量行下方在多模块时展示细分列表（成本诊断：哪个功能在消耗 AI）
 - 验证：ai-usage 集成补 byModule 断言（dashboard 模块 1 次 / 9 tokens）通过；typecheck/lint/format/build 全绿
+
+### 壁纸降分辨率 + 懒挂载淡入（2026-11-15 续 4）
+
+- [x] 服务端：`bingThumbUrl` 纯函数把必应 OHR 图 URL 的分辨率段改写 1920x1080 → 1366x768（半透明遮罩下的氛围层，视觉差异可忽略）；fetchWallpaper 产出即改写；纯函数随包导出 + 单测 2 个（改写/非标准 URL 原样）
+- [x] 前端：壁纸延迟 600ms 挂载（不与首屏 LCP 抢带宽）+ fetchPriority high→low + 加载完成淡入（opacity 过渡走 --duration-slow 令牌；reduced-motion 全局门即时呈现）
+- 验证：同图精确对比 323KB → 167KB（**-48%** 带宽）；浏览器实测 img src 为 1366 版、opacity 走令牌淡入；dashboard-adapters 11/11、typecheck/lint/format/build 全绿
