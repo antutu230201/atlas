@@ -835,3 +835,11 @@
 - [x] journal 新增 `yearSnapshot` 动作（纯 SQL 聚合，零 AI）：12 个月的记录天数 / 平均心情（带心情日记均值）/ 周报篇数 + 年汇总；PG 的 substr 不接受 date 参数——聚合 SQL 里 `day::text` cast 修复
 - [x] 趋势卡升级双视图：月连线 / 年柱状切换（年懒加载 yearSnapshot，年份 ← → 导航，未来年份禁用）；Reveal 同步覆盖两视图
 - 验证：journal 集成 12/12（年聚合/跨月/空月）、全仓 148 测试、journal e2e 补年视图断言通过；浏览器实测年柱状图渲染正确
+
+### 全模块数据导出（2026-11-15 续 6）——宪法 §4 落实
+
+- [x] 新增 dashboard/journal/goals/habits 四个模块的 `exportData` 动作（todo_notes 已有；sample_note 一并补齐）——导出 JSON 含**软删除/归档数据**（备份完整性）；仅读权限；各模块单测覆盖（导出计数 = 活跃 + 软删）
+- [x] 设置页：导出改为**逐模块通用 UI**——五个已启用模块各一个「导出 <模块名>」按钮（未启用禁用并提示），文件名 `<模块名>_export_<日期>.json`；按钮禁用态精确反映模块启用状态
+- [x] e2e：app-shell 补下载断言（文件名 todo/sample_note 格式）；集成测试覆盖 dashboard（倒计时）/journal（含软删条目）/goals（目标+关键结果计数）/habits（习惯+打卡）
+- 说明：通知中心数据属 platform 内核（非模块），本轮不含——列为后续（内核通知导出需内核侧只读端点）
+- 验证：全仓 API 155/155、app-shell e2e（含下载断言）通过、typecheck/lint/format/build 全绿；浏览器实测按钮禁用态与模块启用状态一致

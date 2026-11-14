@@ -155,25 +155,41 @@ function ModulesTab({ slug }: { slug: string }) {
       toast({ title: '模块状态更新失败', description: error.message, variant: 'err' }),
   });
 
-  const exportData = useMutation({
-    mutationFn: () =>
-      api<{ todos: Array<{ title: string; status: string; priority: string }> }>(
-        `/modules/workspaces/${slug}/todo_notes/call/exportData`,
+  // 数据导出（宪法 §4）：逐模块导出 JSON（含软删除数据）；todo 之外仅限支持 exportData 的模块
+  const EXPORTABLE = [
+    'todo_notes',
+    'sample_note',
+    'journal',
+    'goals',
+    'habits',
+    'dashboard',
+  ] as const;
+  const [exporting, setExporting] = useState<string | null>(null);
+  const exportModule = async (moduleName: (typeof EXPORTABLE)[number]) => {
+    setExporting(moduleName);
+    try {
+      const data = await api<Record<string, unknown>>(
+        `/modules/workspaces/${slug}/${moduleName}/call/exportData`,
         { method: 'POST' },
-      ),
-    onSuccess: (data) => {
+      );
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `todo_notes_export_${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `${moduleName}_export_${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-      toast({ title: '待办数据已导出', variant: 'ok' });
-    },
-    onError: (error: Error) =>
-      toast({ title: '导出失败', description: error.message, variant: 'err' }),
-  });
+      toast({ title: `${moduleName} 数据已导出`, variant: 'ok' });
+    } catch (error) {
+      toast({
+        title: '导出失败',
+        description: error instanceof Error ? error.message : '请重试',
+        variant: 'err',
+      });
+    } finally {
+      setExporting(null);
+    }
+  };
 
   if (modules.isPending) return <Skeleton className="h-40 w-full" />;
   if (modules.isError) {
@@ -190,9 +206,6 @@ function ModulesTab({ slug }: { slug: string }) {
       </Card>
     );
   }
-
-  const todoEnabled =
-    modules.data?.some((module) => module.name === 'todo_notes' && module.enabled) ?? false;
 
   return (
     <div className="space-y-3">
@@ -225,19 +238,29 @@ function ModulesTab({ slug }: { slug: string }) {
           </CardHeader>
         </Card>
       ))}
-      <div className="flex gap-2 pt-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          loading={exportData.isPending}
-          disabled={!todoEnabled}
-          onClick={() => exportData.mutate()}
-        >
-          导出待办 JSON
-        </Button>
-        {!todoEnabled ? (
-          <span className="self-center text-xs text-muted">启用待办与笔记后可导出数据。</span>
-        ) : null}
+      <div className="space-y-2 pt-2">
+        <p className="text-xs font-medium text-muted">数据导出（JSON，含已删除数据）</p>
+        <div className="flex flex-wrap gap-2">
+          {EXPORTABLE.map((moduleName) => {
+            const enabled =
+              modules.data?.some((module) => module.name === moduleName && module.enabled) ?? false;
+            return (
+              <Button
+                key={moduleName}
+                size="sm"
+                variant="secondary"
+                loading={exporting === moduleName}
+                disabled={!enabled}
+                onClick={() => void exportModule(moduleName)}
+              >
+                导出 {moduleName}
+              </Button>
+            );
+          })}
+        </div>
+        <span className="text-xs text-muted">
+          仅可导出已启用的模块；数据含软删除条目，适合备份或迁移。
+        </span>
       </div>
     </div>
   );

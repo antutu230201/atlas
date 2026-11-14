@@ -267,6 +267,27 @@ export const definition: ModuleDefinition = {
       },
     },
 
+    /** 导出习惯与打卡记录为 JSON（含归档）——宪法 §4 数据可导出 */
+    exportData: {
+      permission: 'habits:read',
+      handler: async (ctx) => {
+        const habitRows = await ctx.db
+          .select()
+          .from(habit)
+          .where(eq(habit.workspaceId, ctx.workspaceId));
+        const logRows = await ctx.db
+          .select()
+          .from(habitLog)
+          .where(eq(habitLog.workspaceId, ctx.workspaceId));
+        return {
+          exportedAt: new Date().toISOString(),
+          moduleName: 'habits',
+          count: habitRows.length + logRows.length,
+          habits: habitRows,
+          habitLogs: logRows,
+        };
+      },
+    },
     restoreHabit: {
       permission: 'habits:write',
       handler: async (ctx, input) => {

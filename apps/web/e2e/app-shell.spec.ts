@@ -85,6 +85,14 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
     await enableButton.click();
     await expect(sampleCard.getByRole('button', { name: '停用', exact: true })).toBeVisible();
 
+    // 数据导出（宪法 §4）：示例笔记启用后设置页可导出 JSON（文件名含模块名与日期）
+    const exportButton = page.getByRole('button', { name: '导出 sample_note' });
+    await expect(exportButton).toBeVisible({ timeout: 10_000 });
+    const downloadPromise = page.waitForEvent('download');
+    await exportButton.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^sample_note_export_\d{4}-\d{2}-\d{2}\.json$/);
+
     await page.getByRole('tab', { name: 'AI 配置' }).click();
     const timeoutInput = page.getByLabel('超时毫秒');
     await expect(timeoutInput).toHaveValue(/\d+/);

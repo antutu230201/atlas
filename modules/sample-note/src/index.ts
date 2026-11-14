@@ -113,6 +113,20 @@ export const definition: ModuleDefinition = {
       },
     },
 
+    /** 导出全部笔记为 JSON（含软删除）——宪法 §4 数据可导出 */
+    exportData: {
+      permission: 'note:read',
+      handler: async (ctx) => {
+        const rows = await ctx.db.select().from(note).where(eq(note.workspaceId, ctx.workspaceId));
+        return {
+          exportedAt: new Date().toISOString(),
+          moduleName: 'sample_note',
+          count: rows.length,
+          notes: rows,
+        };
+      },
+    },
+
     restore: {
       permission: 'note:write',
       handler: async (ctx, input) => {

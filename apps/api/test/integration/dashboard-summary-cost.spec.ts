@@ -130,4 +130,24 @@ describe('AI 每日小结降本', () => {
     await snapshot();
     expect(upstreamHits).toBe(2);
   });
+
+  it('导出：倒计时全量 JSON——宪法 §4 数据可导出', async () => {
+    await apiFetch(app.url, '/modules/workspaces/ws/dashboard/call/createCountdown', {
+      method: 'POST',
+      cookie,
+      body: { title: '导出测试纪念日', targetDate: '2026-12-01' },
+    });
+    const exported = await apiFetch(app.url, '/modules/workspaces/ws/dashboard/call/exportData', {
+      method: 'POST',
+      cookie,
+    });
+    const data = exported.body.data as {
+      moduleName: string;
+      count: number;
+      countdowns: Array<{ title: string; deletedAt: string | null }>;
+    };
+    expect(data.moduleName).toBe('dashboard');
+    expect(data.countdowns.some((item) => item.title === '导出测试纪念日')).toBe(true);
+    expect(data.count).toBe(data.countdowns.length);
+  });
 });

@@ -1079,6 +1079,22 @@ export const definition: ModuleDefinition = {
     },
 
     /** 手动强刷：跳过 TTL 重新拉取指定源（缺省为全部），失败抛 400 并说明 */
+    /** 导出倒计时/纪念日为 JSON（含软删除）——宪法 §4 数据可导出 */
+    exportData: {
+      permission: 'dashboard:read',
+      handler: async (ctx) => {
+        const rows = await ctx.db
+          .select()
+          .from(countdown)
+          .where(eq(countdown.workspaceId, ctx.workspaceId));
+        return {
+          exportedAt: new Date().toISOString(),
+          moduleName: 'dashboard',
+          count: rows.length,
+          countdowns: rows,
+        };
+      },
+    },
     refresh: {
       permission: 'dashboard:write',
       handler: async (ctx, input) => {

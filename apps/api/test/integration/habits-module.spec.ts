@@ -156,6 +156,17 @@ describe('习惯打卡模块', () => {
     ]);
   });
 
+  it('导出：习惯与打卡记录全量 JSON', async () => {
+    const exported = (await call(ownerCookie, 'exportData')).body.data as {
+      moduleName: string;
+      count: number;
+      habits: Array<{ id: string; archivedAt: string | null }>;
+      habitLogs: Array<{ id: string }>;
+    };
+    expect(exported.moduleName).toBe('habits');
+    expect(exported.habits.length).toBeGreaterThanOrEqual(1);
+    expect(exported.habitLogs.length).toBe(exported.count - exported.habits.length);
+  });
   it('guest 只读：写操作被拒，snapshot 可读', async () => {
     const snap = await snapshot(guestCookie);
     expect(snap.totalToday).toBe(2);

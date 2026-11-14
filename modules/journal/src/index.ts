@@ -443,6 +443,22 @@ export const definition: ModuleDefinition = {
       },
     },
 
+    /** 导出全部复盘条目为 JSON（含软删除）——宪法 §4 数据可导出 */
+    exportData: {
+      permission: 'journal:read',
+      handler: async (ctx) => {
+        const rows = await ctx.db
+          .select()
+          .from(entry)
+          .where(eq(entry.workspaceId, ctx.workspaceId));
+        return {
+          exportedAt: new Date().toISOString(),
+          moduleName: 'journal',
+          count: rows.length,
+          entries: rows,
+        };
+      },
+    },
     /** AI 润色（唯一 AI 消耗点）：显式触发、一次调用、结果入库存档；Mock 未配置时拒绝 */
     polishEntry: {
       permission: 'journal:write',

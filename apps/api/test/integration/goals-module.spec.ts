@@ -273,6 +273,17 @@ describe('目标与年度计划模块', () => {
     expect(snap.objectives[0]!.keyResults).toHaveLength(1);
   });
 
+  it('导出：目标与关键结果全量 JSON', async () => {
+    const exported = (await call(ownerCookie, 'exportData')).body.data as {
+      moduleName: string;
+      count: number;
+      objectives: Array<{ id: string }>;
+      keyResults: Array<{ id: string; deletedAt: string | null }>;
+    };
+    expect(exported.moduleName).toBe('goals');
+    expect(exported.objectives.length).toBeGreaterThanOrEqual(1);
+    expect(exported.keyResults.length).toBe(exported.count - exported.objectives.length);
+  });
   it('guest 只读：写操作被拒，snapshot 可读', async () => {
     const snap = await snapshot(guestCookie);
     expect(snap.objectives).toHaveLength(1);

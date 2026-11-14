@@ -280,6 +280,19 @@ describe('复盘日记模块', () => {
     expect(year.total.days).toBeGreaterThanOrEqual(nov.days);
   });
 
+  it('导出：含软删除条目的全量 JSON', async () => {
+    const snap = (await call(ownerCookie, 'snapshot', { month: '2026-11' })).body
+      .data as SnapshotShape;
+    const exported = (await call(ownerCookie, 'exportData')).body.data as {
+      moduleName: string;
+      count: number;
+      entries: Array<{ id: string; content: string; deletedAt: string | null }>;
+    };
+    expect(exported.moduleName).toBe('journal');
+    expect(exported.entries.some((item) => item.deletedAt !== null)).toBe(true);
+    expect(exported.count).toBe(exported.entries.length);
+    expect(exported.entries.map((item) => item.id)).toContain(snap.entries[0]?.id ?? '');
+  });
   it('guest 只读：写操作 403，snapshot 可读', async () => {
     const snap = (await call(guestCookie, 'snapshot', {})).body.data as SnapshotShape;
     expect(snap.entries.length).toBeGreaterThanOrEqual(0);

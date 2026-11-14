@@ -441,6 +441,27 @@ export const definition: ModuleDefinition = {
       },
     },
 
+    /** 导出目标与关键结果为 JSON（含归档/软删除）——宪法 §4 数据可导出 */
+    exportData: {
+      permission: 'goals:read',
+      handler: async (ctx) => {
+        const objectiveRows = await ctx.db
+          .select()
+          .from(objective)
+          .where(eq(objective.workspaceId, ctx.workspaceId));
+        const keyResultRows = await ctx.db
+          .select()
+          .from(keyResult)
+          .where(eq(keyResult.workspaceId, ctx.workspaceId));
+        return {
+          exportedAt: new Date().toISOString(),
+          moduleName: 'goals',
+          count: objectiveRows.length + keyResultRows.length,
+          objectives: objectiveRows,
+          keyResults: keyResultRows,
+        };
+      },
+    },
     createKeyResult: {
       permission: 'goals:write',
       handler: async (ctx, input) => {
