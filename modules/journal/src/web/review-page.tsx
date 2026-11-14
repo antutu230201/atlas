@@ -2,7 +2,16 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, useToast } from '@atlas/ui';
+import {
+  Button,
+  Reveal,
+  Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  useToast,
+} from '@atlas/ui';
 import { api } from '@/lib/api';
 import type { EntryView, JournalSnapshot } from '../index';
 
@@ -46,6 +55,95 @@ function monthOf(day: string): string {
 function weekRange(monday: string): string {
   const fmt = (day: string) => `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`;
   return `${fmt(monday)} – ${fmt(addDays(monday, 6))}`;
+}
+
+/**
+ * 心情趋势卡（零 AI，纯 SVG）：本月带心情的复盘按日连线，展示平均心情。
+ * x 轴为日期（1–月末），y 轴为心情 1–5；数据来自 snapshot.entries，前端只做展示。
+ */
+function MoodTrendCard({ entries, month }: { entries: EntryView[]; month: string }) {
+  const moods = entries
+    .filter((item) => item.mood !== null)
+    .sort((a, b) => a.day.localeCompare(b.day))
+    .map((item) => ({ day: item.day, mood: item.mood as number }));
+  if (moods.length === 0) return null;
+
+  const [year, monthIndex] = month.split('-').map(Number);
+  const daysInMonth = new Date(year!, monthIndex!, 0).getDate();
+  const W = 320;
+  const H = 88;
+  const PAD_X = 14;
+  const TOP = 10;
+  const BOTTOM = 74;
+  const xOf = (day: string) =>
+    PAD_X + ((Number(day.slice(8, 10)) - 1) / (daysInMonth - 1)) * (W - PAD_X * 2);
+  const yOf = (mood: number) => BOTTOM - ((mood - 1) / 4) * (BOTTOM - TOP);
+  const avg = moods.reduce((sum, item) => sum + item.mood, 0) / moods.length;
+
+  return (
+    <section
+      className="screen-card p-4"
+      aria-label={`心情趋势，${moods.length} 条记录，平均 ${avg.toFixed(1)} 分（满分 5）`}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="screen-label !text-[10px]">Mood trend · 心情走势</p>
+        <p className="font-mono text-xs tabular-nums text-muted">
+          平均 <span className="text-base font-semibold text-primary">{avg.toFixed(1)}</span> / 5 ·{' '}
+          {moods.length} 条
+        </p>
+      </div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="mt-2 h-24 w-full"
+        role="img"
+        aria-hidden={false}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {[1, 2, 3, 4, 5].map((level) => (
+          <line
+            key={level}
+            x1={PAD_X}
+            x2={W - PAD_X}
+            y1={yOf(level)}
+            y2={yOf(level)}
+            className="stroke-border"
+            strokeDasharray="2 4"
+            strokeWidth="1"
+            opacity="0.5"
+          />
+        ))}
+        <polyline
+          points={moods.map((item) => `${xOf(item.day)},${yOf(item.mood)}`).join(' ')}
+          fill="none"
+          stroke="var(--color-primary)"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          opacity="0.85"
+        />
+        {moods.map((item) => (
+          <g key={item.day}>
+            <circle cx={xOf(item.day)} cy={yOf(item.mood)} r="3.5" fill="var(--color-primary)">
+              <title>{`${item.day} · ${moodEmoji(item.mood)} ${item.mood}/5`}</title>
+            </circle>
+          </g>
+        ))}
+        {/* 首末日期标注 */}
+        <text x={PAD_X} y={H - 2} className="fill-muted" fontSize="8">
+          {moods[0]!.day.slice(8, 10)} 日
+        </text>
+        <text x={W - PAD_X - 12} y={H - 2} className="fill-muted" fontSize="8">
+          {moods[moods.length - 1]!.day.slice(8, 10)} 日
+        </text>
+        <text x={4} y={yOf(5) + 3} className="fill-muted" fontSize="8">
+          😄
+        </text>
+        <text x={4} y={yOf(1) + 3} className="fill-muted" fontSize="8">
+          😞
+        </text>
+      </svg>
+    </section>
+  );
 }
 
 /** 本周周一（本地时区） */
@@ -426,6 +524,11 @@ export function JournalReviewPage({
                 </div>
               </div>
             </section>
+
+            {/* 心情趋势：本月带心情的复盘连线（数据来自快照，零 AI）；Reveal 滚动显现 */}
+            <Reveal index={1}>
+              <MoodTrendCard entries={data.entries} month={data.month} />
+            </Reveal>
 
             <Tabs
               value={tab}

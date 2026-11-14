@@ -67,6 +67,11 @@ test.describe('复盘日记模块', () => {
     const overview = page.getByRole('status', { name: '复盘概览' });
     await expect(overview).toContainText('周报 1');
 
+    // 心情趋势卡：两条带心情的复盘 → 平均 3.5
+    const trend = page.getByRole('region', { name: /心情趋势/ });
+    await expect(trend).toBeVisible({ timeout: 10_000 });
+    await expect(trend).toContainText('3.5');
+
     // 390px 无横向溢出
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(400);
