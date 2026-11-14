@@ -805,3 +805,8 @@
 - [x] journal 新增 `saveTemplate` 动作（ctx.settings.set 工作空间级设置，沿用 dashboard 模式）：日记/周复盘模板自定义（≤500 字，空串恢复默认）；manifest.settings 补声明（text 类型，供未来设置页渲染）
 - [x] snapshot 增 `options.dailyTemplate/weeklyTemplate`（空值回落内置默认）；前端占位提示与「写今天/写本周」预填均使用模板；模板面板（两个 textarea + 恢复默认/保存）置于趋势卡下方
 - 验证：journal 集成 11/11（模板生效/空串恢复默认/超长 400）、全仓 148 测试、journal e2e 补断言（改模板 → 保存 → 写今天预填生效）通过；浏览器实测暗色主题全流程
+
+### AI 摘要「展开依据」（2026-11-15 续 2）
+
+- [x] DailySummary 增 `basis: string[]`——喂给模型（或本地兜底所引用）的数据项随载荷下发；SummaryCard 新增「展开依据 ▾」折叠面板逐条展示（AI 与本地小结同源可验证）；旧缓存无此字段时按钮隐藏
+- 验证：dashboard-summary-cost 集成断言 basis 下发通过；浏览器实测重写后展开依据面板显示数据项

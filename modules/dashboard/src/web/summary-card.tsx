@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Skeleton } from '@atlas/ui';
 import type { SourceEnvelope, DailySummary } from './types';
@@ -23,6 +24,8 @@ export function SummaryCard({
   // Mock 供应商会把完整提示词回显到正文；大屏只展示诚实的预览说明，不把调试文本当 AI 产出。
   const isMock = envelope.payload?.text.startsWith('[MockAI]') ?? false;
   const isLocal = !isMock && envelope.payload?.source === 'local';
+  const basis = envelope.payload?.basis ?? [];
+  const [showBasis, setShowBasis] = useState(false);
   return (
     <section
       className="screen-card screen-reveal bg-[linear-gradient(135deg,var(--color-primary-soft),transparent_48%)] p-5"
@@ -118,6 +121,35 @@ export function SummaryCard({
               <p className="mt-2 text-[11px] text-warn" role="status">
                 展示的是上次缓存的小结（本次生成失败）
               </p>
+            ) : null}
+            {/* 展开依据：小结所引用的数据项（AI 与本地小结同源，可验证） */}
+            {basis.length > 0 ? (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  aria-expanded={showBasis}
+                  onClick={() => setShowBasis((v) => !v)}
+                  className="text-[10px] text-muted transition-colors hover:text-text"
+                >
+                  {showBasis ? '收起依据 ▴' : '展开依据 ▾'}
+                </button>
+                {showBasis ? (
+                  <ul className="mt-1.5 space-y-1 rounded-sm border border-border bg-surface/60 p-2.5">
+                    {basis.map((item) => (
+                      <li
+                        key={item}
+                        className="flex items-start gap-1.5 text-[11px] leading-5 text-muted"
+                      >
+                        <span
+                          className="mt-1.5 size-1 shrink-0 rounded-full bg-border"
+                          aria-hidden
+                        />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
             ) : null}
           </>
         ) : (

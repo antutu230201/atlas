@@ -100,6 +100,8 @@ export interface DailySummary {
   text: string;
   generatedAt: string;
   source: 'ai' | 'local';
+  /** 展开依据：小结所引用的数据项（旧缓存无此字段） */
+  basis?: string[];
 }
 
 export interface DashboardSnapshot {

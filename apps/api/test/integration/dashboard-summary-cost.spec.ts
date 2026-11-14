@@ -30,7 +30,7 @@ const snapshot = async () =>
   ).body.data as {
     summary: {
       status: string;
-      payload: { text: string; source: 'ai' | 'local' } | null;
+      payload: { text: string; source: 'ai' | 'local'; basis?: string[] } | null;
     };
   };
 
@@ -97,6 +97,7 @@ describe('AI 每日小结降本', () => {
     expect(first.summary.status).toBe('fresh');
     expect(first.summary.payload?.source).toBe('local');
     expect(first.summary.payload?.text).toContain('最近 7 天完成待办');
+    expect(first.summary.payload?.basis?.length ?? 0).toBeGreaterThan(0);
     expect(upstreamHits).toBe(1);
   });
 

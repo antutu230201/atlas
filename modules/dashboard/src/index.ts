@@ -567,6 +567,8 @@ interface DailySummary {
   generatedAt: string;
   /** 'ai' = 供应商生成；'local' = 本地数据小结（AI 失败/降本回退，缓存后当天不再调用供应商） */
   source: 'ai' | 'local';
+  /** 展开依据：喂给模型（或本地兜底所引用）的数据项，供前端"展开依据"折叠查看 */
+  basis: string[];
 }
 
 /**
@@ -625,7 +627,7 @@ async function generateDailySummary(ctx: ModuleContext): Promise<DailySummary> {
       '你是 Atlas 个人成长助手：温暖、直接、有智慧，像一位老朋友。只输出纯文本小结本身。',
     );
     if (text.length > 0) {
-      return { text, generatedAt: new Date().toISOString(), source: 'ai' };
+      return { text, generatedAt: new Date().toISOString(), source: 'ai', basis: localParts };
     }
     console.warn('[dashboard] AI 小结返回空文本，回退本地数据小结');
   } catch (error) {
@@ -635,7 +637,12 @@ async function generateDailySummary(ctx: ModuleContext): Promise<DailySummary> {
       }`,
     );
   }
-  return { text: localText, generatedAt: new Date().toISOString(), source: 'local' };
+  return {
+    text: localText,
+    generatedAt: new Date().toISOString(),
+    source: 'local',
+    basis: localParts,
+  };
 }
 
 /* ---------------- 模块定义 ---------------- */
