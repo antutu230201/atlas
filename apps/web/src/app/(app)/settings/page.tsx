@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Badge,
@@ -210,6 +210,53 @@ function ModulesTab({ slug }: { slug: string }) {
       setExporting(null);
     }
   };
+  // 数据导入（§4 备份恢复闭环）：选择此前导出的备份 JSON，幂等合并（已存在 id 跳过，不覆盖）
+  const IMPORTABLE = EXPORTABLE;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const handleImportFile = async (file: File) => {
+    setImporting(true);
+    try {
+      const data = JSON.parse(await file.text()) as { moduleName?: unknown };
+      const moduleName = typeof data.moduleName === 'string' ? data.moduleName : '';
+      if (!IMPORTABLE.includes(moduleName as (typeof EXPORTABLE)[number])) {
+        toast({
+          title: '无法识别备份文件',
+          description: 'moduleName 缺失或不支持——请使用设置页导出的备份 JSON。',
+          variant: 'err',
+        });
+        return;
+      }
+      const enabled =
+        modules.data?.some((module) => module.name === moduleName && module.enabled) ?? false;
+      if (!enabled) {
+        toast({
+          title: '请先启用该模块',
+          description: `${moduleName} 未启用，导入入口在模块页签。`,
+          variant: 'err',
+        });
+        return;
+      }
+      const result = await api<{ imported: number; skipped: number }>(
+        `/modules/workspaces/${slug}/${moduleName}/call/importData`,
+        { method: 'POST', json: data },
+      );
+      toast({
+        title: `${moduleName} 导入完成`,
+        description: `新增 ${result.imported} 条，跳过 ${result.skipped} 条（已存在或冲突）`,
+        variant: 'ok',
+      });
+    } catch (error) {
+      toast({
+        title: '导入失败',
+        description: error instanceof Error ? error.message : '文件可能不是合法的备份 JSON',
+        variant: 'err',
+      });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   if (modules.isPending) return <Skeleton className="h-40 w-full" />;
   if (modules.isError) {
@@ -288,6 +335,35 @@ function ModulesTab({ slug }: { slug: string }) {
         </div>
         <span className="text-xs text-muted">
           通知历史等内核数据随时可导出；模块数据含软删除条目，仅限已启用的模块，适合备份或迁移。
+        </span>
+
+        <p className="pt-1 text-xs font-medium text-muted">数据导入（备份恢复）</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void handleImportFile(file);
+            }}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={importing}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            导入 JSON 备份
+          </Button>
+        </div>
+        <span className="text-xs text-muted">
+          选择此前导出的备份文件，按文件内 moduleName
+          自动识别目标模块；幂等合并——已存在的条目自动跳过、
+          绝不覆盖现有数据（软删除状态一并恢复）。需先启用对应模块。
         </span>
       </div>
     </div>

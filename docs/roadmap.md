@@ -867,3 +867,12 @@
 - [x] 复盘概览区新增「报告」按钮（月份随当前月游标），下载 `journal_report_<月份>.html`；模块间不共享代码——journal 自持 downloadJournalReport 助手
 - [x] 测试：报告纯函数单测 7/7（自包含无外链、聚合统计、转义防注入、空月空态、月天数柱数）；journal e2e 补下载文件名断言
 - 验证：单测/e2e/typecheck/lint/format/build 全绿；Node 直出样例页浏览器实测——桌面与 390px 均无溢出，柱子点击明细、条目展开全文、页签切换、AI 段渲染全部正常
+
+### 全模块数据导入——备份恢复闭环（2026-11-15 续 10）
+
+- [x] 六模块补齐 `importData`（此前仅 todo_notes 有）：统一语义——**保留原 id 幂等合并**（冲突跳过、绝不覆盖现有数据）、文件里的 workspaceId 一律忽略（强制当前工作空间，防跨租户投放）、悬空引用跳过（goals 关键结果 / habits 打卡的父引用不在现有 ∪ 导入集合中）、软删除状态随备份恢复（回收站内容复活到回收站）、时间戳非法的行整行跳过
+- [x] 修复 todo_notes 导入缺陷：此前插入未保留原 id，重复导入同一备份会产生重复数据——改为显式 id + ON CONFLICT DO NOTHING；顺带把 journal/goals/habits/dashboard 的日期校验从纯正则升级为"可解析为真实日期"（2026-13-99 这类此前会 500，现 400）
+- [x] 设置页：导出区下方新增「导入 JSON 备份」——按文件内 moduleName 自动识别目标模块，结果 toast 报告新增/跳过条数；模块未启用或文件不合法均有明确错误提示
+- [x] 测试：import-data 集成 8/8（六模块往返、伪造 workspaceId 忽略、journal 同日冲突不覆盖、goals/habits 悬空引用跳过、坏格式整批 400、guest 403）；app-shell e2e 补导出→永久删除→导入→恢复全链路
+- 说明：通知历史不提供导入（属可再生事件流，非业务数据）；内核通知导出上轮已交付
+- 验证：全仓 API **184/184**、app-shell e2e 2/2、typecheck/lint/format/build 全绿；浏览器实测导入区渲染与文案

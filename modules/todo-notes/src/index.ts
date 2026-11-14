@@ -353,7 +353,11 @@ export const definition: ModuleDefinition = {
       },
     },
 
-    /** 导入：接受导出格式的 JSON，跳过已存在的 id，返回导入计数 */
+    /**
+     * 导入：接受导出格式的 JSON，幂等合并（保留原 id，冲突跳过）——宪法 §4 备份恢复闭环。
+     * 修复：此前插入未保留原 id，重复导入同一备份会产生重复数据；现在显式写 id，
+     * 冲突交给 ON CONFLICT DO NOTHING（workspaceId/createdBy 一律取当前上下文）。
+     */
     importData: {
       permission: 'todo:write',
       handler: async (ctx, input) => {
@@ -372,29 +376,23 @@ export const definition: ModuleDefinition = {
           })
           .safeParse(input);
         if (!parsed.success) bad('导入数据格式不正确');
-        let imported = 0;
-        for (const item of parsed.data.todos) {
-          // 有 id 时检查是否已存在（跳过重复），无 id 直接插入
-          if (item.id) {
-            const exists = await ctx.db
-              .select({ id: todo.id })
-              .from(todo)
-              .where(eq(todo.id, item.id))
-              .limit(1);
-            if (exists.length > 0) continue;
-          }
-          await ctx.db.insert(todo).values({
-            workspaceId: ctx.workspaceId,
-            title: item.title,
-            notes: item.notes ?? '',
-            status: item.status ?? 'open',
-            priority: item.priority ?? 'normal',
-            dueDate: item.dueDate ? new Date(item.dueDate) : null,
-            createdBy: ctx.userId,
-          });
-          imported += 1;
-        }
-        return { imported, skipped: parsed.data.todos.length - imported };
+        const rows = parsed.data.todos.map((item) => ({
+          ...(item.id ? { id: item.id } : {}),
+          workspaceId: ctx.workspaceId,
+          title: item.title,
+          notes: item.notes ?? '',
+          status: item.status ?? 'open',
+          priority: item.priority ?? 'normal',
+          dueDate: item.dueDate ? new Date(item.dueDate) : null,
+          createdBy: ctx.userId,
+        }));
+        if (rows.length === 0) return { imported: 0, skipped: 0 };
+        const inserted = await ctx.db
+          .insert(todo)
+          .values(rows)
+          .onConflictDoNothing()
+          .returning({ id: todo.id });
+        return { imported: inserted.length, skipped: parsed.data.todos.length - inserted.length };
       },
     },
   },

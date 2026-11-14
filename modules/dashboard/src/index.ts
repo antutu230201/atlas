@@ -95,12 +95,17 @@ const settingsSchema = z.object({
 
 type WorkspaceSettings = z.infer<typeof settingsSchema>;
 
+const dateStr = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD')
+  .refine(
+    (value) => !Number.isNaN(new Date(`${value}T00:00:00`).getTime()),
+    '日期不合法（如 2026-13-99）',
+  );
+
 const createCountdownSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(60),
-  targetDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD')
-    .optional(),
+  targetDate: dateStr.optional(),
   pinned: z.boolean().optional(),
   /** 农历纪念日：传农历月/日，后端换算为下一次发生的公历日期 */
   lunar: z.boolean().optional(),
@@ -1092,6 +1097,68 @@ export const definition: ModuleDefinition = {
           moduleName: 'dashboard',
           count: rows.length,
           countdowns: rows,
+        };
+      },
+    },
+
+    /**
+     * 导入：接受导出格式的 JSON，幂等合并（保留原 id，冲突跳过）——宪法 §4 备份恢复闭环。
+     * workspaceId/createdBy 强制当前上下文；deletedAt 非法时间戳的行跳过。
+     */
+    importData: {
+      permission: 'dashboard:write',
+      handler: async (ctx, input) => {
+        const parsed = z
+          .object({
+            countdowns: z.array(
+              z.object({
+                id: z.string().uuid().optional(),
+                title: z.string().min(1).max(120),
+                targetDate: dateStr,
+                pinned: z.boolean().optional(),
+                repeatYearly: z.boolean().optional(),
+                lunar: z.boolean().optional(),
+                lunarMonth: z.number().int().min(1).max(12).nullable().optional(),
+                lunarDay: z.number().int().min(1).max(30).nullable().optional(),
+                lunarLabel: z.string().max(60).optional(),
+                deletedAt: z.string().nullable().optional(),
+              }),
+            ),
+          })
+          .safeParse(input);
+        if (!parsed.success) bad('导入数据格式不正确');
+        const rows: Array<typeof countdown.$inferInsert> = [];
+        for (const item of parsed.data.countdowns) {
+          let deletedAt: Date | null = null;
+          if (typeof item.deletedAt === 'string') {
+            const time = new Date(item.deletedAt).getTime();
+            if (Number.isNaN(time)) continue; // 无效时间戳：跳过该行
+            deletedAt = new Date(time);
+          }
+          rows.push({
+            ...(item.id ? { id: item.id } : {}),
+            workspaceId: ctx.workspaceId,
+            title: item.title,
+            targetDate: item.targetDate,
+            pinned: item.pinned ?? false,
+            repeatYearly: item.repeatYearly ?? false,
+            lunar: item.lunar ?? false,
+            lunarMonth: item.lunarMonth ?? null,
+            lunarDay: item.lunarDay ?? null,
+            lunarLabel: item.lunarLabel ?? '',
+            deletedAt,
+            createdBy: ctx.userId,
+          });
+        }
+        if (rows.length === 0) return { imported: 0, skipped: parsed.data.countdowns.length };
+        const inserted = await ctx.db
+          .insert(countdown)
+          .values(rows)
+          .onConflictDoNothing()
+          .returning({ id: countdown.id });
+        return {
+          imported: inserted.length,
+          skipped: parsed.data.countdowns.length - inserted.length,
         };
       },
     },

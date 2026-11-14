@@ -127,6 +127,53 @@ export const definition: ModuleDefinition = {
       },
     },
 
+    /**
+     * 导入：接受导出格式的 JSON，幂等合并（保留原 id，冲突跳过）——宪法 §4 备份恢复闭环。
+     * workspaceId 一律取当前工作空间（文件里的值被忽略，防跨租户投放）；
+     * deletedAt 非法时间戳的行整行跳过（计入 skipped）。
+     */
+    importData: {
+      permission: 'note:write',
+      handler: async (ctx, input) => {
+        const parsed = z
+          .object({
+            notes: z.array(
+              z.object({
+                id: z.string().uuid().optional(),
+                title: z.string().min(1).max(120),
+                body: z.string().max(5000).optional(),
+                deletedAt: z.string().nullable().optional(),
+              }),
+            ),
+          })
+          .safeParse(input);
+        if (!parsed.success) throw new ModuleActionError('导入数据格式不正确');
+        const rows: Array<typeof note.$inferInsert> = [];
+        for (const item of parsed.data.notes) {
+          let deletedAt: Date | null = null;
+          if (typeof item.deletedAt === 'string') {
+            const time = new Date(item.deletedAt).getTime();
+            if (Number.isNaN(time)) continue; // 无效时间戳：跳过该行
+            deletedAt = new Date(time);
+          }
+          rows.push({
+            ...(item.id ? { id: item.id } : {}),
+            workspaceId: ctx.workspaceId,
+            title: item.title,
+            body: item.body ?? '',
+            deletedAt,
+          });
+        }
+        if (rows.length === 0) return { imported: 0, skipped: parsed.data.notes.length };
+        const inserted = await ctx.db
+          .insert(note)
+          .values(rows)
+          .onConflictDoNothing()
+          .returning({ id: note.id });
+        return { imported: inserted.length, skipped: parsed.data.notes.length - inserted.length };
+      },
+    },
+
     restore: {
       permission: 'note:write',
       handler: async (ctx, input) => {

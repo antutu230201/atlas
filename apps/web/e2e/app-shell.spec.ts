@@ -152,6 +152,26 @@ test.describe('阶段 3 · 应用外壳与模块挂载', () => {
     await expect(page.getByText('笔记已恢复', { exact: true })).toBeVisible();
     await page.goto('/m/sample_note/list');
     await expect(page.getByText('外壳验收笔记')).toBeVisible();
+
+    // 数据导入（备份恢复闭环）：导出备份 → 删除并清空（彻底丢失）→ 导入恢复
+    await page.goto('/settings');
+    const backupPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出 sample_note' }).click();
+    const backupDownload = await backupPromise;
+    const backupPath = await backupDownload.path();
+
+    await page.goto('/m/sample_note/list');
+    await page.getByRole('button', { name: '删除 外壳验收笔记' }).click();
+    await page.goto('/m/sample_note/trash');
+    await page.getByRole('button', { name: '永久删除 外壳验收笔记' }).click();
+    await page.getByRole('button', { name: '确认永久删除 外壳验收笔记' }).click();
+    await expect(page.getByText('回收站是空的').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.goto('/settings');
+    await page.setInputFiles('input[type="file"]', backupPath);
+    await expect(page.getByText('sample_note 导入完成').first()).toBeVisible({ timeout: 10_000 });
+    await page.goto('/m/sample_note/list');
+    await expect(page.getByText('外壳验收笔记')).toBeVisible({ timeout: 10_000 });
   });
 
   test('登出后访问受保护页面跳转登录', async ({ page }) => {

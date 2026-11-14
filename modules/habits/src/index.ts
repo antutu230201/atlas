@@ -40,6 +40,13 @@ const manifest = moduleManifestSchema.parse({
 /* ---------------- 输入校验与时区工具 ---------------- */
 
 const habitIdSchema = z.string().uuid();
+const dateStr = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD')
+  .refine(
+    (value) => !Number.isNaN(new Date(`${value}T00:00:00`).getTime()),
+    '日期不合法（如 2026-13-99）',
+  );
 const createSchema = z.object({
   name: z.string().trim().min(1, '名称不能为空').max(40, '名称最长 40 字'),
   /** 单个 emoji（允许带变体选择符），空则用默认 */
@@ -285,6 +292,113 @@ export const definition: ModuleDefinition = {
           count: habitRows.length + logRows.length,
           habits: habitRows,
           habitLogs: logRows,
+        };
+      },
+    },
+
+    /**
+     * 导入：接受导出格式的 JSON，幂等合并（保留原 id，冲突跳过）——宪法 §4 备份恢复闭环。
+     * workspaceId 强制当前工作空间；打卡记录悬空引用（habitId 不在本工作空间现有
+     * ∪ 导入习惯中）跳过；(habitId, day) 冲突由唯一索引吸收跳过，绝不覆盖已有打卡。
+     */
+    importData: {
+      permission: 'habits:write',
+      handler: async (ctx, input) => {
+        const parsed = z
+          .object({
+            habits: z
+              .array(
+                z.object({
+                  id: z.string().uuid().optional(),
+                  name: z.string().min(1).max(60),
+                  icon: z.string().max(4).optional(),
+                  sortOrder: z.number().int().optional(),
+                  archivedAt: z.string().nullable().optional(),
+                }),
+              )
+              .optional()
+              .default([]),
+            habitLogs: z
+              .array(
+                z.object({
+                  id: z.string().uuid().optional(),
+                  habitId: z.string().uuid(),
+                  day: dateStr,
+                }),
+              )
+              .optional()
+              .default([]),
+          })
+          .safeParse(input);
+        if (!parsed.success) bad('导入数据格式不正确');
+
+        const habitRows: Array<typeof habit.$inferInsert> = [];
+        for (const item of parsed.data.habits) {
+          let archivedAt: Date | null = null;
+          if (typeof item.archivedAt === 'string') {
+            const time = new Date(item.archivedAt).getTime();
+            if (Number.isNaN(time)) continue; // 无效时间戳：跳过该行
+            archivedAt = new Date(time);
+          }
+          habitRows.push({
+            ...(item.id ? { id: item.id } : {}),
+            workspaceId: ctx.workspaceId,
+            name: item.name,
+            icon: item.icon ?? '✅',
+            sortOrder: item.sortOrder ?? 0,
+            archivedAt,
+          });
+        }
+        const existingHabits = await ctx.db
+          .select({ id: habit.id })
+          .from(habit)
+          .where(eq(habit.workspaceId, ctx.workspaceId));
+        const validHabitIds = new Set<string>([
+          ...existingHabits.map((row) => row.id),
+          ...habitRows.filter((row) => typeof row.id === 'string').map((row) => row.id as string),
+        ]);
+
+        const logRows: Array<typeof habitLog.$inferInsert> = [];
+        let dangling = 0;
+        for (const item of parsed.data.habitLogs) {
+          if (!validHabitIds.has(item.habitId)) {
+            dangling += 1;
+            continue;
+          }
+          logRows.push({
+            ...(item.id ? { id: item.id } : {}),
+            workspaceId: ctx.workspaceId,
+            habitId: item.habitId,
+            day: item.day,
+          });
+        }
+
+        let importedHabits = 0;
+        if (habitRows.length > 0) {
+          const inserted = await ctx.db
+            .insert(habit)
+            .values(habitRows)
+            .onConflictDoNothing()
+            .returning({ id: habit.id });
+          importedHabits = inserted.length;
+        }
+        let importedLogs = 0;
+        if (logRows.length > 0) {
+          const insertedLogs = await ctx.db
+            .insert(habitLog)
+            .values(logRows)
+            .onConflictDoNothing()
+            .returning({ id: habitLog.id });
+          importedLogs = insertedLogs.length;
+        }
+        return {
+          imported: importedHabits + importedLogs,
+          skipped:
+            parsed.data.habits.length +
+            parsed.data.habitLogs.length -
+            importedHabits -
+            importedLogs,
+          dangling,
         };
       },
     },

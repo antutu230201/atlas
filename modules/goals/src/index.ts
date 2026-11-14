@@ -45,7 +45,13 @@ const manifest = moduleManifestSchema.parse({
 const PERIODS = ['year', 'quarter', 'month', 'custom'] as const;
 const KR_TYPES = ['number', 'boolean'] as const;
 
-const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD');
+const dateStr = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD')
+  .refine(
+    (value) => !Number.isNaN(new Date(`${value}T00:00:00`).getTime()),
+    '日期不合法（如 2026-13-99）',
+  );
 
 const objectiveIdSchema = z.string().uuid();
 const keyResultIdSchema = z.string().uuid();
@@ -459,6 +465,145 @@ export const definition: ModuleDefinition = {
           count: objectiveRows.length + keyResultRows.length,
           objectives: objectiveRows,
           keyResults: keyResultRows,
+        };
+      },
+    },
+
+    /**
+     * 导入：接受导出格式的 JSON，幂等合并（保留原 id，冲突跳过）——宪法 §4 备份恢复闭环。
+     * workspaceId 强制当前工作空间；关键结果悬空引用（objectiveId 不在本工作空间
+     * 现有目标 ∪ 导入目标中）整条跳过；时间戳非法的行跳过。
+     */
+    importData: {
+      permission: 'goals:write',
+      handler: async (ctx, input) => {
+        const parsed = z
+          .object({
+            objectives: z
+              .array(
+                z.object({
+                  id: z.string().uuid().optional(),
+                  title: z.string().min(1).max(120),
+                  description: z.string().nullable().optional(),
+                  period: z.enum(['year', 'quarter', 'month', 'custom']).optional(),
+                  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+                  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+                  icon: z.string().max(4).optional(),
+                  sortOrder: z.number().int().optional(),
+                  archivedAt: z.string().nullable().optional(),
+                }),
+              )
+              .optional()
+              .default([]),
+            keyResults: z
+              .array(
+                z.object({
+                  id: z.string().uuid().optional(),
+                  objectiveId: z.string().uuid(),
+                  title: z.string().min(1).max(120),
+                  type: z.enum(['number', 'boolean']).optional(),
+                  startValue: z.number().optional(),
+                  targetValue: z.number().optional(),
+                  currentValue: z.number().optional(),
+                  unit: z.string().nullable().optional(),
+                  completedAt: z.string().nullable().optional(),
+                  deletedAt: z.string().nullable().optional(),
+                  sortOrder: z.number().int().optional(),
+                }),
+              )
+              .optional()
+              .default([]),
+          })
+          .safeParse(input);
+        if (!parsed.success) bad('导入数据格式不正确');
+
+        const toDate = (value: string | null | undefined): Date | null | 'invalid' => {
+          if (value === null || value === undefined) return null;
+          const time = new Date(value).getTime();
+          return Number.isNaN(time) ? 'invalid' : new Date(time);
+        };
+
+        // 目标先行（objective 的软删除即 archivedAt）；收集合法 objectiveId 集合（现有 ∪ 导入）
+        const objectiveRows: Array<typeof objective.$inferInsert> = [];
+        for (const item of parsed.data.objectives) {
+          const archivedAt = toDate(item.archivedAt);
+          if (archivedAt === 'invalid') continue;
+          objectiveRows.push({
+            ...(item.id ? { id: item.id } : {}),
+            workspaceId: ctx.workspaceId,
+            title: item.title,
+            description: item.description ?? null,
+            period: item.period ?? 'year',
+            startDate: item.startDate,
+            endDate: item.endDate,
+            icon: item.icon ?? '🎯',
+            sortOrder: item.sortOrder ?? 0,
+            archivedAt,
+          });
+        }
+        const existingObjectives = await ctx.db
+          .select({ id: objective.id })
+          .from(objective)
+          .where(eq(objective.workspaceId, ctx.workspaceId));
+        const validObjectiveIds = new Set<string>([
+          ...existingObjectives.map((row) => row.id),
+          ...objectiveRows
+            .filter((row) => typeof row.id === 'string')
+            .map((row) => row.id as string),
+        ]);
+
+        const keyResultRows: Array<typeof keyResult.$inferInsert> = [];
+        let dangling = 0;
+        for (const item of parsed.data.keyResults) {
+          if (!validObjectiveIds.has(item.objectiveId)) {
+            dangling += 1;
+            continue;
+          }
+          const completedAt = toDate(item.completedAt);
+          const deletedAt = toDate(item.deletedAt);
+          if (completedAt === 'invalid' || deletedAt === 'invalid') continue;
+          keyResultRows.push({
+            ...(item.id ? { id: item.id } : {}),
+            workspaceId: ctx.workspaceId,
+            objectiveId: item.objectiveId,
+            title: item.title,
+            type: item.type ?? 'number',
+            startValue: item.startValue ?? 0,
+            targetValue: item.targetValue ?? 1,
+            currentValue: item.currentValue ?? 0,
+            unit: item.unit ?? null,
+            completedAt,
+            deletedAt,
+            sortOrder: item.sortOrder ?? 0,
+          });
+        }
+
+        let importedObjectives = 0;
+        if (objectiveRows.length > 0) {
+          const inserted = await ctx.db
+            .insert(objective)
+            .values(objectiveRows)
+            .onConflictDoNothing()
+            .returning({ id: objective.id });
+          importedObjectives = inserted.length;
+        }
+        let importedKr = 0;
+        if (keyResultRows.length > 0) {
+          const insertedKr = await ctx.db
+            .insert(keyResult)
+            .values(keyResultRows)
+            .onConflictDoNothing()
+            .returning({ id: keyResult.id });
+          importedKr = insertedKr.length;
+        }
+        return {
+          imported: importedObjectives + importedKr,
+          skipped:
+            parsed.data.objectives.length +
+            parsed.data.keyResults.length -
+            importedObjectives -
+            importedKr,
+          dangling,
         };
       },
     },
