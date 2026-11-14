@@ -1,9 +1,11 @@
 'use client';
 
 import { cn } from '../cn';
+import { useEffect, useState } from 'react';
 import {
   useCountUp,
   useMagnetic,
+  usePrefersReducedMotion,
   useScrollReveal,
   useScrollStory,
   useSpotlight,
@@ -131,6 +133,45 @@ export function Typewriter({
   const { ref, shown, done } = useTypewriter(text, speedMs);
   return (
     <span ref={ref} className={cn(!done && 'atlas-m-caret', className)}>
+      {shown}
+    </span>
+  );
+}
+
+/** 07 文字解码：乱码字符从左到右逐步锁定；reduced-motion 直接完整文本 */
+export function TextDecode({
+  text,
+  stepMs = 45,
+  className,
+}: {
+  text: string;
+  stepMs?: number;
+  className?: string;
+}) {
+  const reduced = usePrefersReducedMotion();
+  const [shown, setShown] = useState(reduced ? text : '');
+  useEffect(() => {
+    if (reduced) {
+      setShown(text);
+      return;
+    }
+    const glyphs = 'ABCDEF0123456789#@$%&';
+    let progress = 0;
+    const timer = window.setInterval(() => {
+      progress += 1;
+      const locked = text.slice(0, progress);
+      const scrambling = text
+        .slice(progress)
+        .split('')
+        .map((char) => (char === ' ' ? ' ' : glyphs[Math.floor(Math.random() * glyphs.length)]))
+        .join('');
+      setShown(locked + scrambling);
+      if (progress >= text.length) window.clearInterval(timer);
+    }, stepMs);
+    return () => window.clearInterval(timer);
+  }, [text, stepMs, reduced]);
+  return (
+    <span aria-label={text} className={className}>
       {shown}
     </span>
   );

@@ -674,7 +674,11 @@
 .dashboard-screen[data-scrolling] .screen-vinyl-rotation,
 .dashboard-screen[data-scrolling] .screen-equalizer i,
 .dashboard-screen[data-scrolling] .screen-weather,
-.dashboard-screen[data-scrolling] .screen-weather * {
+.dashboard-screen[data-scrolling] .screen-weather *,
+/* 动效系统（.atlas-m-*）的持续循环动画：紧迫倒计时流光边框与常驻流光扫过 */
+.dashboard-screen[data-scrolling] .atlas-m-glow-border::before,
+.dashboard-screen[data-scrolling] .atlas-m-shimmer-auto::after,
+.dashboard-screen[data-scrolling] .atlas-m-marquee-track {
   animation: none !important;
 }
 
@@ -693,7 +697,12 @@ body[data-screen-scrolling='1'] [data-testid='vinyl-player'] {
 .dashboard-screen[data-low-power] .screen-marquee,
 .dashboard-screen[data-low-power] .screen-orbit,
 .dashboard-screen[data-low-power] .screen-core,
-.dashboard-screen[data-low-power] .screen-pulse-ring {
+.dashboard-screen[data-low-power] .screen-pulse-ring,
+/* 动效系统（.atlas-m-*）的持续循环动画：低功耗下一并停止 */
+.dashboard-screen[data-low-power] .atlas-m-glow-border::before,
+.dashboard-screen[data-low-power] .atlas-m-shimmer-auto::after,
+.dashboard-screen[data-low-power] .atlas-m-marquee-track,
+.dashboard-screen[data-low-power] .atlas-m-caret::after {
   animation: none !important;
 }
 

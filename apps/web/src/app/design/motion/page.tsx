@@ -10,6 +10,7 @@ import {
   Reveal,
   ScrollStory,
   SpotlightCard,
+  TextDecode,
   TiltCard,
   Typewriter,
   usePrefersReducedMotion,
@@ -35,37 +36,6 @@ const PRINCIPLES = [
     body: 'prefers-reduced-motion 下：循环动画停止、过渡即时完成、内容永不因动画不可见（armed 态强制可见）；计数/打字机直接呈现终态。',
   },
 ];
-
-/** 07 文字解码：字符乱序逐步揭示 */
-function TextDecode({ text }: { text: string }) {
-  const reduced = usePrefersReducedMotion();
-  const [shown, setShown] = useState(reduced ? text : '');
-  useEffect(() => {
-    if (reduced) {
-      setShown(text);
-      return;
-    }
-    const glyphs = 'ABCDEF0123456789#@$%&';
-    let progress = 0;
-    const timer = window.setInterval(() => {
-      progress += 1;
-      const locked = text.slice(0, progress);
-      const scrambling = text
-        .slice(progress)
-        .split('')
-        .map((char) => (char === ' ' ? ' ' : glyphs[Math.floor(Math.random() * glyphs.length)]))
-        .join('');
-      setShown(locked + scrambling);
-      if (progress >= text.length) window.clearInterval(timer);
-    }, 45);
-    return () => window.clearInterval(timer);
-  }, [text, reduced]);
-  return (
-    <p className="font-mono text-base tabular-nums text-primary" aria-label={text}>
-      {shown}
-    </p>
-  );
-}
 
 /** 15 弹性动画：加 .atlas-m-bounce 类触发，key 变化重播 */
 function BounceDemo() {

@@ -191,6 +191,7 @@ export function useParallax<T extends HTMLElement>(
 
 /**
  * 10 数字递增：进入视口后按 ease-out 从 0 递增到 target；
+ * 只动画一次——之后 target 变化（如轮询数据更新）直接跟随，不重复播放；
  * reduced-motion / 无 IO → 直接返回终值（不播放）。
  */
 export function useCountUp(
@@ -199,14 +200,22 @@ export function useCountUp(
 ): { ref: React.RefObject<HTMLSpanElement | null>; value: number } {
   const ref = useRef<HTMLSpanElement | null>(null);
   const reduced = usePrefersReducedMotion();
+  const playedRef = useRef(false);
   const [value, setValue] = useState(0);
   useEffect(() => {
+    // 首次动画完成后，后续 target 变化直接跟随（大屏轮询指标不能反复从 0 跳）
+    if (playedRef.current) {
+      setValue(target);
+      return;
+    }
     if (reduced) {
+      playedRef.current = true;
       setValue(target);
       return;
     }
     const element = ref.current;
     if (!element || typeof IntersectionObserver !== 'function') {
+      playedRef.current = true;
       setValue(target);
       return;
     }
@@ -215,6 +224,7 @@ export function useCountUp(
       (entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
         observer.disconnect();
+        playedRef.current = true;
         const start = performance.now();
         const tick = (now: number) => {
           const progress = Math.min(1, (now - start) / durationMs);

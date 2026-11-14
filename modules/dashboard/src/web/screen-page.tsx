@@ -11,8 +11,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  MagneticButton,
   Skeleton,
   ThemeToggle,
+  useCountUp,
   useToast,
 } from '@atlas/ui';
 import { api } from '@/lib/api';
@@ -111,6 +113,8 @@ function HeroMetric({
   onClick: () => void;
   accent?: boolean;
 }) {
+  // 10 数字递增：首次可见时 ease-out 递增；轮询导致的后续变化直接跟随（useCountUp 内建）
+  const { ref, value: shown } = useCountUp(value);
   return (
     <button
       type="button"
@@ -118,9 +122,10 @@ function HeroMetric({
       className="group/metric rounded-sm border-l border-border py-0.5 pl-4 text-left transition-colors first:border-l-0 first:pl-0 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:border-l-0 max-sm:pl-0"
     >
       <span
+        ref={ref}
         className={`block font-mono text-[20px] font-medium tracking-tight tabular-nums sm:text-[26px] ${accent ? 'text-primary' : ''}`}
       >
-        {String(value).padStart(2, '0')}
+        {String(shown).padStart(2, '0')}
       </span>
       <span className="mt-1 flex items-center gap-1 text-[11px] text-muted transition-colors group-hover/metric:text-text">
         {label}
@@ -662,72 +667,82 @@ export function DashboardScreenPage({
             <div className="hidden sm:block">
               <ThemeToggle />
             </div>
-            <button
-              type="button"
-              onClick={toggleFocusMode}
-              aria-pressed={focusMode}
-              className={`screen-icon-button ${focusMode ? '!border-primary/40 !text-primary' : ''}`}
-              aria-label="专注模式"
-              title="专注模式（C）：隐藏热榜与回顾，只留时钟/天气/待办/倒计时"
-            >
-              <ScreenIcon name="focus" className="size-3.5" />
-              <span className="hidden sm:inline">专注</span>
-            </button>
-            <button
-              type="button"
-              className={`screen-icon-button hidden md:inline-flex ${lowPowerMode ? '!border-primary/40 !text-primary' : ''}`}
-              onClick={toggleLowPowerMode}
-              aria-pressed={lowPowerMode}
-              aria-label="低功耗模式"
-              title={
-                lowPowerMode
-                  ? '低功耗模式已开启：已关闭壁纸和氛围动画'
-                  : '低功耗模式：关闭壁纸和氛围动画，保留音乐与时钟'
-              }
-            >
-              <ScreenIcon name="power" className="size-3.5" />
-              <span className="hidden sm:inline">{lowPowerMode ? '省电中' : '低功耗'}</span>
-            </button>
+            <MagneticButton>
+              <button
+                type="button"
+                onClick={toggleFocusMode}
+                aria-pressed={focusMode}
+                className={`screen-icon-button ${focusMode ? '!border-primary/40 !text-primary' : ''}`}
+                aria-label="专注模式"
+                title="专注模式（C）：隐藏热榜与回顾，只留时钟/天气/待办/倒计时"
+              >
+                <ScreenIcon name="focus" className="size-3.5" />
+                <span className="hidden sm:inline">专注</span>
+              </button>
+            </MagneticButton>
+            <MagneticButton>
+              <button
+                type="button"
+                className={`screen-icon-button hidden md:inline-flex ${lowPowerMode ? '!border-primary/40 !text-primary' : ''}`}
+                onClick={toggleLowPowerMode}
+                aria-pressed={lowPowerMode}
+                aria-label="低功耗模式"
+                title={
+                  lowPowerMode
+                    ? '低功耗模式已开启：已关闭壁纸和氛围动画'
+                    : '低功耗模式：关闭壁纸和氛围动画，保留音乐与时钟'
+                }
+              >
+                <ScreenIcon name="power" className="size-3.5" />
+                <span className="hidden sm:inline">{lowPowerMode ? '省电中' : '低功耗'}</span>
+              </button>
+            </MagneticButton>
             {canWrite ? (
               <>
-                <button
-                  type="button"
-                  className="screen-icon-button"
-                  aria-label="刷新大屏数据"
-                  title="刷新大屏数据"
-                  disabled={refresh.isPending}
-                  onClick={() => refresh.mutate()}
-                >
-                  <ScreenIcon
-                    name="refresh"
-                    className={`size-3.5 ${refresh.isPending ? 'animate-spin' : ''}`}
-                  />
-                  <span className="hidden sm:inline">刷新</span>
-                </button>
-                <button
-                  type="button"
-                  className="screen-icon-button"
-                  aria-label="大屏设置"
-                  title="大屏设置"
-                  onClick={openSettings}
-                >
-                  <ScreenIcon name="settings" className="size-3.5" />
-                  <span className="hidden sm:inline">设置</span>
-                </button>
+                <MagneticButton>
+                  <button
+                    type="button"
+                    className="screen-icon-button"
+                    aria-label="刷新大屏数据"
+                    title="刷新大屏数据"
+                    disabled={refresh.isPending}
+                    onClick={() => refresh.mutate()}
+                  >
+                    <ScreenIcon
+                      name="refresh"
+                      className={`size-3.5 ${refresh.isPending ? 'animate-spin' : ''}`}
+                    />
+                    <span className="hidden sm:inline">刷新</span>
+                  </button>
+                </MagneticButton>
+                <MagneticButton>
+                  <button
+                    type="button"
+                    className="screen-icon-button"
+                    aria-label="大屏设置"
+                    title="大屏设置"
+                    onClick={openSettings}
+                  >
+                    <ScreenIcon name="settings" className="size-3.5" />
+                    <span className="hidden sm:inline">设置</span>
+                  </button>
+                </MagneticButton>
               </>
             ) : null}
-            <button
-              type="button"
-              className="screen-icon-button hidden sm:inline-flex"
-              onClick={() => void toggleFullscreen()}
-              title={isFullscreen ? '退出浏览器全屏（Esc）' : '进入浏览器全屏'}
-              aria-label={immersive ? (isFullscreen ? '退出全屏' : '退出沉浸') : '全屏'}
-            >
-              <ScreenIcon name={immersive ? 'collapse' : 'fullscreen'} className="size-3.5" />
-              <span className="hidden sm:inline">
-                {immersive ? (isFullscreen ? '退出全屏' : '退出沉浸') : '全屏'}
-              </span>
-            </button>
+            <MagneticButton>
+              <button
+                type="button"
+                className="screen-icon-button hidden sm:inline-flex"
+                onClick={() => void toggleFullscreen()}
+                title={isFullscreen ? '退出浏览器全屏（Esc）' : '进入浏览器全屏'}
+                aria-label={immersive ? (isFullscreen ? '退出全屏' : '退出沉浸') : '全屏'}
+              >
+                <ScreenIcon name={immersive ? 'collapse' : 'fullscreen'} className="size-3.5" />
+                <span className="hidden sm:inline">
+                  {immersive ? (isFullscreen ? '退出全屏' : '退出沉浸') : '全屏'}
+                </span>
+              </button>
+            </MagneticButton>
           </div>
         </header>
 

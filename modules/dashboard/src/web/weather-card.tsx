@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { Skeleton } from '@atlas/ui';
+import { Skeleton, TiltCard } from '@atlas/ui';
 import type { SourceEnvelope, WeatherData } from './types';
 import { ScreenIcon, WeatherIcon } from './icons';
 import { getWeatherScene, WEATHER_SCENE_LABELS } from './weather-atmosphere';
@@ -146,23 +146,26 @@ export function WeatherCard({
           </div>
         </header>
 
-        <button
-          type="button"
-          aria-label="查看实时天气详情"
-          onClick={() => setDetailsOpen(true)}
-          className="relative flex items-start justify-between gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-        >
-          <div>
-            <p className="flex items-start font-mono font-medium tracking-[-0.07em] tabular-nums">
-              <span className="text-6xl leading-none">{Math.round(data.now.temperature)}</span>
-              <span className="mt-1 ml-1 text-xl tracking-normal text-muted">°</span>
-            </p>
-            <p className="mt-2 text-sm font-medium">{data.now.text}</p>
-          </div>
-          <div className="rounded-md border border-border bg-info-soft p-3 text-info transition-transform duration-[var(--duration-slow)] group-hover:rotate-3 group-hover:scale-105">
-            <WeatherIcon icon={data.now.icon} className="size-12 shrink-0" />
-          </div>
-        </button>
+        {/* 06 3D 倾斜：温度主区随指针轻倾（≤8°，reduced-motion 失活），离开复位 */}
+        <TiltCard className="rounded-sm">
+          <button
+            type="button"
+            aria-label="查看实时天气详情"
+            onClick={() => setDetailsOpen(true)}
+            className="relative flex w-full items-start justify-between gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <div>
+              <p className="flex items-start font-mono font-medium tracking-[-0.07em] tabular-nums">
+                <span className="text-6xl leading-none">{Math.round(data.now.temperature)}</span>
+                <span className="mt-1 ml-1 text-xl tracking-normal text-muted">°</span>
+              </p>
+              <p className="mt-2 text-sm font-medium">{data.now.text}</p>
+            </div>
+            <div className="rounded-md border border-border bg-info-soft p-3 text-info transition-transform duration-[var(--duration-slow)] group-hover:rotate-3 group-hover:scale-105">
+              <WeatherIcon icon={data.now.icon} className="size-12 shrink-0" />
+            </div>
+          </button>
+        </TiltCard>
 
         <div className="relative flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
           {data.now.apparent !== undefined ? (

@@ -1,5 +1,6 @@
 'use client';
 
+import { Typewriter } from '@atlas/ui';
 import type { Quote, SourceEnvelope } from './types';
 
 /** 一言卡：横向满宽 + 右侧元信息列，纵向随左栏拉伸，避免短句留下大片空白 */
@@ -18,8 +19,9 @@ export function QuoteCard({ envelope }: { envelope: SourceEnvelope<Quote> }) {
         「
       </span>
       <div className="flex min-w-0 flex-1 flex-col justify-center">
+        {/* 12 打字机：一言逐字打出（reduced-motion 直接完整文本），换一言时重新打出 */}
         <blockquote className="text-[13px] leading-6 text-text/90 md:text-sm md:leading-7">
-          {quote.text}」
+          <Typewriter key={quote.text} text={quote.text} speedMs={45} />」
         </blockquote>
         <figcaption className="mt-2 flex items-center gap-2 text-[11px] text-muted">
           <span className="h-px w-5 bg-border" />

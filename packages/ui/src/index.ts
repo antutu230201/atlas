@@ -20,6 +20,7 @@ export {
 export {
   Reveal,
   SpotlightCard,
+  TextDecode,
   TiltCard,
   MagneticButton,
   CountUp,

@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { TextDecode } from '@atlas/ui';
 
 /**
  * 顶栏副标轮播：把"工作空间 / AI 小结首句 / 连续打卡 / 天气"轮流显示在同一行，
  * 首屏不额外占高度，但一眼能看到今天最值得看的那句话。悬停暂停，点击可看全文。
+ * 07 文字解码：每次轮换以解码动效揭示（reduced-motion 直接完整文本）。
  */
 export function ScreenHeadline({ items }: { items: string[] }) {
   const [index, setIndex] = useState(0);
@@ -36,8 +38,8 @@ export function ScreenHeadline({ items }: { items: string[] }) {
       }}
       title={text}
     >
-      <span className="screen-headline-fade truncate" key={index}>
-        {text}
+      <span className="truncate" key={index}>
+        <TextDecode text={text} stepMs={30} />
       </span>
       {items.length > 1 ? (
         <span className="flex shrink-0 items-center gap-1" aria-hidden>

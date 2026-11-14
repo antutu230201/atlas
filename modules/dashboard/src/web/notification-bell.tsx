@@ -33,7 +33,10 @@ export function NotificationBell() {
     >
       <ScreenIcon name="bell" className="size-3.5" />
       {unread > 0 ? (
-        <span className="absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-err px-1 font-mono text-[10px] leading-4 font-semibold text-white">
+        <span
+          key={unread}
+          className="atlas-m-bounce absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-err px-1 font-mono text-[10px] leading-4 font-semibold text-white"
+        >
           {unread > 9 ? '9+' : unread}
         </span>
       ) : null}

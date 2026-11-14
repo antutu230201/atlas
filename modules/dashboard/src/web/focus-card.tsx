@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Skeleton } from '@atlas/ui';
+import { SpotlightCard, Skeleton } from '@atlas/ui';
 import { ScreenIcon } from './icons';
 
 /**
@@ -77,110 +77,113 @@ export function FocusCard({
       aria-label="今日焦点"
       style={{ '--screen-index': 2 } as React.CSSProperties}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-sm border border-primary/20 bg-primary-soft text-primary">
-            <ScreenIcon name="focus" className="size-4" />
-          </span>
-          <div>
-            <h2 className="text-sm font-semibold">今日焦点</h2>
-            <p className="screen-label mt-0.5 !text-[10px]">Focus · What matters today</p>
+      {/* 01 鼠标聚光灯：高光层跟随指针（reduced-motion 失活） */}
+      <SpotlightCard className="rounded-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-sm border border-primary/20 bg-primary-soft text-primary">
+              <ScreenIcon name="focus" className="size-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold">今日焦点</h2>
+              <p className="screen-label mt-0.5 !text-[10px]">Focus · What matters today</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider text-muted">
+            {todos.length > 0 ? <span className="text-primary">{todos.length} 要务</span> : null}
+            {goals.length > 0 ? <span>{goals.length} 目标在推进</span> : null}
           </div>
         </div>
-        <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider text-muted">
-          {todos.length > 0 ? <span className="text-primary">{todos.length} 要务</span> : null}
-          {goals.length > 0 ? <span>{goals.length} 目标在推进</span> : null}
-        </div>
-      </div>
 
-      {loading ? (
-        <div className="mt-4 grid gap-4 xl:grid-cols-2">
-          <Skeleton className="h-20 w-full rounded-md" />
-          <Skeleton className="h-20 w-full rounded-md" />
-        </div>
-      ) : empty ? (
-        <p className="mt-4 rounded-sm border border-dashed border-border px-3 py-4 text-center text-xs text-muted">
-          今天还没有重点——
-          <Link href="/m/goals/list" className="text-primary underline-offset-2 hover:underline">
-            定一个目标
-          </Link>
-          ，或
-          <Link
-            href="/m/todo_notes/list"
-            className="text-primary underline-offset-2 hover:underline"
-          >
-            添加一条高优待办
-          </Link>
-          。
-        </p>
-      ) : (
-        <div className="mt-4 grid gap-x-6 gap-y-4 xl:grid-cols-2">
-          {todos.length > 0 ? (
-            <div>
-              <p className="screen-label px-1 pb-1.5 !text-[10px]">今日要务</p>
-              <ul className="space-y-1">
-                {todos.map((item) => {
-                  const due = item.dueDate ? dueLabel(item.dueDate) : null;
-                  return (
-                    <li key={item.id}>
-                      <Link
-                        href="/m/todo_notes/list"
-                        className="flex items-center gap-2.5 rounded-sm px-1 py-1.5 transition-colors hover:bg-surface-hover"
-                      >
-                        <span
-                          className="size-1.5 shrink-0 rounded-full bg-err"
-                          aria-hidden
-                          title="高优先级"
-                        />
-                        <span className="min-w-0 flex-1 truncate text-sm">{item.title}</span>
-                        {due ? (
+        {loading ? (
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <Skeleton className="h-20 w-full rounded-md" />
+            <Skeleton className="h-20 w-full rounded-md" />
+          </div>
+        ) : empty ? (
+          <p className="mt-4 rounded-sm border border-dashed border-border px-3 py-4 text-center text-xs text-muted">
+            今天还没有重点——
+            <Link href="/m/goals/list" className="text-primary underline-offset-2 hover:underline">
+              定一个目标
+            </Link>
+            ，或
+            <Link
+              href="/m/todo_notes/list"
+              className="text-primary underline-offset-2 hover:underline"
+            >
+              添加一条高优待办
+            </Link>
+            。
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-x-6 gap-y-4 xl:grid-cols-2">
+            {todos.length > 0 ? (
+              <div>
+                <p className="screen-label px-1 pb-1.5 !text-[10px]">今日要务</p>
+                <ul className="space-y-1">
+                  {todos.map((item) => {
+                    const due = item.dueDate ? dueLabel(item.dueDate) : null;
+                    return (
+                      <li key={item.id}>
+                        <Link
+                          href="/m/todo_notes/list"
+                          className="flex items-center gap-2.5 rounded-sm px-1 py-1.5 transition-colors hover:bg-surface-hover"
+                        >
                           <span
-                            className={`shrink-0 font-mono text-[11px] tabular-nums ${DUE_TONE_CLASS[due.tone]}`}
-                          >
-                            {due.text}
+                            className="size-1.5 shrink-0 rounded-full bg-err"
+                            aria-hidden
+                            title="高优先级"
+                          />
+                          <span className="min-w-0 flex-1 truncate text-sm">{item.title}</span>
+                          {due ? (
+                            <span
+                              className={`shrink-0 font-mono text-[11px] tabular-nums ${DUE_TONE_CLASS[due.tone]}`}
+                            >
+                              {due.text}
+                            </span>
+                          ) : null}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+
+            {goals.length > 0 ? (
+              <div>
+                <p className="screen-label px-1 pb-1.5 !text-[10px]">目标推进</p>
+                <ul className="space-y-2">
+                  {goals.map((goal) => (
+                    <li key={goal.id}>
+                      <Link
+                        href="/m/goals/list"
+                        className="flex items-center gap-2.5 rounded-sm px-1 py-1 transition-colors hover:bg-surface-hover"
+                      >
+                        <span aria-hidden className="shrink-0 text-base">
+                          {goal.icon}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm">{goal.title}</span>
+                          <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-border">
+                            <span
+                              className="block h-full rounded-full bg-primary transition-[width] duration-300"
+                              style={{ width: `${Math.round(goal.progress * 100)}%` }}
+                            />
                           </span>
-                        ) : null}
+                        </span>
+                        <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-primary">
+                          {Math.round(goal.progress * 100)}%
+                        </span>
                       </Link>
                     </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : null}
-
-          {goals.length > 0 ? (
-            <div>
-              <p className="screen-label px-1 pb-1.5 !text-[10px]">目标推进</p>
-              <ul className="space-y-2">
-                {goals.map((goal) => (
-                  <li key={goal.id}>
-                    <Link
-                      href="/m/goals/list"
-                      className="flex items-center gap-2.5 rounded-sm px-1 py-1 transition-colors hover:bg-surface-hover"
-                    >
-                      <span aria-hidden className="shrink-0 text-base">
-                        {goal.icon}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm">{goal.title}</span>
-                        <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-border">
-                          <span
-                            className="block h-full rounded-full bg-primary transition-[width] duration-300"
-                            style={{ width: `${Math.round(goal.progress * 100)}%` }}
-                          />
-                        </span>
-                      </span>
-                      <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-primary">
-                        {Math.round(goal.progress * 100)}%
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-      )}
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </SpotlightCard>
     </section>
   );
 }

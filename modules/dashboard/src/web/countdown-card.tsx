@@ -367,94 +367,96 @@ export function CountdownSection({
           const days = daysFromToday(item.targetDate);
           const urgent = days !== null && days >= 0 && days <= 7;
           return (
-            <article
-              key={item.id}
-              className={`screen-card group p-4 transition-transform ${canWrite ? 'cursor-pointer hover:-translate-y-0.5' : 'hover:-translate-y-0.5'}`}
-              onClick={canWrite ? () => startEdit(item) : undefined}
-              role={canWrite ? 'button' : undefined}
-              aria-label={canWrite ? `编辑 ${item.title}` : undefined}
-              onKeyDown={
-                canWrite
-                  ? (event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        startEdit(item);
+            // 03 边缘流光：紧迫（≤7 天）的倒计时整卡微光环绕（transform 旋转，滚动/低功耗时停）
+            <div key={item.id} className={urgent ? 'atlas-m-glow-border rounded-sm' : undefined}>
+              <article
+                className={`screen-card group p-4 transition-transform ${canWrite ? 'cursor-pointer hover:-translate-y-0.5' : 'hover:-translate-y-0.5'}`}
+                onClick={canWrite ? () => startEdit(item) : undefined}
+                role={canWrite ? 'button' : undefined}
+                aria-label={canWrite ? `编辑 ${item.title}` : undefined}
+                onKeyDown={
+                  canWrite
+                    ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          startEdit(item);
+                        }
                       }
-                    }
-                  : undefined
-              }
-              tabIndex={canWrite ? 0 : undefined}
-            >
-              <div
-                className="flex items-start justify-between gap-2"
-                onClick={(e) => e.stopPropagation()}
+                    : undefined
+                }
+                tabIndex={canWrite ? 0 : undefined}
               >
-                {/* 按钮区不触发编辑 */}
-
-                <p className="min-w-0 flex-1 truncate text-sm font-semibold">
-                  {item.title}
-                  {item.repeatYearly ? (
-                    <span
-                      className="ml-1.5 align-middle text-[10px] text-muted/70"
-                      title="每年循环，过期自动顺推"
-                    >
-                      ↻
-                    </span>
-                  ) : null}
-                </p>
-                {canWrite ? (
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      aria-label={`编辑 ${item.title}`}
-                      onClick={() => startEdit(item)}
-                      className="rounded-xs p-1 text-muted transition-colors opacity-0 hover:bg-primary-soft hover:text-primary group-hover:opacity-100"
-                    >
-                      <ScreenIcon name="settings" className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={item.pinned ? '取消置顶' : '置顶'}
-                      onClick={() => togglePin(item)}
-                      className={`rounded-xs p-1 transition-colors hover:bg-primary-soft hover:text-primary ${item.pinned ? 'text-warn' : 'text-muted'}`}
-                    >
-                      <ScreenIcon name="pin" className="size-3.5" />
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              <p className="mt-3 flex items-baseline gap-2">
-                <span
-                  className={`font-mono text-3xl font-medium tracking-tight tabular-nums ${urgent ? 'text-err' : 'text-primary'}`}
+                <div
+                  className="flex items-start justify-between gap-2"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {days === 0 ? '今天' : Math.abs(days ?? 0)}
-                </span>
-                <span className="text-[11px] text-muted">{daysText(days)}</span>
-              </p>
-              <div
-                className="mt-3 flex items-center justify-between border-t border-border pt-3"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <span className="font-mono text-[10px] text-muted">
-                  {item.lunar && item.lunarLabel ? (
-                    <span className="text-warn/90">{item.lunarLabel}</span>
+                  {/* 按钮区不触发编辑 */}
+
+                  <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+                    {item.title}
+                    {item.repeatYearly ? (
+                      <span
+                        className="ml-1.5 align-middle text-[10px] text-muted/70"
+                        title="每年循环，过期自动顺推"
+                      >
+                        ↻
+                      </span>
+                    ) : null}
+                  </p>
+                  {canWrite ? (
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        aria-label={`编辑 ${item.title}`}
+                        onClick={() => startEdit(item)}
+                        className="rounded-xs p-1 text-muted transition-colors opacity-0 hover:bg-primary-soft hover:text-primary group-hover:opacity-100"
+                      >
+                        <ScreenIcon name="settings" className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={item.pinned ? '取消置顶' : '置顶'}
+                        onClick={() => togglePin(item)}
+                        className={`rounded-xs p-1 transition-colors hover:bg-primary-soft hover:text-primary ${item.pinned ? 'text-warn' : 'text-muted'}`}
+                      >
+                        <ScreenIcon name="pin" className="size-3.5" />
+                      </button>
+                    </div>
                   ) : null}
-                  <span className={item.lunar && item.lunarLabel ? 'ml-1.5' : ''}>
-                    {item.targetDate}
-                  </span>
-                </span>
-                {canWrite ? (
-                  <button
-                    type="button"
-                    aria-label={`删除 ${item.title}`}
-                    onClick={() => remove(item.id)}
-                    className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-err"
+                </div>
+                <p className="mt-3 flex items-baseline gap-2">
+                  <span
+                    className={`font-mono text-3xl font-medium tracking-tight tabular-nums ${urgent ? 'text-err' : 'text-primary'}`}
                   >
-                    <ScreenIcon name="trash" className="size-3" /> 删除
-                  </button>
-                ) : null}
-              </div>
-            </article>
+                    {days === 0 ? '今天' : Math.abs(days ?? 0)}
+                  </span>
+                  <span className="text-[11px] text-muted">{daysText(days)}</span>
+                </p>
+                <div
+                  className="mt-3 flex items-center justify-between border-t border-border pt-3"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="font-mono text-[10px] text-muted">
+                    {item.lunar && item.lunarLabel ? (
+                      <span className="text-warn/90">{item.lunarLabel}</span>
+                    ) : null}
+                    <span className={item.lunar && item.lunarLabel ? 'ml-1.5' : ''}>
+                      {item.targetDate}
+                    </span>
+                  </span>
+                  {canWrite ? (
+                    <button
+                      type="button"
+                      aria-label={`删除 ${item.title}`}
+                      onClick={() => remove(item.id)}
+                      className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-err"
+                    >
+                      <ScreenIcon name="trash" className="size-3" /> 删除
+                    </button>
+                  ) : null}
+                </div>
+              </article>
+            </div>
           );
         })}
 
