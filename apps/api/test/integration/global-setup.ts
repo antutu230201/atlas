@@ -69,6 +69,7 @@ export default async function (): Promise<() => Promise<void>> {
       platform.event, platform.entitlement, platform.module_install,
       platform.invitation, platform.membership, platform.session,
       platform.workspace, platform."user", platform.boot_markers,
+      platform.app_setting,
       "modules.dashboard".listening_daily
     restart identity cascade
   `);

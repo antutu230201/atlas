@@ -6,8 +6,9 @@ import type { SourceEnvelope, DailySummary } from './types';
 import { ScreenIcon } from './icons';
 
 /**
- * AI 每日摘要卡：服务端按天缓存（TTL 6h / 手动强刷），此处纯展示。
- * 数据为 MockAI 模板文案时同样可读——配置真实供应商后自动升级（阶段 5 遗留项）。
+ * AI 每日摘要卡：服务端按天缓存（TTL 24h / 手动强刷），此处纯展示。
+ * 数据为 MockAI 模板文案时同样可读——配置真实供应商后自动升级（阶段 5 遗留项）；
+ * AI 失败（含限流）时服务端回退本地数据小结（source='local'），徽章诚实标注，不再弹错误。
  */
 export function SummaryCard({
   envelope,
@@ -15,12 +16,13 @@ export function SummaryCard({
   regenerating = false,
 }: {
   envelope: SourceEnvelope<DailySummary>;
-  /** 手动重新生成当天小结（服务端按天缓存，默认 6h 才更新） */
+  /** 手动重新生成当天小结（服务端按天缓存，默认 24h 才更新） */
   onRegenerate?: () => void;
   regenerating?: boolean;
 }) {
   // Mock 供应商会把完整提示词回显到正文；大屏只展示诚实的预览说明，不把调试文本当 AI 产出。
   const isMock = envelope.payload?.text.startsWith('[MockAI]') ?? false;
+  const isLocal = !isMock && envelope.payload?.source === 'local';
   return (
     <section
       className="screen-card screen-reveal bg-[linear-gradient(135deg,var(--color-primary-soft),transparent_48%)] p-5"
@@ -39,8 +41,8 @@ export function SummaryCard({
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 rounded-full border border-border bg-primary-soft px-2.5 py-1 text-[11px] text-primary">
-            <span className="size-1 animate-pulse rounded-full bg-primary" />
-            {isMock ? 'PREVIEW · 待接入' : 'AI BRIEFING'}
+            <span className={`size-1 rounded-full bg-primary ${isLocal ? '' : 'animate-pulse'}`} />
+            {isMock ? 'PREVIEW · 待接入' : isLocal ? 'DATA BRIEF · 数据小结' : 'AI BRIEFING'}
           </div>
           {onRegenerate ? (
             <button
@@ -80,6 +82,16 @@ export function SummaryCard({
               <p className="text-[10px] text-muted">
                 {isMock ? (
                   '预览模式 · 不消耗 AI 配额'
+                ) : isLocal ? (
+                  <>
+                    AI 暂歇，先用数据说话；点「重写」可再试 AI。
+                    <Link
+                      href="/assistant"
+                      className="ml-1.5 text-primary/80 transition-colors hover:text-primary"
+                    >
+                      继续和 AI 聊 →
+                    </Link>
+                  </>
                 ) : (
                   <>
                     从今天的天气、进度与节奏里，提炼给你。

@@ -720,3 +720,14 @@
 - [x] payload 扩展：activity 增 graceUsed / bestStreak / lastStreak（days 本就是 365 天窗口，无 schema 变更）；指标卡改「宽容连续（含最高纪录与宽免次数）/ 今日 / 累计·活跃天数」
 - [x] 断签恢复提示：streak=0 且 lastStreak>0 时显示「上次连续 N 天 · 今天重新开始，小步回到节奏就好」
 - 验证：纯函数单测 10 个（桥接/冷却/连休/窗口边界/空数据）+ 全仓 API 130 测试 + dashboard e2e 7/7（新增 365 热力图渲染断言）+ a11y 48 扫描全绿；浏览器实测亮暗/390px（页面无溢出、容器可滚动、恢复提示真实数据触发）
+
+### AI 降本：小结失败本地兜底 + 每日预算上限（2026-11-14）
+
+- 背景：TokenRhythm 供应商限流（429）期间，AI 每日小结的 stale-while-revalidate 在每次快照轮询（5 分钟）都重试供应商并弹错误横幅——成本与体验双输。
+- [x] `generateDailySummary` 永不抛错：AI 失败（429/401/超时/空文本）回退**本地数据小结**（近 7 天待办 + 连续打卡 + 临近纪念日 + 天气，全部真实数据），照常写缓存——失败当天零上游调用，重试风暴消除；手动「重写」仍会再试 AI（恢复后一键升级）。
+- [x] 小结 TTL 6h → 24h（key 本就含日期）：每天最多 1 次自动生成；听歌周报点评（每周 1 次）与日报晚安语（每天 1 次）本就低频，不动。
+- [x] `DailySummary` 增 `source: 'ai' | 'local'`；小结卡徽章诚实标注「AI BRIEFING / DATA BRIEF · 数据小结 / PREVIEW · 待接入」三态，本地态脚注「AI 暂歇，先用数据说话」，不再出现错误横幅。
+- [x] 测试：新增 `dashboard-summary-cost.spec.ts`（mock 上游请求计数作成本断言：失败后同日多次快照仅 1 次上游调用、恢复+refresh 后 AI 小结、24h 内不重复调用）3/3；全仓 API 133 测试通过。
+- [x] 测试基建修复：global-setup 的 truncate 清单补 `platform.app_setting`（AI 配置此前跨运行残留，会让 ai-config「初始视图」用例在第二轮全量时假失败）；本 spec afterAll 显式 `PUT { apiKey: null }` 回落 mock。
+- 排障记录：验收时发现 3001 仍跑旧逻辑——根因是 `nest start --watch` wrapper 在子进程被杀后自动重启子进程并继续占端口，`taskkill` 监听 PID 杀不死 wrapper 本体；正确做法是把所有 `nest.js start --watch` wrapper 一并 kill //T 再重启。
+- 验证：真实 429 限流下快照返回 `source=local`（curl 实证）+ 浏览器实测小结卡 DATA BRIEF 徽章与真实数据文案（纪念日 47 天 / 实时天气）。

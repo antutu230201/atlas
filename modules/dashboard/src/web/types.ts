@@ -95,10 +95,11 @@ export interface ActivityStats {
   lastStreak: number;
 }
 
-/** AI 每日摘要（服务端按天缓存） */
+/** AI 每日摘要（服务端按天缓存；AI 失败/降本时回退本地数据小结，source='local'） */
 export interface DailySummary {
   text: string;
   generatedAt: string;
+  source: 'ai' | 'local';
 }
 
 export interface DashboardSnapshot {

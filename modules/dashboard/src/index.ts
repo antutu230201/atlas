@@ -565,11 +565,15 @@ function currentStreak(days: ActivityDay[], today: string): number {
 interface DailySummary {
   text: string;
   generatedAt: string;
+  /** 'ai' = 供应商生成；'local' = 本地数据小结（AI 失败/降本回退，缓存后当天不再调用供应商） */
+  source: 'ai' | 'local';
 }
 
 /**
  * 生成每日小结：汇总活跃度 / 临近纪念日 / 当地天气，经内核 AI 层生成（阶段 5 适配器）。
- * 快照的按日缓存拉取与 refresh 强刷共用此实现；MockAI 下返回模板文案，配置真实供应商后自动升级。
+ * 降本策略（2026-11-14）：key 按天 + TTL 24h = 每天最多 1 次自动生成；
+ * AI 失败（含限流 429）回退本地数据小结并照常写缓存——失败当天不再重试供应商，
+ * 消除 stale-while-revalidate 每 5 分钟快照轮询触发的重试风暴；手动「重写」仍会再试 AI。
  */
 async function generateDailySummary(ctx: ModuleContext): Promise<DailySummary> {
   const recent = await readRecentActivity(ctx, 365);
@@ -589,9 +593,12 @@ async function generateDailySummary(ctx: ModuleContext): Promise<DailySummary> {
   const hour = new Date().getHours();
   const weekAgo = localDay(new Date(Date.now() - 7 * 86_400_000));
   const weekCount = recent.filter((d) => d.day >= weekAgo).reduce((sum, d) => sum + d.count, 0);
-  const parts: string[] = [
-    `现在是今天 ${hour} 点。`,
-    `最近 7 天完成待办 ${weekCount} 件，连续打卡 ${streak} 天${todayCount > 0 ? `，今天已完成 ${todayCount} 件` : ''}。`,
+
+  // 本地数据小结（零 AI 成本）：供应商失败时的兜底文案，全部来自真实数据
+  const localParts: string[] = [
+    `最近 7 天完成待办 ${weekCount} 件，连续打卡 ${streak} 天${
+      todayCount > 0 ? `，今天已完成 ${todayCount} 件` : ''
+    }。`,
   ];
   const upcoming = countdownRows.slice(0, 3);
   if (upcoming.length > 0) {
@@ -603,17 +610,32 @@ async function generateDailySummary(ctx: ModuleContext): Promise<DailySummary> {
       );
       return `${c.title}（${diff >= 0 ? `还有 ${diff} 天` : `已过 ${-diff} 天`}）`;
     });
-    parts.push(`临近的纪念日：${described.join('、')}。`);
+    localParts.push(`临近的纪念日：${described.join('、')}。`);
   }
-  if (weatherText) parts.push(`当地天气：${weatherText}。`);
-  parts.push(
+  if (weatherText) localParts.push(`当地天气：${weatherText}。`);
+  const localText = localParts.join('') || '今天还没有记录——去做一件小事，让明天的盘点有东西可写。';
+
+  const promptParts: string[] = [`现在是今天 ${hour} 点。`, localText];
+  promptParts.push(
     '请基于这些信息写一段 60 字以内的中文小结：一句对当下状态的肯定 + 一条具体可行的小建议。不要罗列数据，不要用 markdown。',
   );
-  const text = await ctx.ai.complete(
-    parts.join(' '),
-    '你是 Atlas 个人成长助手：温暖、直接、有智慧，像一位老朋友。只输出纯文本小结本身。',
-  );
-  return { text, generatedAt: new Date().toISOString() };
+  try {
+    const text = await ctx.ai.complete(
+      promptParts.join(''),
+      '你是 Atlas 个人成长助手：温暖、直接、有智慧，像一位老朋友。只输出纯文本小结本身。',
+    );
+    if (text.length > 0) {
+      return { text, generatedAt: new Date().toISOString(), source: 'ai' };
+    }
+    console.warn('[dashboard] AI 小结返回空文本，回退本地数据小结');
+  } catch (error) {
+    console.warn(
+      `[dashboard] AI 小结生成失败，今天回退本地数据小结：${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+  return { text: localText, generatedAt: new Date().toISOString(), source: 'local' };
 }
 
 /* ---------------- 模块定义 ---------------- */
@@ -666,8 +688,8 @@ export const definition: ModuleDefinition = {
                 }),
             listCountdownRows(ctx, false),
             readRecentActivity(ctx, 365),
-            // AI 每日摘要：按天缓存（key 含日期，TTL 6 小时），失败回退旧值，不打断大屏
-            resolveSource<DailySummary>(ctx, `summary:${todayDay}`, 6 * 3_600_000, () =>
+            // AI 每日小结：key 含日期 + TTL 24h = 每天最多 1 次自动生成（降本）；重写按钮强刷；失败回退本地数据小结
+            resolveSource<DailySummary>(ctx, `summary:${todayDay}`, 24 * 3_600_000, () =>
               generateDailySummary(ctx),
             ),
           ]);
