@@ -799,3 +799,9 @@
 - [x] 准确性语义：仅**成功**的 ctx.ai.complete 写入 usage（module.service 既有写入点不变）；AI 失败走本地兜底的天数不计数——用量行反映真实供应商成本
 - [x] 测试：ai-usage.spec 4 个（零值/小结触发一次调用聚合 9 tokens/同日缓存不增长/401）；ai-config 回归 5 个通过
 - 验证：typecheck/lint/format 全绿；浏览器实测设置页用量行渲染（0 次调用 · 0 tokens）
+
+### 复盘模板自定义（2026-11-15 续）
+
+- [x] journal 新增 `saveTemplate` 动作（ctx.settings.set 工作空间级设置，沿用 dashboard 模式）：日记/周复盘模板自定义（≤500 字，空串恢复默认）；manifest.settings 补声明（text 类型，供未来设置页渲染）
+- [x] snapshot 增 `options.dailyTemplate/weeklyTemplate`（空值回落内置默认）；前端占位提示与「写今天/写本周」预填均使用模板；模板面板（两个 textarea + 恢复默认/保存）置于趋势卡下方
+- 验证：journal 集成 11/11（模板生效/空串恢复默认/超长 400）、全仓 148 测试、journal e2e 补断言（改模板 → 保存 → 写今天预填生效）通过；浏览器实测暗色主题全流程

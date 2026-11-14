@@ -72,6 +72,14 @@ test.describe('复盘日记模块', () => {
     await expect(trend).toBeVisible({ timeout: 10_000 });
     await expect(trend).toContainText('3.5');
 
+    // 模板设置：改日记模板 → 「写今天」预填生效
+    await page.getByRole('button', { name: '模板设置' }).click();
+    await page.getByLabel('日记模板').fill('自定义模板：第一步：');
+    await page.getByRole('button', { name: '保存模板' }).click();
+    await expect(page.getByText('模板已保存')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('tab', { name: '日记' }).click();
+    await page.getByRole('button', { name: '写今天' }).click();
+    await expect(page.getByLabel('日记内容')).toHaveValue(/自定义模板：第一步：/);
     // 390px 无横向溢出
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(400);

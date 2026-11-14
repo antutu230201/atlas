@@ -23,7 +23,10 @@ const manifest = moduleManifestSchema.parse({
   permissions: ['journal:read', 'journal:write'],
   dependsOn: [],
   routes: [{ path: 'review', title: '复盘', nav: { order: 4, icon: '📝' } }],
-  settings: [],
+  settings: [
+    { key: 'dailyTemplate', label: '日记模板', type: 'text', default: DEFAULT_DAILY_TEMPLATE },
+    { key: 'weeklyTemplate', label: '周复盘模板', type: 'text', default: DEFAULT_WEEKLY_TEMPLATE },
+  ],
   events: {
     publishes: ['journal.saved', 'journal.polished', 'journal.deleted', 'journal.restored'],
     subscribes: [],
@@ -39,6 +42,34 @@ type Kind = (typeof KINDS)[number];
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD');
 const monthStr = z.string().regex(/^\d{4}-\d{2}$/, '月份格式应为 YYYY-MM');
 const idSchema = z.object({ entryId: z.string().uuid() });
+
+/* 写作模板（工作空间级设置）：空值回落默认；上限与内容一致 */
+export const DEFAULT_DAILY_TEMPLATE = '今天的三件好事：\n卡住的地方：\n明天最重要的一件事：';
+export const DEFAULT_WEEKLY_TEMPLATE = '本周做得好的：\n可以更好的：\n下周专注的一件事：';
+
+const settingsSchema = z.object({
+  dailyTemplate: z.string().max(500).optional(),
+  weeklyTemplate: z.string().max(500).optional(),
+});
+
+type JournalSettings = z.infer<typeof settingsSchema>;
+
+function parseSettings(raw: Record<string, unknown>): JournalSettings & {
+  dailyTemplate: string;
+  weeklyTemplate: string;
+} {
+  const parsed = settingsSchema.safeParse(raw);
+  const value = parsed.success ? parsed.data : {};
+  return {
+    dailyTemplate: value.dailyTemplate || DEFAULT_DAILY_TEMPLATE,
+    weeklyTemplate: value.weeklyTemplate || DEFAULT_WEEKLY_TEMPLATE,
+  };
+}
+
+const saveTemplateSchema = z.object({
+  dailyTemplate: z.string().max(500, '日记模板最长 500 字').optional(),
+  weeklyTemplate: z.string().max(500, '周复盘模板最长 500 字').optional(),
+});
 
 const saveSchema = z
   .object({
@@ -112,6 +143,11 @@ export interface JournalSnapshot {
     streak: number;
     currentMonday: string;
   };
+  /** 日记/周复盘写作模板（工作空间级设置，saveTemplate 修改；空值回落默认） */
+  options: {
+    dailyTemplate: string;
+    weeklyTemplate: string;
+  };
 }
 
 function toView(row: typeof entry.$inferSelect): EntryView {
@@ -174,6 +210,8 @@ async function buildSnapshot(ctx: ModuleContext, month: string): Promise<Journal
     cursor.setDate(cursor.getDate() - 1);
   }
 
+  const templates = parseSettings(await ctx.settings.get());
+
   return {
     month,
     entries: activeRows.map(toView),
@@ -188,6 +226,10 @@ async function buildSnapshot(ctx: ModuleContext, month: string): Promise<Journal
       monthWeekly: activeRows.filter((row) => row.kind === 'weekly').length,
       streak,
       currentMonday: currentMonday(),
+    },
+    options: {
+      dailyTemplate: templates.dailyTemplate,
+      weeklyTemplate: templates.weeklyTemplate,
     },
   };
 }
@@ -310,6 +352,29 @@ export const definition: ModuleDefinition = {
           await ctx.events.publish('journal.restored', { entryId: row.id });
         }
         return { ok: true };
+      },
+    },
+
+    /** 保存写作模板（工作空间级设置）：空串 = 恢复默认模板 */
+    saveTemplate: {
+      permission: 'journal:write',
+      handler: async (ctx, input) => {
+        const parsed = saveTemplateSchema.safeParse(input ?? {});
+        if (!parsed.success) bad(parsed.error.issues[0]?.message ?? '参数错误');
+        const patch: Record<string, string> = {};
+        if (parsed.data.dailyTemplate !== undefined)
+          patch.dailyTemplate = parsed.data.dailyTemplate;
+        if (parsed.data.weeklyTemplate !== undefined) {
+          patch.weeklyTemplate = parsed.data.weeklyTemplate;
+        }
+        await ctx.settings.set(patch);
+        const templates = parseSettings(await ctx.settings.get());
+        return {
+          options: {
+            dailyTemplate: templates.dailyTemplate,
+            weeklyTemplate: templates.weeklyTemplate,
+          },
+        };
       },
     },
 

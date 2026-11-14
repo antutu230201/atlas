@@ -226,6 +226,31 @@ describe('复盘日记模块', () => {
     expect(clash.status).toBe(400);
   });
 
+  it('模板设置：saveTemplate 生效、空串恢复默认、超长被拒', async () => {
+    const before = (await call(ownerCookie, 'snapshot', { month: '2026-11' })).body
+      .data as SnapshotShape;
+    expect(before.options.dailyTemplate).toContain('三件好事');
+
+    const saved = await call(ownerCookie, 'saveTemplate', {
+      dailyTemplate: '自定义日记模板：一、二、三。',
+      weeklyTemplate: '',
+    });
+    expect(saved.status).toBe(200);
+    expect(
+      (saved.body.data as { options: { dailyTemplate: string; weeklyTemplate: string } }).options
+        .dailyTemplate,
+    ).toContain('自定义日记模板');
+    expect(
+      (saved.body.data as { options: { weeklyTemplate: string } }).options.weeklyTemplate,
+    ).toContain('本周做得好的');
+
+    const snap = (await call(ownerCookie, 'snapshot', { month: '2026-11' })).body
+      .data as SnapshotShape;
+    expect(snap.options.dailyTemplate).toContain('自定义日记模板');
+
+    const tooLong = await call(ownerCookie, 'saveTemplate', { dailyTemplate: 'x'.repeat(501) });
+    expect(tooLong.status).toBe(400);
+  });
   it('guest 只读：写操作 403，snapshot 可读', async () => {
     const snap = (await call(guestCookie, 'snapshot', {})).body.data as SnapshotShape;
     expect(snap.entries.length).toBeGreaterThanOrEqual(0);

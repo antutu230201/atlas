@@ -222,6 +222,7 @@ function EntryEditor({
   entryId,
   busy,
   workspaceSlug,
+  template,
   onMoodChange,
   onContentChange,
   onSaved,
@@ -235,6 +236,8 @@ function EntryEditor({
   entryId: string | null;
   busy: boolean;
   workspaceSlug: string;
+  /** 写作模板（工作空间级设置）：占位提示与「写今天/写本周」预填都来自它 */
+  template: string;
   onMoodChange: (mood: number | null) => void;
   onContentChange: (content: string) => void;
   onSaved: (entryId?: string) => void;
@@ -335,11 +338,7 @@ function EntryEditor({
       <textarea
         aria-label={kind === 'daily' ? '日记内容' : '周复盘内容'}
         className="mt-3 min-h-40 w-full rounded-sm border border-border bg-bg p-3 text-sm leading-6 outline-none transition-colors focus:border-primary"
-        placeholder={
-          kind === 'daily'
-            ? '今天的三件好事：\n卡住的地方：\n明天最重要的一件事：'
-            : '本周做得好的：\n可以更好的：\n下周专注的一件事：'
-        }
+        placeholder={template}
         value={content}
         maxLength={5000}
         disabled={busy}
@@ -449,8 +448,23 @@ export function JournalReviewPage({
     });
   };
 
-  /** 编辑器切换到"今天/本周"的空白状态（新建） */
+  /** 编辑器切换到"今天/本周"的新建状态：内容用写作模板预填（「写今天/写本周」按钮） */
   const newEntry = (kind: 'daily' | 'weekly') => {
+    setTab(kind);
+    setEditor({
+      kind,
+      day: kind === 'daily' ? localDay() : currentMonday(),
+      mood: null,
+      content:
+        kind === 'daily'
+          ? (data?.options.dailyTemplate ?? '')
+          : (data?.options.weeklyTemplate ?? ''),
+      entryId: null,
+    });
+  };
+
+  /** 编辑器切回空白（删除条目后用），不预填模板 */
+  const blankEntry = (kind: 'daily' | 'weekly') => {
     setTab(kind);
     setEditor({
       kind,
@@ -462,6 +476,14 @@ export function JournalReviewPage({
   };
 
   const editorAi = data?.entries.find((item) => item.id === editor.entryId) ?? null;
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [dailyDraft, setDailyDraft] = useState('');
+  const [weeklyDraft, setWeeklyDraft] = useState('');
+  const openTemplatePanel = () => {
+    setDailyDraft(data?.options.dailyTemplate ?? '');
+    setWeeklyDraft(data?.options.weeklyTemplate ?? '');
+    setTemplateOpen(true);
+  };
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4 p-4 md:p-6">
@@ -530,6 +552,81 @@ export function JournalReviewPage({
               <MoodTrendCard entries={data.entries} month={data.month} />
             </Reveal>
 
+            {/* 模板设置：占位提示与「写今天/写本周」预填都来自这里（工作空间级设置） */}
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-expanded={templateOpen}
+                onClick={() => (templateOpen ? setTemplateOpen(false) : openTemplatePanel())}
+              >
+                模板设置
+              </Button>
+            </div>
+            {templateOpen ? (
+              <div className="screen-card space-y-3 p-4" aria-label="模板设置">
+                <p className="text-xs text-muted">
+                  模板用于写作占位提示与「写今天 / 写本周」预填；留空保存即恢复默认。
+                </p>
+                <label className="block space-y-1">
+                  <span className="text-xs font-medium">日记模板</span>
+                  <textarea
+                    aria-label="日记模板"
+                    className="min-h-20 w-full rounded-sm border border-border bg-bg p-2.5 text-sm leading-6 outline-none focus:border-primary"
+                    value={dailyDraft}
+                    maxLength={500}
+                    onChange={(event) => setDailyDraft(event.target.value)}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs font-medium">周复盘模板</span>
+                  <textarea
+                    aria-label="周复盘模板"
+                    className="min-h-20 w-full rounded-sm border border-border bg-bg p-2.5 text-sm leading-6 outline-none focus:border-primary"
+                    value={weeklyDraft}
+                    maxLength={500}
+                    onChange={(event) => setWeeklyDraft(event.target.value)}
+                  />
+                </label>
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      setDailyDraft('');
+                      setWeeklyDraft('');
+                    }}
+                  >
+                    恢复默认
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={busy}
+                    loading={mutate.isPending}
+                    onClick={() =>
+                      mutate.mutate(
+                        {
+                          action: 'saveTemplate',
+                          json: { dailyTemplate: dailyDraft, weeklyTemplate: weeklyDraft },
+                        },
+                        {
+                          onSuccess: () => {
+                            toast({ title: '模板已保存', variant: 'ok' });
+                            void queryClient.invalidateQueries({
+                              queryKey: ['module', moduleName, workspaceSlug, 'snapshot'],
+                            });
+                          },
+                        },
+                      )
+                    }
+                  >
+                    保存模板
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             <Tabs
               value={tab}
               onValueChange={(value) => {
@@ -563,6 +660,11 @@ export function JournalReviewPage({
                     aiPolishedAt={editorAi?.aiPolishedAt ?? null}
                     busy={busy}
                     workspaceSlug={workspaceSlug}
+                    template={
+                      editor.kind === 'daily'
+                        ? data.options.dailyTemplate
+                        : data.options.weeklyTemplate
+                    }
                     onMoodChange={(mood) => setEditor((prev) => ({ ...prev, mood }))}
                     onContentChange={(content) => setEditor((prev) => ({ ...prev, content }))}
                     onSaved={(entryId) => {
@@ -689,7 +791,7 @@ export function JournalReviewPage({
                             {
                               onSuccess: () => {
                                 toast({ title: '已移入归档', description: '可在归档区恢复' });
-                                newEntry(editor.kind);
+                                blankEntry(editor.kind);
                               },
                             },
                           );
