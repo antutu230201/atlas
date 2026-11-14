@@ -105,6 +105,16 @@ test.describe('个人大屏模块（假数据源）', () => {
     // 时钟走时（role=timer）
     await expect(page.getByRole('timer', { name: '当前时间' })).toBeVisible();
 
+    // 成长打卡：365 天热力图（新用户无数据时渲染空网格）
+    await page
+      .getByRole('img', { name: '最近一年打卡热力图' })
+      .scrollIntoViewIfNeeded()
+      .catch(() => undefined);
+    await expect(page.getByRole('img', { name: '最近一年打卡热力图' })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByRole('region', { name: '成长打卡' })).toContainText('365');
+
     // 热榜卡片（假数据源 ×3）
     await expect(page.getByText('微博热搜').first()).toBeVisible();
     await expect(page.getByText('抖音热搜').first()).toBeVisible();

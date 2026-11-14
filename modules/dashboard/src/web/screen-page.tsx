@@ -940,25 +940,22 @@ export function DashboardScreenPage({
               />
             </section>
 
-            {/* 每日小结 + 打卡 + 一言：第二屏，长期停留时向下浏览；专注模式下隐藏 */}
+            {/* 每日小结 + 一言：第二屏；打卡热力图独立成全宽行（53 周列需要横向空间）；专注模式下隐藏 */}
             {!focusMode ? (
-              <section
-                id="overview-section"
-                aria-label="今日节奏"
-                className="grid items-stretch gap-4 xl:grid-cols-12"
-              >
-                <div className="flex min-w-0 flex-col gap-4 xl:col-span-7">
-                  <SummaryCard
-                    envelope={data.summary}
-                    regenerating={refresh.isPending}
-                    onRegenerate={() => refresh.mutate(['summary'])}
-                  />
-                  {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
-                </div>
-                <div id="activity-section" className="min-w-0 scroll-mt-6 xl:col-span-5">
-                  <ActivityCard stats={data.activity} />
-                </div>
+              <section id="overview-section" aria-label="今日节奏" className="space-y-4">
+                <SummaryCard
+                  envelope={data.summary}
+                  regenerating={refresh.isPending}
+                  onRegenerate={() => refresh.mutate(['summary'])}
+                />
+                {data.quote.payload ? <QuoteCard envelope={data.quote} /> : null}
               </section>
+            ) : null}
+
+            {!focusMode ? (
+              <div id="activity-section" className="scroll-mt-6">
+                <ActivityCard stats={data.activity} />
+              </div>
             ) : null}
 
             {/* 滚动信号流：从首屏移到下方，首屏优先给时钟/天气/热榜/听歌；专注模式下隐藏 */}

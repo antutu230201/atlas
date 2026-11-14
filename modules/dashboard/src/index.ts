@@ -35,6 +35,7 @@ import {
 } from './providers/netease';
 import { open as openSealed, seal as sealSecret } from './providers/secret-box';
 import { neteaseBinding } from './db/schema';
+import { computeStreakStats } from './activity-streak';
 import {
   fakeLocation,
   fakeLyrics,
@@ -553,19 +554,11 @@ async function readRecentActivity(ctx: ModuleContext, days: number): Promise<Act
 }
 
 /**
- * 连续打卡天数（宽容型规则，参考习惯追踪 UX 惯例）：
- * 从今天往回数连续有产出的日子；今天尚未打卡不断签（今天还没结束），从昨天起算。
+ * 连续打卡天数：宽容口径见 activity-streak.ts（单天空档每 14 天宽免 1 次 + 今天未产出不断签）。
+ * 保留此薄包装供 AI 摘要等内部调用；测试直接针对 computeStreakStats 纯函数。
  */
-function currentStreak(days: ActivityDay[]): number {
-  const done = new Set(days.map((d) => d.day));
-  let streak = 0;
-  const cursor = new Date();
-  if (!done.has(localDay(cursor))) cursor.setDate(cursor.getDate() - 1);
-  while (done.has(localDay(cursor))) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return streak;
+function currentStreak(days: ActivityDay[], today: string): number {
+  return computeStreakStats({ days, today }).streak;
 }
 
 /** AI 每日摘要载荷（缓存进 sourceCache，key 按天，TTL 内不重生成） */
@@ -580,8 +573,8 @@ interface DailySummary {
  */
 async function generateDailySummary(ctx: ModuleContext): Promise<DailySummary> {
   const recent = await readRecentActivity(ctx, 365);
-  const streak = currentStreak(recent);
   const todayDay = localDay();
+  const streak = currentStreak(recent, todayDay);
   const todayCount = recent.find((d) => d.day === todayDay)?.count ?? 0;
 
   const settings = parseSettings(await ctx.settings.get());
@@ -684,7 +677,7 @@ export const definition: ModuleDefinition = {
           hot[source.key] = results[index] as SourceEnvelope<HotItem[]>;
         });
 
-        const streak = currentStreak(recentActivity);
+        const streakStats = computeStreakStats({ days: recentActivity, today: todayDay });
         const todayCount = recentActivity.find((d) => d.day === todayDay)?.count ?? 0;
 
         return {
@@ -705,8 +698,11 @@ export const definition: ModuleDefinition = {
           countdowns: countdownRows,
           activity: {
             days: recentActivity,
-            streak,
+            streak: streakStats.streak,
             todayCount,
+            graceUsed: streakStats.graceUsed,
+            bestStreak: streakStats.bestStreak,
+            lastStreak: streakStats.lastStreak,
           },
           summary,
         };
@@ -1407,6 +1403,7 @@ export {
 } from './providers/hotlists';
 export { describeWeatherCode } from './providers/weather';
 export { parseLrc } from './providers/lyrics';
+export { computeStreakStats } from './activity-streak';
 export { seal as sealSecret, open as openSecret } from './providers/secret-box';
 export {
   qrUnikey,

@@ -81,11 +81,18 @@ export interface CountdownItem {
   lunarLabel?: string;
 }
 
-/** 活跃度统计（打卡热力图 / 连续天数，事件订阅累积） */
+/** 活跃度统计（打卡热力图 / 连续天数，事件订阅累积；days 覆盖最近 365 天） */
 export interface ActivityStats {
   days: Array<{ day: string; count: number }>;
+  /** 宽容连续天数：单天空档每 14 天可宽免 1 次不断签（activity-streak.ts） */
   streak: number;
   todayCount: number;
+  /** 当前连续段已使用的宽免次数 */
+  graceUsed: number;
+  /** 窗口内最长连续段 */
+  bestStreak: number;
+  /** 上一段已结束的连续段（断签恢复提示用） */
+  lastStreak: number;
 }
 
 /** AI 每日摘要（服务端按天缓存） */
