@@ -810,3 +810,8 @@
 
 - [x] DailySummary 增 `basis: string[]`——喂给模型（或本地兜底所引用）的数据项随载荷下发；SummaryCard 新增「展开依据 ▾」折叠面板逐条展示（AI 与本地小结同源可验证）；旧缓存无此字段时按钮隐藏
 - 验证：dashboard-summary-cost 集成断言 basis 下发通过；浏览器实测重写后展开依据面板显示数据项
+
+### AI 用量按模块细分（2026-11-15 续 3）
+
+- [x] `GET /v1/ai/usage` 增 `byModule`（按 moduleName 分组的调用次数与 tokens，次数降序）；设置页用量行下方在多模块时展示细分列表（成本诊断：哪个功能在消耗 AI）
+- 验证：ai-usage 集成补 byModule 断言（dashboard 模块 1 次 / 9 tokens）通过；typecheck/lint/format/build 全绿

@@ -24,6 +24,7 @@ const usage = async () =>
     calls: number;
     promptTokens: number;
     completionTokens: number;
+    byModule: Array<{ moduleName: string; calls: number; tokens: number }>;
   };
 
 beforeAll(async () => {
@@ -105,6 +106,9 @@ describe('AI 用量可见化', () => {
     expect(report.calls).toBe(1);
     expect(report.promptTokens).toBe(5);
     expect(report.completionTokens).toBe(4);
+    expect(report.byModule).toHaveLength(1);
+    expect(report.byModule[0]?.moduleName).toBe('dashboard');
+    expect(report.byModule[0]?.tokens).toBe(9);
   });
 
   it('同日重复快照走缓存：usage 不再增长（成本断言）', async () => {

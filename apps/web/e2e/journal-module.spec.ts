@@ -76,7 +76,7 @@ test.describe('复盘日记模块', () => {
     await page.getByRole('button', { name: '模板设置' }).click();
     await page.getByLabel('日记模板').fill('自定义模板：第一步：');
     await page.getByRole('button', { name: '保存模板' }).click();
-    await expect(page.getByText('模板已保存')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('模板已保存').first()).toBeVisible({ timeout: 10_000 });
     await page.getByRole('tab', { name: '日记' }).click();
     await page.getByRole('button', { name: '写今天' }).click();
     await expect(page.getByLabel('日记内容')).toHaveValue(/自定义模板：第一步：/);

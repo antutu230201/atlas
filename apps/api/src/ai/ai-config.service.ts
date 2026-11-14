@@ -163,13 +163,18 @@ export class ConfigurableAIProvider implements AIAdapter, OnApplicationBootstrap
     this.current = instantiateAdapter(initialConfig, env);
   }
 
-  /** 当前用户本月 AI 用量（成本可见化）：ai_usage 按用户聚合（次数与 token 总量） */
-  async monthlyUsage(
-    userId: string,
-  ): Promise<{ month: string; calls: number; promptTokens: number; completionTokens: number }> {
+  /** 当前用户本月 AI 用量（成本可见化）：ai_usage 按用户聚合（次数与 token 总量）+ 按模块细分 */
+  async monthlyUsage(userId: string): Promise<{
+    month: string;
+    calls: number;
+    promptTokens: number;
+    completionTokens: number;
+    byModule: Array<{ moduleName: string; calls: number; tokens: number }>;
+  }> {
     const now = new Date();
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const inMonth = and(eq(aiUsage.userId, userId), gte(aiUsage.createdAt, monthStart));
     const rows = await withUser(this.db, userId, (tx) =>
       tx
         .select({
@@ -178,7 +183,19 @@ export class ConfigurableAIProvider implements AIAdapter, OnApplicationBootstrap
           completionTokens: sql<number>`coalesce(sum(${aiUsage.completionTokens}), 0)::int`,
         })
         .from(aiUsage)
-        .where(and(eq(aiUsage.userId, userId), gte(aiUsage.createdAt, monthStart))),
+        .where(inMonth),
+    );
+    const byModuleRows = await withUser(this.db, userId, (tx) =>
+      tx
+        .select({
+          moduleName: aiUsage.moduleName,
+          calls: sql<number>`count(*)::int`,
+          tokens: sql<number>`coalesce(sum(${aiUsage.promptTokens} + ${aiUsage.completionTokens}), 0)::int`,
+        })
+        .from(aiUsage)
+        .where(inMonth)
+        .groupBy(aiUsage.moduleName)
+        .orderBy(sql`count(*) desc`),
     );
     const row = rows[0] ?? { calls: 0, promptTokens: 0, completionTokens: 0 };
     return {
@@ -186,6 +203,7 @@ export class ConfigurableAIProvider implements AIAdapter, OnApplicationBootstrap
       calls: row.calls,
       promptTokens: row.promptTokens,
       completionTokens: row.completionTokens,
+      byModule: byModuleRows,
     };
   }
   /**

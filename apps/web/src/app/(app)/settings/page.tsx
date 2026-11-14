@@ -406,6 +406,7 @@ interface AiUsageView {
   calls: number;
   promptTokens: number;
   completionTokens: number;
+  byModule: Array<{ moduleName: string; calls: number; tokens: number }>;
 }
 
 const SOURCE_LABELS: Record<AiConfigView['source'], string> = {
@@ -549,6 +550,18 @@ function AiConfigTab() {
               tokens（提示 {usage.data.promptTokens.toLocaleString('zh-CN')} + 生成{' '}
               {usage.data.completionTokens.toLocaleString('zh-CN')}）
             </p>
+          ) : null}
+          {usage.data && usage.data.byModule.length > 1 ? (
+            <ul className="space-y-1 text-xs text-muted" aria-label="按模块细分">
+              {usage.data.byModule.map((item) => (
+                <li key={item.moduleName} className="flex items-center justify-between gap-3">
+                  <span className="truncate">{item.moduleName}</span>
+                  <span className="shrink-0 font-mono tabular-nums">
+                    {item.calls} 次 · {item.tokens.toLocaleString('zh-CN')} tokens
+                  </span>
+                </li>
+              ))}
+            </ul>
           ) : null}
 
           <Field id="ai-base-url" label="Base URL" hint="OpenAI 兼容接口根地址，以 /v1 结尾">
