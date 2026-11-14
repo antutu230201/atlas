@@ -1,9 +1,11 @@
 import { Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AIAdapter, AICompletionRequest, AICompletionResponse } from '@atlas/core';
 import { MockAIProvider, OpenAICompatProvider } from '@atlas/core';
 import { appSetting } from '../db/schema/platform';
+import { aiUsage } from '../db/schema/ops';
+import { withUser } from '../db/tenant';
 import type { Db } from '../db/client';
 
 /**
@@ -161,6 +163,31 @@ export class ConfigurableAIProvider implements AIAdapter, OnApplicationBootstrap
     this.current = instantiateAdapter(initialConfig, env);
   }
 
+  /** 当前用户本月 AI 用量（成本可见化）：ai_usage 按用户聚合（次数与 token 总量） */
+  async monthlyUsage(
+    userId: string,
+  ): Promise<{ month: string; calls: number; promptTokens: number; completionTokens: number }> {
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const rows = await withUser(this.db, userId, (tx) =>
+      tx
+        .select({
+          calls: sql<number>`count(*)::int`,
+          promptTokens: sql<number>`coalesce(sum(${aiUsage.promptTokens}), 0)::int`,
+          completionTokens: sql<number>`coalesce(sum(${aiUsage.completionTokens}), 0)::int`,
+        })
+        .from(aiUsage)
+        .where(and(eq(aiUsage.userId, userId), gte(aiUsage.createdAt, monthStart))),
+    );
+    const row = rows[0] ?? { calls: 0, promptTokens: 0, completionTokens: 0 };
+    return {
+      month,
+      calls: row.calls,
+      promptTokens: row.promptTokens,
+      completionTokens: row.completionTokens,
+    };
+  }
   /**
    * 库配置必须在应用启动完成后再读：内嵌 PG 由 infra 在 onModuleInit 阶段拉起，
    * 工厂函数执行时库还没就绪，读库会直接失败——这正是"库里配了 key 却一直走 Mock"的根因。

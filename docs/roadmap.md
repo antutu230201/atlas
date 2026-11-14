@@ -791,3 +791,11 @@
 - 明确跳过（记录理由）：待办/笔记页——列表已虚拟化（100–200 行），逐行 IO 观察是纯开销；页头为单一区块，收益不足
 - 排障：node 正则把 Reveal 插进了 react 导入块（第一个 import 匹配）导致通知页运行时 500——e2e 第一时间抓住；同上轮教训，导入改动一律用结构化编辑器
 - 验证：goal/habit/app-shell e2e 全过（app-shell 抓住上述 500 并回归通过）；a11y 三路由 12 扫描 0 严重；typecheck/lint/format 全绿
+
+### 设置页 AI 月度用量（成本可见化）（2026-11-15）
+
+- [x] 后端：`GET /v1/ai/usage`（ai.controller）——aiUsage 表按当前用户聚合当月调用次数与 token 总量（提示/生成分列），withUser 租户上下文查询；未登录 401
+- [x] 前端：设置 → AI 配置卡新增「本月 AI 用量」行（调用次数 + tokens 总量 + 提示/生成拆分），数据缺失/加载中隐藏不占位
+- [x] 准确性语义：仅**成功**的 ctx.ai.complete 写入 usage（module.service 既有写入点不变）；AI 失败走本地兜底的天数不计数——用量行反映真实供应商成本
+- [x] 测试：ai-usage.spec 4 个（零值/小结触发一次调用聚合 9 tokens/同日缓存不增长/401）；ai-config 回归 5 个通过
+- 验证：typecheck/lint/format 全绿；浏览器实测设置页用量行渲染（0 次调用 · 0 tokens）

@@ -401,6 +401,13 @@ interface AiConfigView {
   keyMasked: string | null;
 }
 
+interface AiUsageView {
+  month: string;
+  calls: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
 const SOURCE_LABELS: Record<AiConfigView['source'], string> = {
   db: '界面配置',
   env: '环境变量',
@@ -413,6 +420,11 @@ function AiConfigTab() {
   const config = useQuery({
     queryKey: ['ai-config'],
     queryFn: () => api<AiConfigView>('/ai/config'),
+  });
+  // 本月用量（成本可见化）：模块调用（小结/周报点评等）写入 ai_usage 后按用户聚合
+  const usage = useQuery({
+    queryKey: ['ai-usage'],
+    queryFn: () => api<AiUsageView>('/ai/usage'),
   });
 
   const [baseUrl, setBaseUrl] = useState('');
@@ -523,6 +535,21 @@ function AiConfigTab() {
             。适配任意 OpenAI 兼容服务（TokenRhythm / DeepSeek / OpenAI / 智谱等）；保存后立即生效，
             无需重启。密钥仅存数据库与后端内存，界面与审计日志只显示掩码。
           </p>
+
+          {usage.data ? (
+            <p className="rounded-sm border border-border bg-surface-hover px-3 py-2 text-xs text-muted">
+              本月 AI 用量：
+              <span className="font-mono font-semibold text-text">
+                {usage.data.calls.toLocaleString('zh-CN')}
+              </span>{' '}
+              次调用 ·{' '}
+              <span className="font-mono text-text">
+                {(usage.data.promptTokens + usage.data.completionTokens).toLocaleString('zh-CN')}
+              </span>{' '}
+              tokens（提示 {usage.data.promptTokens.toLocaleString('zh-CN')} + 生成{' '}
+              {usage.data.completionTokens.toLocaleString('zh-CN')}）
+            </p>
+          ) : null}
 
           <Field id="ai-base-url" label="Base URL" hint="OpenAI 兼容接口根地址，以 /v1 结尾">
             <Input

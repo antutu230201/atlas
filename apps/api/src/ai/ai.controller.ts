@@ -57,6 +57,13 @@ export class AIController {
     return { data: this.ai.describe() };
   }
 
+  /** 当前用户本月 AI 用量（成本可见化）：ai_usage 按用户聚合 */
+  @Get('usage')
+  async usage(@Req() request: Request) {
+    const user = request.user as RequestUser;
+    return { data: await this.ai.monthlyUsage(user.id) };
+  }
+
   /** 保存配置：登录即可改（部署级，自用阶段），写入审计由全局 interceptor 覆盖，key 已脱敏 */
   @Put('config')
   @HttpCode(200)
