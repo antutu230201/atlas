@@ -860,3 +860,10 @@
 - [x] 修复潜伏竞态：dashboard-summary-cost 导出用例原来依赖注册自动个人空间的 slug 'ws'（中文显示名被 slugify 清空 → 全部回落 'ws'），新增注册类 spec 后并行套件里撞 slug——改用本 spec 自建的 sum-team
 - 说明：免打扰 = 展示层静默（不打扰），通知数据照常入库、随时可查可导出（宪法 §4 不打扰 ≠ 丢数据）
 - 验证：全仓 API **169/169**、app-shell e2e 2/2、typecheck/lint/format/build 全绿；浏览器实测设置卡、横幅、刷新持久化
+
+### 复盘月度报告单页（2026-11-15 续 9）
+
+- [x] journal 新增 `review-report.ts`：把月快照渲染成自包含 HTML 报告单页（与听歌报告同一设计语言）——Hero（日记/周复盘/平均心情/字数 KPI + 连续徽章）、逐日心情柱状图（点击看明细、峰值高亮）、心情分布、日记/周复盘页签列表（点开全文 + ✦ AI 润色段）；打印即存 PDF；零 AI 调用
+- [x] 复盘概览区新增「报告」按钮（月份随当前月游标），下载 `journal_report_<月份>.html`；模块间不共享代码——journal 自持 downloadJournalReport 助手
+- [x] 测试：报告纯函数单测 7/7（自包含无外链、聚合统计、转义防注入、空月空态、月天数柱数）；journal e2e 补下载文件名断言
+- 验证：单测/e2e/typecheck/lint/format/build 全绿；Node 直出样例页浏览器实测——桌面与 390px 均无溢出，柱子点击明细、条目展开全文、页签切换、AI 段渲染全部正常

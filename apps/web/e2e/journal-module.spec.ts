@@ -72,6 +72,12 @@ test.describe('复盘日记模块', () => {
     await expect(trend).toBeVisible({ timeout: 10_000 });
     await expect(trend).toContainText('3.5');
 
+    // 月度报告：概览区「报告」按钮下载自包含 HTML 单页（文件名含月份）
+    const reportPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: '下载月度复盘报告' }).click();
+    const reportDownload = await reportPromise;
+    expect(reportDownload.suggestedFilename()).toMatch(/^journal_report_\d{4}-\d{2}\.html$/);
+
     // 模板设置：改日记模板 → 「写今天」预填生效
     await page.getByRole('button', { name: '模板设置' }).click();
     await page.getByLabel('日记模板').fill('自定义模板：第一步：');

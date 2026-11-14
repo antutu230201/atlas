@@ -8,6 +8,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./web": "./src/web/index.tsx",
+    "./web/review-report": "./src/web/review-report.ts",
     "./package.json": "./package.json"
   },
   "files": [

@@ -13,6 +13,7 @@ import {
   useToast,
 } from '@atlas/ui';
 import { api } from '@/lib/api';
+import { buildJournalReportHtml, downloadJournalReport } from './review-report';
 import type { EntryView, JournalSnapshot, YearStats } from '../index';
 
 /**
@@ -628,6 +629,26 @@ export function JournalReviewPage({
                   <span>周报 {data.summary.monthWeekly}</span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    aria-label="下载月度复盘报告"
+                    disabled={snapshot.isPending}
+                    onClick={() => {
+                      if (!data) return;
+                      downloadJournalReport(
+                        `journal_report_${data.month}.html`,
+                        buildJournalReportHtml({
+                          month: data.month,
+                          generatedAt: new Date(),
+                          entries: data.entries,
+                          summary: data.summary,
+                        }),
+                      );
+                    }}
+                  >
+                    报告
+                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"
