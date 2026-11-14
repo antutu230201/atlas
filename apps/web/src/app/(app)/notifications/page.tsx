@@ -3,7 +3,16 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Card, CardContent, EmptyState, Skeleton, useToast } from '@atlas/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  EmptyState,
+  Reveal,
+  Skeleton,
+  useToast,
+} from '@atlas/ui';
 import { api } from '@/lib/api';
 import { useUnreadNotificationCount, type NotificationItem } from '@/lib/queries';
 
@@ -143,39 +152,41 @@ export default function NotificationsPage() {
         ) : null}
       </header>
 
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="通知筛选">
-        {(
-          [
-            { key: 'all', label: '全部' },
-            { key: 'listening', label: '听歌周报' },
-            { key: 'system', label: '系统' },
-          ] as const
-        ).map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            aria-pressed={typeFilter === option.key}
-            onClick={() => changeTypeFilter(option.key)}
-            className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-              typeFilter === option.key
-                ? 'border-primary/40 bg-primary-soft text-primary'
-                : 'border-border bg-surface/60 text-muted hover:text-text'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-        <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted">
-          <input
-            type="checkbox"
-            className="size-3.5 accent-[var(--primary)]"
-            aria-label="只看未读"
-            checked={filter === 'unread'}
-            onChange={(event) => changeFilter(event.target.checked ? 'unread' : 'all')}
-          />
-          只看未读{unread > 0 ? `（${unread}）` : ''}
-        </label>
-      </div>
+      <Reveal index={0}>
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="通知筛选">
+          {(
+            [
+              { key: 'all', label: '全部' },
+              { key: 'listening', label: '听歌周报' },
+              { key: 'system', label: '系统' },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={typeFilter === option.key}
+              onClick={() => changeTypeFilter(option.key)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                typeFilter === option.key
+                  ? 'border-primary/40 bg-primary-soft text-primary'
+                  : 'border-border bg-surface/60 text-muted hover:text-text'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+          <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted">
+            <input
+              type="checkbox"
+              className="size-3.5 accent-[var(--primary)]"
+              aria-label="只看未读"
+              checked={filter === 'unread'}
+              onChange={(event) => changeFilter(event.target.checked ? 'unread' : 'all')}
+            />
+            只看未读{unread > 0 ? `（${unread}）` : ''}
+          </label>
+        </div>
+      </Reveal>
 
       {listQuery.isPending ? (
         <div className="space-y-3">

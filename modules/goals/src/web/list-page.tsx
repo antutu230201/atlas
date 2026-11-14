@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
+  Reveal,
   Input,
   Skeleton,
   Select,
@@ -550,19 +551,23 @@ export function GoalsListPage({
       ) : (
         data && (
           <>
-            <SummaryBanner data={data} />
+            <Reveal index={0}>
+              <SummaryBanner data={data} />
+            </Reveal>
 
             {data.objectives.length > 0 ? (
-              <div className="space-y-3">
-                {data.objectives.map((objective) => (
-                  <ObjectiveCard
-                    key={objective.id}
-                    objective={objective}
-                    busy={busy}
-                    onAction={(action, json) => apply.mutate({ action, json })}
-                  />
-                ))}
-              </div>
+              <Reveal index={1}>
+                <div className="space-y-3">
+                  {data.objectives.map((objective) => (
+                    <ObjectiveCard
+                      key={objective.id}
+                      objective={objective}
+                      busy={busy}
+                      onAction={(action, json) => apply.mutate({ action, json })}
+                    />
+                  ))}
+                </div>
+              </Reveal>
             ) : (
               <div className="screen-card border-dashed p-10 text-center">
                 <p className="text-2xl" aria-hidden>
@@ -576,30 +581,32 @@ export function GoalsListPage({
             )}
 
             {data.archived.length > 0 ? (
-              <section aria-label="已归档" className="screen-card p-3">
-                <p className="screen-label px-1 pb-2 !text-[10px]">已归档</p>
-                <ul className="space-y-1.5">
-                  {data.archived.map((item) => (
-                    <li key={item.id} className="flex items-center gap-2 px-1 text-xs text-muted">
-                      <span aria-hidden>{item.icon}</span>
-                      <span className="flex-1 truncate">{item.title}</span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() =>
-                          apply.mutate({
-                            action: 'restoreObjective',
-                            json: { objectiveId: item.id },
-                          })
-                        }
-                      >
-                        恢复
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+              <Reveal index={2}>
+                <section aria-label="已归档" className="screen-card p-3">
+                  <p className="screen-label px-1 pb-2 !text-[10px]">已归档</p>
+                  <ul className="space-y-1.5">
+                    {data.archived.map((item) => (
+                      <li key={item.id} className="flex items-center gap-2 px-1 text-xs text-muted">
+                        <span aria-hidden>{item.icon}</span>
+                        <span className="flex-1 truncate">{item.title}</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            apply.mutate({
+                              action: 'restoreObjective',
+                              json: { objectiveId: item.id },
+                            })
+                          }
+                        >
+                          恢复
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </Reveal>
             ) : null}
 
             <form

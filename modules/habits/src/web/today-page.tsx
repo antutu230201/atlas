@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Input, Skeleton, useToast } from '@atlas/ui';
+import { Button, Input, Reveal, Skeleton, useToast } from '@atlas/ui';
 import { api } from '@/lib/api';
 import type { HabitsSnapshot } from '../index';
 
@@ -153,66 +153,73 @@ export function HabitsTodayPage({
       ) : (
         data && (
           <>
-            <ProgressBanner data={data} allDone={allDone} />
+            <Reveal index={0}>
+              <ProgressBanner data={data} allDone={allDone} />
+            </Reveal>
 
             {data.habits.length > 0 ? (
-              <ul className="space-y-2.5">
-                {data.habits.map((item) => (
-                  <li
-                    key={item.id}
-                    className={`screen-card flex items-center gap-3 p-3.5 transition-colors ${
-                      item.checkedToday ? '!border-ok/40' : ''
-                    }`}
-                  >
-                    <span
-                      className={`flex size-10 shrink-0 items-center justify-center rounded-sm border text-xl ${
-                        item.checkedToday
-                          ? 'border-ok/30 bg-ok-soft'
-                          : 'border-primary/20 bg-primary-soft'
+              <Reveal index={1}>
+                <ul className="space-y-2.5">
+                  {data.habits.map((item) => (
+                    <li
+                      key={item.id}
+                      className={`screen-card flex items-center gap-3 p-3.5 transition-colors ${
+                        item.checkedToday ? '!border-ok/40' : ''
                       }`}
-                      aria-hidden
                     >
-                      {item.icon}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`truncate text-sm font-medium ${item.checkedToday ? 'text-ok' : 'text-text'}`}
+                      <span
+                        className={`flex size-10 shrink-0 items-center justify-center rounded-sm border text-xl ${
+                          item.checkedToday
+                            ? 'border-ok/30 bg-ok-soft'
+                            : 'border-primary/20 bg-primary-soft'
+                        }`}
+                        aria-hidden
                       >
-                        {item.name}
-                      </p>
-                      <div className="mt-1 flex items-center gap-2.5">
-                        <span className="text-[11px] text-muted" title={`已连续 ${item.streak} 天`}>
-                          🔥 连续 {item.streak} 天
-                        </span>
-                        <WeekDots week={item.week} />
+                        {item.icon}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`truncate text-sm font-medium ${item.checkedToday ? 'text-ok' : 'text-text'}`}
+                        >
+                          {item.name}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2.5">
+                          <span
+                            className="text-[11px] text-muted"
+                            title={`已连续 ${item.streak} 天`}
+                          >
+                            🔥 连续 {item.streak} 天
+                          </span>
+                          <WeekDots week={item.week} />
+                        </div>
                       </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={item.checkedToday ? 'secondary' : 'primary'}
-                      disabled={busy}
-                      loading={busy}
-                      aria-pressed={item.checkedToday}
-                      onClick={() =>
-                        apply.mutate({ action: 'toggleCheck', json: { habitId: item.id } })
-                      }
-                    >
-                      {item.checkedToday ? '已打卡 ✓' : '打卡'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy}
-                      aria-label={`归档习惯 ${item.name}`}
-                      onClick={() =>
-                        apply.mutate({ action: 'archiveHabit', json: { habitId: item.id } })
-                      }
-                    >
-                      归档
-                    </Button>
-                  </li>
-                ))}
-              </ul>
+                      <Button
+                        size="sm"
+                        variant={item.checkedToday ? 'secondary' : 'primary'}
+                        disabled={busy}
+                        loading={busy}
+                        aria-pressed={item.checkedToday}
+                        onClick={() =>
+                          apply.mutate({ action: 'toggleCheck', json: { habitId: item.id } })
+                        }
+                      >
+                        {item.checkedToday ? '已打卡 ✓' : '打卡'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy}
+                        aria-label={`归档习惯 ${item.name}`}
+                        onClick={() =>
+                          apply.mutate({ action: 'archiveHabit', json: { habitId: item.id } })
+                        }
+                      >
+                        归档
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </Reveal>
             ) : (
               <div className="screen-card border-dashed p-10 text-center">
                 <p className="text-2xl" aria-hidden>
