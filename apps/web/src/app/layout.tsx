@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { THEME_INIT_SCRIPT } from '@atlas/tokens';
+import { OfflineBanner } from '@/components/offline-banner';
 import { PwaRegister } from '@/components/pwa-register';
 import { Providers } from './providers';
 import './globals.css';
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         style={{ background: 'var(--bg-gradient)', backgroundAttachment: 'fixed' }}
       >
         <PwaRegister />
+        <OfflineBanner />
         <Providers>{children}</Providers>
       </body>
     </html>
