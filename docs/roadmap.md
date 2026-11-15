@@ -14,7 +14,7 @@
 | 3    | 应用外壳 + 第一个真实模块                                         | ✅ 外壳、待办与笔记、个人大屏、习惯模块已交付                                                                                                                                                                                                          |
 | 4    | 体验打磨（命令面板 / 全局搜索 / 导入导出 / 性能 / 离线 / 无障碍） | ✅ **阶段完成**：搜索 + 导入导出 + Toast + 命令面板；按需分包与滚动性能；全站无障碍复查（56 扫描）；Lighthouse 基线（docs/plans/lighthouse-2026-11-15.md）；10 万级压测（docs/plans/stress-2026-11-15.md）；完整离线（SW 缓存壳 + 离线横幅，e2e 验证） |
 | 5    | AI 能力层（模型适配器 / pgvector 检索 / 工具注册 / 用量）         | 🔨 2026-10-31：AIAdapter 接口 + MockAIProvider + ctx.ai.complete() + ai_usage 追踪表 ✅；真实供应商接入 ⬜（需 API 密钥）                                                                                                                              |
-| 6    | 质量与安全加固（OWASP / 备份演练 / 负载测试）                     | 🔨 2026-10-31：安全响应头 + RLS 两道防线 + 限流 + 输入校验 + 审计 ✅；OWASP 完整审计 / 负载测试 ⬜                                                                                                                                                     |
+| 6    | 质量与安全加固（OWASP / 备份演练 / 负载测试）                     | 🔨 安全响应头 + RLS 两道防线 + 限流 + 输入校验 + 审计 ✅；OWASP Top 10 自审 ✅（docs/plans/owasp-2026-11-15.md，零重大发现 + 2 项加固：API no-store、AI 元数据端点封锁）；依赖审计零漏洞 ✅；多用户并发负载测试 ⬜（单用户 10 万行压测已过）           |
 | 7    | 多租户运营、计费与授权                                            | 🔨 2026-10-31：EntitlementService（hasFeature/getLimit）+ module_install/entitlement 表 ✅；支付回调 / 运营后台 ⬜（需支付通道决策）                                                                                                                   |
 | 8    | 上线与商业化                                                      | ⬜ 需部署环境（云服务器 / 域名 / SSL）；可提前准备 Dockerfile                                                                                                                                                                                          |
 
@@ -891,3 +891,12 @@
 - [x] e2e `offline.spec.ts`：显式注册同一份 public/sw.js（生产由 PwaRegister 自动注册、dev 由测试代管）→ 预热缓存 → 断网刷新（缓存壳 SSR 表单仍可交互）→ 横幅出现 → **断言 API 层不缓存**（断网 fetch /v1/auth/me 必须失败，防敏感数据被缓存误导）→ 恢复在线横幅消失；1.6s 跑完
 - [x] 边界决策：数据级离线队列（IndexedDB 草稿/冲突处理）**明确不做**——按优化计划要求，涉及用户数据的离线缓存需先做隐私/冲突决策，本轮只做展示层离线
 - 验证：全仓 API 187/187、e2e 3/3（app-shell 2 + offline 1）、typecheck/lint/format/build 全绿；浏览器实测横幅元素挂载且默认隐藏（离线时脚本点亮）
+
+### OWASP Top 10 安全自审（2026-11-15 续 13）
+
+- [x] A01–A10 逐项审查，每项结论附代码/测试证据（docs/plans/owasp-2026-11-15.md）：鉴权覆盖（4 控制器整体 Guard + auth 按路由）、SQL 全参数化（12 处 sql`` 模板抽查）、Cookie httpOnly/sameSite/secure、scrypt 密码哈希、登录注册限流、CORS 白名单——**零重大发现**
+- [x] 加固 1：API 响应新增 `Cache-Control: private, no-store`（个人数据不入浏览器/中间层 HTTP 缓存；前端数据缓存由 TanStack Query 负责）——curl 验证生效
+- [x] 加固 2：SSRF 封锁——AI baseUrl 是用户可控的服务端出网目标，新增 `isBlockedAiEndpoint` 封锁云元数据端点（169.254.169.254 / metadata.google.internal / metadata.goog / fd00:ec2::254 + 链路本地段），适配器请求前校验；单测 3 组。**决策记录**：不封 127.0.0.1/局域网（本地 mock/自建代理合法）——多租户售卖前升级出网白名单（写入阶段 7 前置条件）
+- [x] 依赖审计：`pnpm audit --prod`（官方源）**零已知漏洞**（npmmirror 不支持 audit 端点，需指定 --registry）
+- [x] 遗留决策项：HSTS/CSP（随 HTTPS 部署）、全私网出网白名单（多租户前）、限流扩展到模块动作（多租户前）、audit 入 CI（Actions 接入时）
+- 验证：全仓 API **190/190**（+3 SSRF 单测）、e2e 3/3、typecheck/lint/format/build 全绿

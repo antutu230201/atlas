@@ -30,6 +30,33 @@ export interface AIAdapter {
   complete(request: AICompletionRequest): Promise<AICompletionResponse>;
 }
 
+/**
+ * SSRF 加固（OWASP 自审 2026-11-15）：AI baseUrl 是用户可控的服务端出网目标，
+ * 云元数据端点是 SSRF 的头号靶标（窃取主机凭证）。只封此清单 + 链路本地段——
+ * 不封 127.0.0.1/局域网：本地 mock 上游与自建代理是合法用法（单租户自用）。
+ * 多租户售卖前需升级为出网代理 + 全私网段白名单（见 docs/plans/owasp-2026-11-15.md）。
+ */
+const BLOCKED_METADATA_HOSTS = new Set([
+  '169.254.169.254',
+  'metadata.google.internal',
+  'metadata.goog',
+]);
+
+export function isBlockedAiEndpoint(baseUrl: string): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    return false; // URL 本身不合法交给 zod 校验报错
+  }
+  // WHATWG URL 对 IPv6 保留方括号（[fe80::1]），比较前剥离
+  const bare = hostname.startsWith('[') ? hostname.slice(1, -1) : hostname;
+  if (BLOCKED_METADATA_HOSTS.has(bare)) return true;
+  if (bare.startsWith('169.254.')) return true; // AWS/GCP/Azure 链路本地段
+  if (bare.startsWith('fe80:') || bare === 'fd00:ec2::254') return true; // IPv6 链路本地/元数据
+  return false;
+}
+
 /** 本地开发 Mock：返回模板化响应，不调用外部 API */
 export class MockAIProvider implements AIAdapter {
   readonly name = 'ai-mock';
@@ -85,6 +112,9 @@ export class OpenAICompatProvider implements AIAdapter {
 
   async complete(request: AICompletionRequest): Promise<AICompletionResponse> {
     const { baseUrl, apiKey, model, timeoutMs = 30_000 } = this.options;
+    if (isBlockedAiEndpoint(baseUrl)) {
+      throw new Error('AI 供应商地址不允许指向云元数据端点');
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {

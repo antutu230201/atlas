@@ -10,6 +10,10 @@ export class SecurityHeadersMiddleware implements NestMiddleware {
     res.setHeader('X-XSS-Protection', '0');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    // OWASP A05：API 全部是动态且携带个人数据，禁止入浏览器/中间层 HTTP 缓存
+    // （前端数据缓存由 TanStack Query 客户端负责，不受影响）
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Pragma', 'no-cache');
     next();
   }
 }
